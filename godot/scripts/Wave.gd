@@ -63,12 +63,9 @@ func _process(delta: float) -> void:
 
 
 func get_crest_radii() -> Array[float]:
-	var radii: Array[float] = []
-	for i in range(8):
-		var crest_radius := radius - float(i) * crest_spacing
-		if crest_radius > 8.0:
-			radii.append(crest_radius)
-	return radii
+	if radius <= 8.0:
+		return []
+	return [radius]
 
 
 func is_crest_at(global_point: Vector2, margin: float = 0.0) -> bool:
@@ -89,15 +86,42 @@ func crest_closeness(global_point: Vector2) -> float:
 
 func _draw() -> void:
 	var fade := clampf(1.0 - age / lifetime, 0.0, 1.0)
-	for crest_radius in get_crest_radii():
+	var radii := get_crest_radii()
+	for crest_index in range(radii.size()):
+		var crest_radius: float = radii[crest_index]
+		var is_front := crest_index == 0
 		var local_alpha := fade * clampf(crest_radius / 90.0, 0.35, 1.0)
-		var glow_color := color
-		glow_color.a = 0.12 * local_alpha
-		var line_color := color
-		line_color.a = 0.82 * local_alpha
-		var core_color := Color(1.0, 0.92, 1.0, 0.5 * local_alpha)
+		if wave_owner == "enemy":
+			_draw_enemy_crest(crest_radius, crest_index, is_front, local_alpha)
+		else:
+			_draw_player_crest(crest_radius, is_front, local_alpha)
 
-		draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, glow_color, crest_width * 2.8, true)
-		draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, line_color, crest_width, true)
-		draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, core_color, 2.0, true)
+
+func _draw_enemy_crest(crest_radius: float, crest_index: int, is_front: bool, local_alpha: float) -> void:
+	var crest_alpha := (0.96 if is_front else 0.40) * local_alpha
+	var glow_alpha := (0.16 if is_front else 0.05) * local_alpha
+	var crest_color := color
+	crest_color.a = crest_alpha
+	var glow_color := color
+	glow_color.a = glow_alpha
+	var inner_hot := Color(1.0, 0.74, 0.78, (0.62 if is_front else 0.18) * local_alpha)
+
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 192, glow_color, crest_width * (2.2 if is_front else 1.4), true)
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 192, crest_color, crest_width * (1.05 if is_front else 0.65), true)
+	draw_arc(Vector2.ZERO, crest_radius + crest_width * 0.72, 0.0, TAU, 192, inner_hot, 3.0 if is_front else 1.5, true)
+	if is_front:
+		var leading := Color(1.0, 0.16, 0.20, 0.95 * local_alpha)
+		draw_arc(Vector2.ZERO, crest_radius + crest_width * 1.05, 0.0, TAU, 192, leading, 4.0, true)
+
+
+func _draw_player_crest(crest_radius: float, is_front: bool, local_alpha: float) -> void:
+	var glow_color := color
+	glow_color.a = (0.10 if is_front else 0.05) * local_alpha
+	var line_color := color
+	line_color.a = (0.78 if is_front else 0.42) * local_alpha
+	var core_color := Color(0.82, 0.75, 1.0, (0.42 if is_front else 0.20) * local_alpha)
+
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, glow_color, crest_width * 2.0, true)
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, line_color, crest_width * 0.85, true)
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, core_color, 2.0, true)
 

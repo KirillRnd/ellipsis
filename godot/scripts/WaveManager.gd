@@ -8,22 +8,24 @@ const ARENA_RECT := Rect2(Vector2(80, 60), Vector2(1120, 600))
 
 var player
 var waves: Array = []
-var player_wave
+var player_waves: Array = []
 var _last_danger_value := 0
 
 
 func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: Dictionary = {}):
-	if wave_owner == "player" and is_instance_valid(player_wave):
-		player_wave.queue_free()
-		waves.erase(player_wave)
-
 	var wave = WAVE_SCENE.instantiate()
-	add_child(wave)
+	var host := get_parent()
+	if host == null:
+		host = self
+	host.add_child(wave)
+	if host != self:
+		host.move_child(wave, get_index())
+
 	wave.setup(wave_owner, wave_kind, origin, config)
 	wave.expired.connect(_on_wave_expired)
 	waves.append(wave)
 	if wave_owner == "player":
-		player_wave = wave
+		player_waves.append(wave)
 	return wave
 
 
@@ -44,10 +46,18 @@ func get_point_danger(global_point: Vector2) -> int:
 	if enemy_wave == null:
 		return 0
 
-	if is_instance_valid(player_wave) and player_wave.is_crest_at(global_point, 24.0):
-		return _interference_result(global_point, enemy_wave, player_wave)
+	var saw_danger_node := false
+	for counter_wave in player_waves:
+		if not is_instance_valid(counter_wave):
+			continue
+		if not counter_wave.is_crest_at(global_point, 24.0):
+			continue
+		var result := _interference_result(global_point, enemy_wave, counter_wave)
+		if result < 0:
+			return -1
+		saw_danger_node = true
 
-	return 1
+	return 2 if saw_danger_node else 1
 
 
 func _first_enemy_crest_at(global_point: Vector2, margin: float):
@@ -61,19 +71,19 @@ func _first_enemy_crest_at(global_point: Vector2, margin: float):
 
 func _interference_result(global_point: Vector2, enemy_wave, counter_wave) -> int:
 	var mix := sin(global_point.x * 0.025 + global_point.y * 0.019 + enemy_wave.radius * 0.018 - counter_wave.radius * 0.021)
-	if mix > 0.78:
+	if mix > 0.82:
 		return 2
 	return -1
 
 
 func _draw() -> void:
-	if not is_instance_valid(player_wave):
-		return
-
 	for enemy_wave in waves:
 		if not is_instance_valid(enemy_wave) or enemy_wave.wave_owner != "enemy":
 			continue
-		_draw_interference_between(enemy_wave, player_wave)
+		for counter_wave in player_waves:
+			if not is_instance_valid(counter_wave):
+				continue
+			_draw_interference_between(enemy_wave, counter_wave)
 
 
 func _draw_interference_between(enemy_wave, counter_wave) -> void:
@@ -87,7 +97,7 @@ func _draw_interference_between(enemy_wave, counter_wave) -> void:
 					continue
 				var result := _interference_result(point, enemy_wave, counter_wave)
 				if result < 0:
-					_draw_safe_cut(enemy_wave.global_position, enemy_radius, point)
+					_draw_erased_arc(enemy_wave.global_position, enemy_radius, point)
 				else:
 					_draw_danger_node(point)
 
@@ -119,31 +129,33 @@ func _circle_intersections(a: Vector2, ar: float, b: Vector2, br: float) -> Arra
 	return result
 
 
-func _draw_safe_cut(center: Vector2, radius: float, point: Vector2) -> void:
+func _draw_erased_arc(center: Vector2, radius: float, point: Vector2) -> void:
 	var angle := (point - center).angle()
-	var width := 0.22
-	var dark := Color(0.002, 0.006, 0.020, 0.90)
-	var rim := Color(0.12, 0.28, 0.85, 0.55)
-	draw_arc(center, radius, angle - width, angle + width, 24, dark, 34.0, true)
-	draw_arc(center, radius, angle - width, angle + width, 24, rim, 4.0, true)
-	draw_circle(point, 7.0, Color(0.02, 0.06, 0.16, 0.80))
+	var width := 0.30
+	var arena_fill := Color(0.055, 0.052, 0.070, 0.98)
+	var edge := Color(0.12, 0.30, 0.90, 0.70)
+	draw_arc(center, radius, angle - width, angle + width, 32, arena_fill, 54.0, true)
+	draw_arc(center, radius, angle - width, angle + width, 32, edge, 5.0, true)
+	draw_circle(point, 12.0, Color(0.025, 0.035, 0.075, 0.92))
 
 
 func _draw_danger_node(point: Vector2) -> void:
-	draw_circle(point, 30.0, Color(1.0, 0.10, 0.42, 0.20))
-	draw_circle(point, 15.0, Color(1.0, 0.35, 0.62, 0.55))
-	draw_circle(point, 6.0, Color(1.0, 0.92, 0.98, 0.95))
-	draw_line(point + Vector2(-18, 0), point + Vector2(18, 0), Color(1.0, 0.80, 0.95, 0.65), 2.0, true)
-	draw_line(point + Vector2(0, -18), point + Vector2(0, 18), Color(1.0, 0.80, 0.95, 0.65), 2.0, true)
+	draw_circle(point, 26.0, Color(1.0, 0.10, 0.42, 0.18))
+	draw_circle(point, 13.0, Color(1.0, 0.30, 0.58, 0.50))
+	draw_circle(point, 5.0, Color(1.0, 0.92, 0.98, 0.92))
+	draw_line(point + Vector2(-15, 0), point + Vector2(15, 0), Color(1.0, 0.80, 0.95, 0.62), 2.0, true)
+	draw_line(point + Vector2(0, -15), point + Vector2(0, 15), Color(1.0, 0.80, 0.95, 0.62), 2.0, true)
 
 
 func _on_wave_expired(wave) -> void:
 	waves.erase(wave)
-	if wave == player_wave:
-		player_wave = null
+	player_waves.erase(wave)
 
 
 func _cleanup_dead_waves() -> void:
 	for i in range(waves.size() - 1, -1, -1):
 		if not is_instance_valid(waves[i]):
 			waves.remove_at(i)
+	for i in range(player_waves.size() - 1, -1, -1):
+		if not is_instance_valid(player_waves[i]):
+			player_waves.remove_at(i)

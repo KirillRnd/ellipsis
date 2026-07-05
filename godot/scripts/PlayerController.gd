@@ -12,10 +12,12 @@ const DASH_TIME := 0.13
 const DASH_COOLDOWN := 0.55
 const INVULNERABLE_TIME := 1.05
 const FIRE_COOLDOWN := 0.0
+const HELD_FIRE_INTERVAL := 0.22
 
 var hit_points := 100
 var counter_wave_enabled := false
 var _fire_cooldown := 0.0
+var _held_fire_timer := 0.0
 var _dash_time_left := 0.0
 var _dash_cooldown := 0.0
 var _invulnerable_left := 0.0
@@ -49,11 +51,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	global_position = global_position.clamp(ARENA_RECT.position, ARENA_RECT.end)
 
-	var fire_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	if fire_down and not _fire_was_down:
-		_try_fire_counter_wave()
-	_fire_was_down = fire_down
-
+	_update_counter_wave_input(delta)
 	queue_redraw()
 
 
@@ -68,6 +66,21 @@ func _read_move_input() -> Vector2:
 	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
 		dir.y += 1.0
 	return dir.normalized()
+
+
+func _update_counter_wave_input(delta: float) -> void:
+	var fire_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	if fire_down and not _fire_was_down:
+		_try_fire_counter_wave()
+		_held_fire_timer = HELD_FIRE_INTERVAL
+	elif fire_down:
+		_held_fire_timer -= delta
+		while _held_fire_timer <= 0.0:
+			_try_fire_counter_wave()
+			_held_fire_timer += HELD_FIRE_INTERVAL
+	else:
+		_held_fire_timer = 0.0
+	_fire_was_down = fire_down
 
 
 func _try_fire_counter_wave() -> void:
@@ -103,13 +116,12 @@ func _draw() -> void:
 	var blink := is_invulnerable() and int(Time.get_ticks_msec() / 80) % 2 == 0
 	var body_color := Color(0.45, 0.22, 1.0, 0.45 if blink else 1.0)
 	var core_color := Color(0.85, 0.78, 1.0, 0.75 if blink else 1.0)
-	var hitbox_color := Color(0.30, 0.85, 1.0, 0.9)
+	var hitbox_color := Color(0.30, 0.85, 1.0, 0.95)
 
-	draw_circle(Vector2.ZERO, 24.0, Color(0.25, 0.08, 1.0, 0.26))
-	draw_circle(Vector2.ZERO, 12.0, body_color)
+	draw_circle(Vector2.ZERO, 30.0, Color(0.0, 0.0, 0.0, 0.72))
+	draw_circle(Vector2.ZERO, 22.0, Color(0.25, 0.08, 1.0, 0.30))
+	draw_arc(Vector2.ZERO, 14.0, 0.0, TAU, 48, Color(0.95, 0.88, 1.0, 0.90), 3.0, true)
+	draw_circle(Vector2.ZERO, 11.0, body_color)
 	draw_circle(Vector2(0, -3), 5.0, core_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
 	draw_line(Vector2.ZERO, _last_move_dir * 22.0, Color(0.90, 0.82, 1.0, 0.95), 2.0, true)
-
-
-
