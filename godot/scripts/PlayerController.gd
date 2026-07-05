@@ -11,7 +11,7 @@ const DASH_SPEED := 650.0
 const DASH_TIME := 0.13
 const DASH_COOLDOWN := 0.55
 const INVULNERABLE_TIME := 1.05
-const FIRE_COOLDOWN := 0.0
+const FIRE_COOLDOWN := 0.11
 const HELD_FIRE_INTERVAL := 0.22
 
 var hit_points := 100
@@ -125,3 +125,4 @@ func _draw() -> void:
 	draw_circle(Vector2(0, -3), 5.0, core_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
 	draw_line(Vector2.ZERO, _last_move_dir * 22.0, Color(0.90, 0.82, 1.0, 0.95), 2.0, true)
+

@@ -46,18 +46,13 @@ func get_point_danger(global_point: Vector2) -> int:
 	if enemy_wave == null:
 		return 0
 
-	var saw_danger_node := false
 	for counter_wave in player_waves:
 		if not is_instance_valid(counter_wave):
 			continue
-		if not counter_wave.is_crest_at(global_point, 24.0):
-			continue
-		var result := _interference_result(global_point, enemy_wave, counter_wave)
-		if result < 0:
+		if counter_wave.is_crest_at(global_point, 24.0):
 			return -1
-		saw_danger_node = true
 
-	return 2 if saw_danger_node else 1
+	return 1
 
 
 func _first_enemy_crest_at(global_point: Vector2, margin: float):
@@ -69,36 +64,61 @@ func _first_enemy_crest_at(global_point: Vector2, margin: float):
 	return null
 
 
-func _interference_result(global_point: Vector2, enemy_wave, counter_wave) -> int:
-	var mix := sin(global_point.x * 0.025 + global_point.y * 0.019 + enemy_wave.radius * 0.018 - counter_wave.radius * 0.021)
-	if mix > 0.82:
-		return 2
-	return -1
-
-
 func _draw() -> void:
+	_draw_player_erasure()
+	_draw_enemy_interference_nodes()
+
+
+func _draw_player_erasure() -> void:
 	for enemy_wave in waves:
 		if not is_instance_valid(enemy_wave) or enemy_wave.wave_owner != "enemy":
 			continue
 		for counter_wave in player_waves:
 			if not is_instance_valid(counter_wave):
 				continue
-			_draw_interference_between(enemy_wave, counter_wave)
+			_draw_erasure_between(enemy_wave, counter_wave)
 
 
-func _draw_interference_between(enemy_wave, counter_wave) -> void:
+func _draw_enemy_interference_nodes() -> void:
+	var enemies := _enemy_waves()
+	for a_index in range(enemies.size()):
+		var a = enemies[a_index]
+		if not is_instance_valid(a):
+			continue
+		for b_index in range(a_index + 1, enemies.size()):
+			var b = enemies[b_index]
+			if not is_instance_valid(b):
+				continue
+			_draw_nodes_between_enemy_waves(a, b)
+
+
+func _enemy_waves() -> Array:
+	var enemies := []
+	for wave in waves:
+		if is_instance_valid(wave) and wave.wave_owner == "enemy":
+			enemies.append(wave)
+	return enemies
+
+
+func _draw_erasure_between(enemy_wave, counter_wave) -> void:
 	for enemy_radius in enemy_wave.get_crest_radii():
 		for counter_radius in counter_wave.get_crest_radii():
 			if not _circles_can_intersect(enemy_wave.global_position, enemy_radius, counter_wave.global_position, counter_radius):
 				continue
 			var points := _circle_intersections(enemy_wave.global_position, enemy_radius, counter_wave.global_position, counter_radius)
 			for point in points:
-				if not ARENA_RECT.has_point(point):
-					continue
-				var result := _interference_result(point, enemy_wave, counter_wave)
-				if result < 0:
+				if ARENA_RECT.has_point(point):
 					_draw_erased_arc(enemy_wave.global_position, enemy_radius, point)
-				else:
+
+
+func _draw_nodes_between_enemy_waves(a, b) -> void:
+	for a_radius in a.get_crest_radii():
+		for b_radius in b.get_crest_radii():
+			if not _circles_can_intersect(a.global_position, a_radius, b.global_position, b_radius):
+				continue
+			var points := _circle_intersections(a.global_position, a_radius, b.global_position, b_radius)
+			for point in points:
+				if ARENA_RECT.has_point(point):
 					_draw_danger_node(point)
 
 
