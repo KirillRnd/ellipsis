@@ -14,7 +14,7 @@ const INVULNERABLE_TIME := 1.05
 const FIRE_COOLDOWN := 0.11
 const HELD_FIRE_INTERVAL := 0.22
 
-var hit_points := 100
+var hit_points := 30
 var counter_wave_enabled := false
 var _fire_cooldown := 0.0
 var _held_fire_timer := 0.0
@@ -92,10 +92,10 @@ func _try_fire_counter_wave() -> void:
 	fired_counter_wave.emit(global_position)
 
 
-func take_hit() -> void:
+func take_hit(amount: int = 1) -> void:
 	if is_invulnerable():
 		return
-	hit_points -= 1
+	hit_points -= amount
 	_invulnerable_left = INVULNERABLE_TIME
 	hit_points_changed.emit(hit_points)
 	if hit_points <= 0:
@@ -125,4 +125,6 @@ func _draw() -> void:
 	draw_circle(Vector2(0, -3), 5.0, core_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
 	draw_line(Vector2.ZERO, _last_move_dir * 22.0, Color(0.90, 0.82, 1.0, 0.95), 2.0, true)
+
+
 

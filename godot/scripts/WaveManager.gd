@@ -3,18 +3,26 @@ extends Node2D
 
 signal danger_changed(danger_value: int)
 
-const WAVE_SCENE := preload("res://scenes/Wave.tscn")
-const ARENA_RECT := Rect2(Vector2(80, 60), Vector2(1120, 600))
+const WAVE_SCENE = preload("res://scenes/Wave.tscn")
+const ARENA_RECT = Rect2(Vector2(80, 60), Vector2(1120, 600))
+const PLAYER_WAVE_DAMAGE = 1
+const PLAYER_NODE_DAMAGE = 3
+const ENEMY_NODE_DAMAGE = 3
+const NODE_HIT_RADIUS = 26.0
+const MIN_ERASE_SEGMENT = 72.0
+const ERASE_ARC_WIDTH = 0.30
 
 var player
+var emitters: Array = []
 var waves: Array = []
 var player_waves: Array = []
-var _last_danger_value := 0
+var _last_danger_value = 0
+var _boost_damage_marks = {}
 
 
 func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: Dictionary = {}):
 	var wave = WAVE_SCENE.instantiate()
-	var host := get_parent()
+	var host = get_parent()
 	if host == null:
 		host = self
 	host.add_child(wave)
@@ -31,13 +39,14 @@ func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: 
 
 func _process(_delta: float) -> void:
 	_cleanup_dead_waves()
+	_damage_emitters()
 	if is_instance_valid(player):
-		var danger := get_point_danger(player.global_position)
+		var danger = get_point_danger(player.global_position)
 		if danger != _last_danger_value:
 			_last_danger_value = danger
 			danger_changed.emit(danger)
 		if danger > 0:
-			player.take_hit()
+			player.take_hit(danger)
 	queue_redraw()
 
 
@@ -52,6 +61,9 @@ func get_point_danger(global_point: Vector2) -> int:
 		if counter_wave.is_crest_at(global_point, 24.0):
 			return -1
 
+	if _point_on_enemy_interference_node(global_point):
+		return ENEMY_NODE_DAMAGE
+
 	return 1
 
 
@@ -64,9 +76,47 @@ func _first_enemy_crest_at(global_point: Vector2, margin: float):
 	return null
 
 
+func _point_on_enemy_interference_node(global_point: Vector2) -> bool:
+	var enemies = _enemy_waves()
+	for a_index in range(enemies.size()):
+		var a = enemies[a_index]
+		for b_index in range(a_index + 1, enemies.size()):
+			var b = enemies[b_index]
+			for point in _front_intersections(a, b):
+				if ARENA_RECT.has_point(point) and point.distance_to(global_point) <= NODE_HIT_RADIUS:
+					return true
+	return false
+
+
+func _damage_emitters() -> void:
+	for emitter in emitters:
+		if not is_instance_valid(emitter) or not emitter.can_take_damage():
+			continue
+		var emitter_id = emitter.get_instance_id()
+		for wave in player_waves:
+			if not is_instance_valid(wave):
+				continue
+			if wave.damaged_emitters.has(emitter_id):
+				continue
+			if wave.is_crest_at(emitter.global_position, 18.0):
+				wave.damaged_emitters[emitter_id] = true
+				emitter.take_damage(PLAYER_WAVE_DAMAGE)
+
+		for pair in _player_intersection_pairs():
+			var key = "%s:%s:%s" % [pair[0].get_instance_id(), pair[1].get_instance_id(), emitter_id]
+			if _boost_damage_marks.has(key):
+				continue
+			for point in _front_intersections(pair[0], pair[1]):
+				if point.distance_to(emitter.global_position) <= NODE_HIT_RADIUS:
+					_boost_damage_marks[key] = true
+					emitter.take_damage(PLAYER_NODE_DAMAGE)
+					break
+
+
 func _draw() -> void:
 	_draw_player_erasure()
 	_draw_enemy_interference_nodes()
+	_draw_player_interference_nodes()
 
 
 func _draw_player_erasure() -> void:
@@ -80,7 +130,7 @@ func _draw_player_erasure() -> void:
 
 
 func _draw_enemy_interference_nodes() -> void:
-	var enemies := _enemy_waves()
+	var enemies = _enemy_waves()
 	for a_index in range(enemies.size()):
 		var a = enemies[a_index]
 		if not is_instance_valid(a):
@@ -89,11 +139,33 @@ func _draw_enemy_interference_nodes() -> void:
 			var b = enemies[b_index]
 			if not is_instance_valid(b):
 				continue
-			_draw_nodes_between_enemy_waves(a, b)
+			for point in _front_intersections(a, b):
+				if ARENA_RECT.has_point(point):
+					_draw_enemy_danger_node(point)
+
+
+func _draw_player_interference_nodes() -> void:
+	for pair in _player_intersection_pairs():
+		for point in _front_intersections(pair[0], pair[1]):
+			if ARENA_RECT.has_point(point):
+				_draw_player_boost_node(point)
+
+
+func _player_intersection_pairs() -> Array:
+	var result = []
+	for a_index in range(player_waves.size()):
+		var a = player_waves[a_index]
+		if not is_instance_valid(a):
+			continue
+		for b_index in range(a_index + 1, player_waves.size()):
+			var b = player_waves[b_index]
+			if is_instance_valid(b):
+				result.append([a, b])
+	return result
 
 
 func _enemy_waves() -> Array:
-	var enemies := []
+	var enemies = []
 	for wave in waves:
 		if is_instance_valid(wave) and wave.wave_owner == "enemy":
 			enemies.append(wave)
@@ -101,70 +173,137 @@ func _enemy_waves() -> Array:
 
 
 func _draw_erasure_between(enemy_wave, counter_wave) -> void:
-	for enemy_radius in enemy_wave.get_crest_radii():
-		for counter_radius in counter_wave.get_crest_radii():
-			if not _circles_can_intersect(enemy_wave.global_position, enemy_radius, counter_wave.global_position, counter_radius):
-				continue
-			var points := _circle_intersections(enemy_wave.global_position, enemy_radius, counter_wave.global_position, counter_radius)
-			for point in points:
-				if ARENA_RECT.has_point(point):
-					_draw_erased_arc(enemy_wave.global_position, enemy_radius, point)
+	for point in _front_intersections(enemy_wave, counter_wave):
+		if ARENA_RECT.has_point(point):
+			_draw_erased_front(enemy_wave, point)
 
 
-func _draw_nodes_between_enemy_waves(a, b) -> void:
-	for a_radius in a.get_crest_radii():
-		for b_radius in b.get_crest_radii():
-			if not _circles_can_intersect(a.global_position, a_radius, b.global_position, b_radius):
-				continue
-			var points := _circle_intersections(a.global_position, a_radius, b.global_position, b_radius)
-			for point in points:
-				if ARENA_RECT.has_point(point):
-					_draw_danger_node(point)
+func _front_intersections(a, b) -> Array[Vector2]:
+	if not is_instance_valid(a) or not is_instance_valid(b):
+		return []
+	if a.get_crest_radii().is_empty() or b.get_crest_radii().is_empty():
+		return []
+
+	var ar: float = a.get_crest_radii()[0]
+	var br: float = b.get_crest_radii()[0]
+	if a.wave_shape == "circle" and b.wave_shape == "circle":
+		return _circle_intersections(a.global_position, ar, b.global_position, br)
+	if a.wave_shape == "line" and b.wave_shape == "circle":
+		return _line_circle_intersections(a, ar, b, br)
+	if a.wave_shape == "circle" and b.wave_shape == "line":
+		return _line_circle_intersections(b, br, a, ar)
+	return _line_line_intersections(a, ar, b, br)
 
 
 func _circles_can_intersect(a: Vector2, ar: float, b: Vector2, br: float) -> bool:
-	var d := a.distance_to(b)
+	var d = a.distance_to(b)
 	return d > 0.01 and d <= ar + br and d >= absf(ar - br)
 
 
 func _circle_intersections(a: Vector2, ar: float, b: Vector2, br: float) -> Array[Vector2]:
 	var result: Array[Vector2] = []
-	var delta := b - a
-	var d := delta.length()
+	if not _circles_can_intersect(a, ar, b, br):
+		return result
+	var delta = b - a
+	var d = delta.length()
 	if d <= 0.01:
 		return result
 
-	var along := (ar * ar - br * br + d * d) / (2.0 * d)
-	var height_sq := ar * ar - along * along
+	var along = (ar * ar - br * br + d * d) / (2.0 * d)
+	var height_sq = ar * ar - along * along
 	if height_sq < 0.0:
 		return result
 
-	var dir := delta / d
-	var base := a + dir * along
-	var normal := Vector2(-dir.y, dir.x)
-	var height := sqrt(height_sq)
+	var dir = delta / d
+	var base = a + dir * along
+	var normal = Vector2(-dir.y, dir.x)
+	var height = sqrt(height_sq)
 	result.append(base + normal * height)
 	if height > 0.5:
 		result.append(base - normal * height)
 	return result
 
 
+func _line_circle_intersections(line_wave, line_radius: float, circle_wave, circle_radius: float) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	var tangent = Vector2(-line_wave.line_direction.y, line_wave.line_direction.x)
+	var base = line_wave.global_position + line_wave.line_direction * line_radius
+	var offset = base - circle_wave.global_position
+	var side_center = -offset.dot(tangent)
+	var dist_sq = offset.length_squared() - offset.dot(tangent) * offset.dot(tangent)
+	var radius_sq = circle_radius * circle_radius
+	if dist_sq > radius_sq:
+		return result
+	var half_span = sqrt(maxf(0.0, radius_sq - dist_sq))
+	for side in [side_center - half_span, side_center + half_span]:
+		if absf(side) <= line_wave.line_half_length:
+			result.append(base + tangent * side)
+	return result
+
+
+func _line_line_intersections(a, ar: float, b, br: float) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	var a_tangent = Vector2(-a.line_direction.y, a.line_direction.x)
+	var b_tangent = Vector2(-b.line_direction.y, b.line_direction.x)
+	var a_base = a.global_position + a.line_direction * ar
+	var b_base = b.global_position + b.line_direction * br
+	var denom = a_tangent.cross(b_tangent)
+	if absf(denom) < 0.001:
+		return result
+	var delta = b_base - a_base
+	var a_side = delta.cross(b_tangent) / denom
+	var b_side = delta.cross(a_tangent) / denom
+	if absf(a_side) <= a.line_half_length and absf(b_side) <= b.line_half_length:
+		result.append(a_base + a_tangent * a_side)
+	return result
+
+
+func _draw_erased_front(enemy_wave, point: Vector2) -> void:
+	if enemy_wave.wave_shape == "line":
+		_draw_erased_line(enemy_wave, point)
+	else:
+		_draw_erased_arc(enemy_wave.global_position, enemy_wave.radius, point)
+
+
 func _draw_erased_arc(center: Vector2, radius: float, point: Vector2) -> void:
-	var angle := (point - center).angle()
-	var width := 0.30
-	var arena_fill := Color(0.055, 0.052, 0.070, 0.98)
-	var edge := Color(0.12, 0.30, 0.90, 0.70)
-	draw_arc(center, radius, angle - width, angle + width, 32, arena_fill, 54.0, true)
-	draw_arc(center, radius, angle - width, angle + width, 32, edge, 5.0, true)
+	if radius * ERASE_ARC_WIDTH * 2.0 < MIN_ERASE_SEGMENT:
+		return
+	var angle = (point - center).angle()
+	var arena_fill = Color(0.055, 0.052, 0.070, 0.98)
+	var edge = Color(0.12, 0.30, 0.90, 0.70)
+	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, arena_fill, 54.0, true)
+	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, edge, 5.0, true)
 	draw_circle(point, 12.0, Color(0.025, 0.035, 0.075, 0.92))
 
 
-func _draw_danger_node(point: Vector2) -> void:
-	draw_circle(point, 26.0, Color(1.0, 0.10, 0.42, 0.18))
-	draw_circle(point, 13.0, Color(1.0, 0.30, 0.58, 0.50))
-	draw_circle(point, 5.0, Color(1.0, 0.92, 0.98, 0.92))
-	draw_line(point + Vector2(-15, 0), point + Vector2(15, 0), Color(1.0, 0.80, 0.95, 0.62), 2.0, true)
-	draw_line(point + Vector2(0, -15), point + Vector2(0, 15), Color(1.0, 0.80, 0.95, 0.62), 2.0, true)
+func _draw_erased_line(enemy_wave, point: Vector2) -> void:
+	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
+	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
+	var side = (point - base).dot(tangent)
+	var edge_room = enemy_wave.line_half_length - absf(side)
+	if edge_room < MIN_ERASE_SEGMENT * 0.5:
+		return
+	var half_len = 56.0
+	var start = point - tangent * half_len
+	var end = point + tangent * half_len
+	draw_line(start, end, Color(0.055, 0.052, 0.070, 0.98), 54.0, true)
+	draw_line(start, end, Color(0.12, 0.30, 0.90, 0.70), 5.0, true)
+
+
+func _draw_enemy_danger_node(point: Vector2) -> void:
+	draw_circle(point, 30.0, Color(1.0, 0.03, 0.12, 0.22))
+	draw_circle(point, 15.0, Color(1.0, 0.08, 0.18, 0.62))
+	draw_circle(point, 6.0, Color(1.0, 0.90, 0.92, 0.95))
+	draw_line(point + Vector2(-17, 0), point + Vector2(17, 0), Color(1.0, 0.68, 0.72, 0.72), 2.0, true)
+	draw_line(point + Vector2(0, -17), point + Vector2(0, 17), Color(1.0, 0.68, 0.72, 0.72), 2.0, true)
+
+
+func _draw_player_boost_node(point: Vector2) -> void:
+	draw_circle(point, 28.0, Color(0.10, 0.45, 1.0, 0.22))
+	draw_circle(point, 14.0, Color(0.24, 0.72, 1.0, 0.58))
+	draw_circle(point, 5.0, Color(0.88, 0.98, 1.0, 0.95))
+	draw_line(point + Vector2(-16, 0), point + Vector2(16, 0), Color(0.72, 0.94, 1.0, 0.72), 2.0, true)
+	draw_line(point + Vector2(0, -16), point + Vector2(0, 16), Color(0.72, 0.94, 1.0, 0.72), 2.0, true)
 
 
 func _on_wave_expired(wave) -> void:
@@ -179,3 +318,5 @@ func _cleanup_dead_waves() -> void:
 	for i in range(player_waves.size() - 1, -1, -1):
 		if not is_instance_valid(player_waves[i]):
 			player_waves.remove_at(i)
+
+

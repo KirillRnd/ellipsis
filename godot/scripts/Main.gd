@@ -1,7 +1,9 @@
 extends Node2D
 
 const BATTLE_LENGTH := 90.0
-const GAME_SPEED := 0.5
+const GAME_SPEED := 0.333333
+const KILLS_TO_WIN := 3
+const NEXT_EMITTER_DELAY := 2.0
 
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
@@ -13,7 +15,10 @@ const GAME_SPEED := 0.5
 
 var _state := "combat"
 var _elapsed := 0.0
+var _kills := 0
+var _next_emitter_index := 1
 var _restart_was_down := false
+var _scheduled_active_times: Array = []
 var _timer_label: Label
 var _hp_label: Label
 var _status_label: Label
@@ -23,13 +28,18 @@ var _hint_label: Label
 func _ready() -> void:
 	Engine.time_scale = GAME_SPEED
 	wave_manager.player = player
+	wave_manager.emitters = emitters
 	player.fired_counter_wave.connect(_on_player_fired_counter_wave)
 	player.hit_points_changed.connect(_on_player_hit_points_changed)
 	player.died.connect(_on_player_died)
 	wave_manager.danger_changed.connect(_on_danger_changed)
 
-	for emitter in emitters:
+	_scheduled_active_times.clear()
+	for i in range(emitters.size()):
+		var emitter = emitters[i]
 		emitter.wave_manager = wave_manager
+		_scheduled_active_times.append(emitter.active_at)
+		emitter.defeated.connect(_on_emitter_defeated)
 
 	_create_ui()
 	_update_ui()
@@ -44,10 +54,6 @@ func _process(delta: float) -> void:
 	_elapsed += delta
 	player.counter_wave_enabled = true
 	_update_emitters(true)
-
-	if _elapsed >= BATTLE_LENGTH:
-		_set_state("victory")
-
 	_update_ui()
 
 
@@ -71,11 +77,37 @@ func _on_player_fired_counter_wave(origin: Vector2) -> void:
 
 func _on_player_hit_points_changed(hit_points: int) -> void:
 	if is_instance_valid(_hp_label):
-		_hp_label.text = "HP %d/100" % max(hit_points, 0)
+		_hp_label.text = "HP %d/30" % max(hit_points, 0)
 
 
 func _on_player_died() -> void:
 	_set_state("defeat")
+
+
+func _on_emitter_defeated(_emitter) -> void:
+	if _state != "combat":
+		return
+	_kills += 1
+	if _kills >= KILLS_TO_WIN:
+		_set_state("victory")
+		return
+	_accelerate_next_scheduled_emitter()
+	_status_label.text = "TARGET DOWN"
+	_update_ui()
+
+
+func _accelerate_next_scheduled_emitter() -> void:
+	while _next_emitter_index < emitters.size():
+		var next_emitter = emitters[_next_emitter_index]
+		if not is_instance_valid(next_emitter) or next_emitter.is_destroyed():
+			_next_emitter_index += 1
+			continue
+		if _elapsed >= next_emitter.active_at:
+			_next_emitter_index += 1
+			continue
+		next_emitter.active_at = minf(next_emitter.active_at, _elapsed + NEXT_EMITTER_DELAY)
+		_next_emitter_index += 1
+		return
 
 
 func _on_danger_changed(danger_value: int) -> void:
@@ -94,7 +126,7 @@ func _set_state(new_state: String) -> void:
 	player.counter_wave_enabled = false
 	if _state == "victory":
 		_status_label.text = "VICTORY"
-		_hint_label.text = "90 seconds survived. Press R to restart."
+		_hint_label.text = "3 emitters defeated. Press R to restart."
 	elif _state == "defeat":
 		_status_label.text = "DEFEAT"
 		_hint_label.text = "All HP lost. Press R to restart."
@@ -130,19 +162,16 @@ func _create_ui() -> void:
 
 func _update_ui() -> void:
 	var time_left := maxf(0.0, BATTLE_LENGTH - _elapsed)
-	_timer_label.text = "TIME %05.1f" % time_left
+	_timer_label.text = "TIME %05.1f  KILLS %d/%d" % [time_left, _kills, KILLS_TO_WIN]
 
 	if _state == "combat":
 		if not player.counter_wave_enabled:
 			_status_label.text = "SURVIVE"
-			_hint_label.text = "WASD move  |  Space dash  |  LMB counter wave"
+			_hint_label.text = "WASD move | Space dash | LMB click: wave, hold: cascade | R restart"
 		elif player.get_cooldown_ratio() > 0.0:
 			_status_label.text = "RECHARGING"
-			_hint_label.text = "LMB sends a violet counter wave. R restarts."
+			_hint_label.text = "WASD move | Space dash | LMB click: wave, hold: cascade | R restart"
 		else:
 			_status_label.text = "COUNTER READY"
-			_hint_label.text = "LMB to cut safe lanes through enemy crests. R restarts."
-
-
-
+			_hint_label.text = "WASD move | Space dash | LMB click: wave, hold: cascade | R restart"
 
