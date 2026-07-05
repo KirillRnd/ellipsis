@@ -1,0 +1,27 @@
+# Godot editor and import cache
+godot/.godot/
+godot/.import/
+godot/imported/
+godot/export.cfg
+
+# Godot exports and generated packages
+godot/export/
+godot/exports/
+godot/build/
+godot/builds/
+godot/*.apk
+godot/*.aab
+godot/*.ipa
+godot/*.pck
+godot/*.zip
+godot/*.exe
+godot/*.x86_64
+godot/*.arm64
+
+# Local Godot editor binaries
+godot_exe/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
