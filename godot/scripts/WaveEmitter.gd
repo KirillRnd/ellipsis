@@ -13,6 +13,9 @@ const TELEGRAPH_TIME := 0.55
 const RED_REACH_RADIUS := Wave.RED_MAX_RADIUS
 const GOLD_REACH_LENGTH := Wave.GOLD_MAX_RADIUS
 const GOLD_REACH_HALF_WIDTH := Wave.GOLD_LINE_HALF_LENGTH
+const HITBOX_RADIUS := 7.0
+const HITBOX_DOT_RADIUS := 5.0
+const TIMER_BAR_HEIGHT := 7.0
 const RED_EMITTER_TEXTURE := preload("res://assets/actors/emitter_red_base.png")
 const GOLD_BOSS_TEXTURE := preload("res://assets/actors/boss_golden_knight_topdown.png")
 
@@ -88,27 +91,12 @@ func _draw() -> void:
 	if active and _cooldown <= TELEGRAPH_TIME:
 		charge = 1.0 - clampf(_cooldown / TELEGRAPH_TIME, 0.0, 1.0)
 
-	var body := Color(0.040, 0.035, 0.050, 1.0)
-	var rim := Color(0.24, 0.22, 0.30, 0.80 * alpha)
-	var core := base_color
-	core.a = alpha
-	var glow := base_color
-	glow.a = (0.16 + charge * 0.22) * alpha
-	var charge_color := base_color
-	charge_color.a = charge * 0.85
-
 	_draw_damage_reach(base_color, active)
-	draw_circle(Vector2.ZERO, 42.0 + charge * 13.0, glow)
-	draw_circle(Vector2.ZERO, 25.0, body)
 	_draw_sprite_body(alpha)
-	draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 72, rim, 5.0, true)
-	draw_circle(Vector2.ZERO, 11.0 + charge * 3.0, core)
-	if active:
-		draw_arc(Vector2.ZERO, 34.0 + charge * 16.0, 0.0, TAU, 96, charge_color, 4.0 + charge * 3.0, true)
-		draw_arc(Vector2.ZERO, 17.0, -PI * 0.5, -PI * 0.5 + TAU * charge, 48, Color(1.0, 0.86, 0.86, 0.8 * charge), 3.0, true)
 	if _hit_flash > 0.0:
-		draw_circle(Vector2.ZERO, 31.0, Color(0.80, 0.92, 1.0, 0.55))
-	draw_line(Vector2(-15, 18), Vector2(15, 18), Color(0.28, 0.26, 0.34, 0.95), 6.0, true)
+		draw_arc(Vector2.ZERO, HITBOX_RADIUS + 8.0, 0.0, TAU, 48, Color(0.80, 0.92, 1.0, 0.70), 3.0, true)
+	_draw_hitbox(base_color, alpha)
+	_draw_wave_timer(base_color, active, charge)
 	_draw_hp_bar()
 
 
@@ -145,6 +133,37 @@ func _draw_sprite_body(alpha: float) -> void:
 	var texture = GOLD_BOSS_TEXTURE if wave_kind == "gold" else RED_EMITTER_TEXTURE
 	var size := Vector2(76, 76) if wave_kind == "gold" else Vector2(68, 68)
 	draw_texture_rect(texture, Rect2(-size * 0.5, size), false, Color(1.0, 1.0, 1.0, alpha))
+
+
+func _draw_hitbox(base_color: Color, alpha: float) -> void:
+	var visibility := maxf(alpha, 0.42)
+	var fill := base_color.lerp(Color.WHITE, 0.35)
+	fill.a = 0.72 * visibility
+	var edge := base_color.lerp(Color.WHITE, 0.20)
+	edge.a = 0.95 * visibility
+	draw_circle(Vector2.ZERO, HITBOX_DOT_RADIUS, fill)
+	draw_arc(Vector2.ZERO, HITBOX_RADIUS, 0.0, TAU, 48, edge, 2.0, true)
+
+
+func _draw_wave_timer(base_color: Color, active: bool, charge: float) -> void:
+	var width := 76.0 if wave_kind == "red" else 96.0
+	var pos := Vector2(-width * 0.5, -55.0)
+	var bg := Rect2(pos, Vector2(width, TIMER_BAR_HEIGHT))
+	draw_rect(bg, Color(0.02, 0.015, 0.025, 0.88))
+
+	if active and interval > 0.0:
+		var ready := 1.0 - clampf(_cooldown / interval, 0.0, 1.0)
+		var fill := base_color.lerp(Color.WHITE, 0.45 * charge)
+		fill.a = 0.88
+		draw_rect(Rect2(pos + Vector2(1.0, 1.0), Vector2((width - 2.0) * ready, TIMER_BAR_HEIGHT - 2.0)), fill)
+		if charge > 0.0:
+			var alert := Color(1.0, 1.0, 1.0, 0.45 * charge)
+			draw_rect(Rect2(pos + Vector2(1.0, 1.0), Vector2(width - 2.0, TIMER_BAR_HEIGHT - 2.0)), alert, false, 1.0)
+
+	for tick in range(1, 4):
+		var x := pos.x + width * float(tick) / 4.0
+		draw_line(Vector2(x, pos.y + 1.0), Vector2(x, pos.y + TIMER_BAR_HEIGHT - 1.0), Color(0.92, 0.88, 0.82, 0.24), 1.0, false)
+	draw_rect(bg, Color(0.92, 0.88, 0.82, 0.55 if active else 0.22), false, 1.0)
 
 
 func _draw_hp_bar() -> void:
