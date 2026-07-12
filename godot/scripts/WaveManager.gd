@@ -9,6 +9,7 @@ const PLAYER_WAVE_DAMAGE = 1
 const PLAYER_NODE_DAMAGE = 3
 const ENEMY_NODE_DAMAGE = 3
 const NODE_HIT_RADIUS = 26.0
+const EMITTER_HITBOX_RADIUS := WaveEmitter.HITBOX_RADIUS
 const MIN_ERASE_SEGMENT = 72.0
 const ERASE_ARC_WIDTH = 0.30
 
@@ -98,7 +99,7 @@ func _damage_emitters() -> void:
 				continue
 			if wave.damaged_emitters.has(emitter_id):
 				continue
-			if wave.is_crest_at(emitter.global_position, 18.0):
+			if wave.is_crest_at(emitter.global_position, EMITTER_HITBOX_RADIUS):
 				wave.damaged_emitters[emitter_id] = true
 				emitter.take_damage(PLAYER_WAVE_DAMAGE)
 
@@ -107,7 +108,7 @@ func _damage_emitters() -> void:
 			if _boost_damage_marks.has(key):
 				continue
 			for point in _front_intersections(pair[0], pair[1]):
-				if point.distance_to(emitter.global_position) <= NODE_HIT_RADIUS:
+				if point.distance_to(emitter.global_position) <= EMITTER_HITBOX_RADIUS:
 					_boost_damage_marks[key] = true
 					emitter.take_damage(PLAYER_NODE_DAMAGE)
 					break
