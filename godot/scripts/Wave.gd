@@ -7,6 +7,7 @@ const PLAYER_MAX_RADIUS := 300.0
 const RED_MAX_RADIUS := 425.0
 const GOLD_MAX_RADIUS := 430.0
 const GOLD_LINE_HALF_LENGTH := 700.0
+const SHARED_CREST_WIDTH := 14.0
 
 var wave_owner := "enemy"
 var wave_kind := "red"
@@ -38,7 +39,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		speed = 255.0
 		lifetime = 2.35
 		crest_spacing = 42.0
-		crest_width = 14.0
+		crest_width = SHARED_CREST_WIDTH
 		max_radius = PLAYER_MAX_RADIUS
 		phase = PI
 	elif wave_kind == "gold":
@@ -47,7 +48,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		speed = 105.0
 		lifetime = 8.0
 		crest_spacing = 70.0
-		crest_width = 16.0
+		crest_width = SHARED_CREST_WIDTH
 		max_radius = GOLD_MAX_RADIUS
 		line_half_length = GOLD_LINE_HALF_LENGTH
 		phase = PI * 0.35
@@ -56,7 +57,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		speed = 118.0
 		lifetime = 7.2
 		crest_spacing = 56.0
-		crest_width = 12.0
+		crest_width = SHARED_CREST_WIDTH
 		max_radius = RED_MAX_RADIUS
 		phase = 0.0
 
@@ -135,28 +136,23 @@ func _draw() -> void:
 			_draw_player_crest(crest_radius, is_front, local_alpha)
 
 
-func _draw_enemy_front(crest_radius: float, crest_index: int, is_front: bool, local_alpha: float) -> void:
+func _draw_enemy_front(crest_radius: float, _crest_index: int, is_front: bool, local_alpha: float) -> void:
 	if wave_shape == "line":
 		_draw_enemy_line_front(crest_radius, is_front, local_alpha)
 	else:
-		_draw_enemy_circle_front(crest_radius, crest_index, is_front, local_alpha)
+		_draw_circle_crest(crest_radius, is_front, local_alpha)
 
 
-func _draw_enemy_circle_front(crest_radius: float, crest_index: int, is_front: bool, local_alpha: float) -> void:
-	var crest_alpha := (0.96 if is_front else 0.40) * local_alpha
-	var glow_alpha := (0.16 if is_front else 0.05) * local_alpha
-	var crest_color := color
-	crest_color.a = crest_alpha
+func _draw_circle_crest(crest_radius: float, is_front: bool, local_alpha: float) -> void:
 	var glow_color := color
-	glow_color.a = glow_alpha
-	var inner_hot := Color(1.0, 0.74, 0.78, (0.62 if is_front else 0.18) * local_alpha)
+	glow_color.a = (0.10 if is_front else 0.05) * local_alpha
+	var line_color := color
+	line_color.a = (0.78 if is_front else 0.42) * local_alpha
+	var core_color := _crest_core_color(local_alpha, is_front)
 
-	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 192, glow_color, crest_width * (2.2 if is_front else 1.4), true)
-	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 192, crest_color, crest_width * (1.05 if is_front else 0.65), true)
-	draw_arc(Vector2.ZERO, crest_radius + crest_width * 0.72, 0.0, TAU, 192, inner_hot, 3.0 if is_front else 1.5, true)
-	if is_front:
-		var leading := Color(1.0, 0.16, 0.20, 0.95 * local_alpha)
-		draw_arc(Vector2.ZERO, crest_radius + crest_width * 1.05, 0.0, TAU, 192, leading, 4.0, true)
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, glow_color, crest_width * 2.0, true)
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, line_color, crest_width * 0.85, true)
+	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, core_color, 2.0, true)
 
 
 func _draw_enemy_line_front(crest_radius: float, is_front: bool, local_alpha: float) -> void:
@@ -165,23 +161,21 @@ func _draw_enemy_line_front(crest_radius: float, is_front: bool, local_alpha: fl
 	var start := center - tangent * line_half_length
 	var end := center + tangent * line_half_length
 	var glow_color := color
-	glow_color.a = 0.15 * local_alpha
-	var line_color := color
-	line_color.a = 0.92 * local_alpha
-	var hot := Color(1.0, 0.94, 0.72, 0.72 * local_alpha)
-
-	draw_line(start, end, glow_color, crest_width * 3.0, true)
-	draw_line(start, end, line_color, crest_width * 1.15, true)
-	draw_line(start, end, hot, 3.5, true)
-
-
-func _draw_player_crest(crest_radius: float, is_front: bool, local_alpha: float) -> void:
-	var glow_color := color
 	glow_color.a = (0.10 if is_front else 0.05) * local_alpha
 	var line_color := color
 	line_color.a = (0.78 if is_front else 0.42) * local_alpha
-	var core_color := Color(0.82, 0.75, 1.0, (0.42 if is_front else 0.20) * local_alpha)
+	var core_color := _crest_core_color(local_alpha, is_front)
 
-	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, glow_color, crest_width * 2.0, true)
-	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, line_color, crest_width * 0.85, true)
-	draw_arc(Vector2.ZERO, crest_radius, 0.0, TAU, 160, core_color, 2.0, true)
+	draw_line(start, end, glow_color, crest_width * 2.0, true)
+	draw_line(start, end, line_color, crest_width * 0.85, true)
+	draw_line(start, end, core_color, 2.0, true)
+
+
+func _draw_player_crest(crest_radius: float, is_front: bool, local_alpha: float) -> void:
+	_draw_circle_crest(crest_radius, is_front, local_alpha)
+
+
+func _crest_core_color(local_alpha: float, is_front: bool) -> Color:
+	var core_color := color.lerp(Color.WHITE, 0.68)
+	core_color.a = (0.42 if is_front else 0.20) * local_alpha
+	return core_color
