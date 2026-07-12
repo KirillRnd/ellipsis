@@ -25,3 +25,7 @@ godot_exe/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Local generated build artifacts
+/build/
+godot_export_templates/
