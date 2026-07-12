@@ -97,6 +97,8 @@ func _damage_emitters() -> void:
 		for wave in player_waves:
 			if not is_instance_valid(wave):
 				continue
+			if not wave.can_damage_emitters:
+				continue
 			if wave.damaged_emitters.has(emitter_id):
 				continue
 			if wave.is_crest_at(emitter.global_position, EMITTER_HITBOX_RADIUS):
@@ -156,11 +158,11 @@ func _player_intersection_pairs() -> Array:
 	var result = []
 	for a_index in range(player_waves.size()):
 		var a = player_waves[a_index]
-		if not is_instance_valid(a):
+		if not is_instance_valid(a) or not a.can_create_boost:
 			continue
 		for b_index in range(a_index + 1, player_waves.size()):
 			var b = player_waves[b_index]
-			if is_instance_valid(b):
+			if is_instance_valid(b) and b.can_create_boost:
 				result.append([a, b])
 	return result
 

@@ -7,6 +7,10 @@ const NEXT_EMITTER_DELAY := 2.0
 const HUD_TOP_Y := 8.0
 const HUD_SECOND_Y := 34.0
 const HUD_BOTTOM_Y := 674.0
+const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
+const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
+const BLUE_BEACON_POSITION := Vector2(305, 515)
+const RESONATOR_PLACE_RANGE := 190.0
 
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
@@ -21,7 +25,10 @@ var _elapsed := 0.0
 var _kills := 0
 var _next_emitter_index := 1
 var _restart_was_down := false
+var _resonator_was_down := false
 var _scheduled_active_times: Array = []
+var _blue_beacon
+var _resonator
 var _timer_label: Label
 var _hp_label: Label
 var _status_label: Label
@@ -44,6 +51,7 @@ func _ready() -> void:
 		_scheduled_active_times.append(emitter.active_at)
 		emitter.defeated.connect(_on_emitter_defeated)
 
+	_create_blue_beacon()
 	_create_ui()
 	_update_ui()
 
@@ -52,11 +60,14 @@ func _process(delta: float) -> void:
 	_handle_restart()
 	if _state != "combat":
 		_update_emitters(false)
+		_update_blue_beacon(false)
 		return
 
 	_elapsed += delta
 	player.counter_wave_enabled = true
 	_update_emitters(true)
+	_update_blue_beacon(true)
+	_handle_resonator_input()
 	_update_ui()
 
 
@@ -73,9 +84,69 @@ func _update_emitters(running: bool) -> void:
 		emitter.combat_running = running
 
 
+func _update_blue_beacon(running: bool) -> void:
+	if not is_instance_valid(_blue_beacon):
+		return
+	_blue_beacon.combat_time = _elapsed
+	_blue_beacon.combat_running = running
+
+
+func _create_blue_beacon() -> void:
+	_blue_beacon = BLUE_BEACON_SCRIPT.new()
+	_blue_beacon.name = "BlueBeacon"
+	_blue_beacon.global_position = BLUE_BEACON_POSITION
+	_blue_beacon.fired_friendly_wave.connect(_on_blue_beacon_fired)
+	add_child(_blue_beacon)
+
+
 func _on_player_fired_counter_wave(origin: Vector2) -> void:
 	wave_manager.spawn_wave("player", "violet", origin)
+	if is_instance_valid(_resonator):
+		wave_manager.spawn_wave("player", "resonator", _resonator.global_position)
+		_resonator.trigger()
 	_status_label.text = "COUNTER WAVE"
+
+
+func _on_blue_beacon_fired(origin: Vector2) -> void:
+	wave_manager.spawn_wave("player", "blue", origin, {
+		"speed": 190.0,
+		"lifetime": 2.6,
+		"max_radius": Wave.RED_MAX_RADIUS,
+		"can_damage_emitters": false,
+		"can_create_boost": false,
+	})
+	_status_label.text = "BLUE SOURCE"
+
+
+func _handle_resonator_input() -> void:
+	var resonator_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	if resonator_down and not _resonator_was_down:
+		_place_resonator(_get_resonator_target_position())
+	_resonator_was_down = resonator_down
+
+
+func _get_resonator_target_position() -> Vector2:
+	var target: Vector2 = get_global_mouse_position()
+	var offset: Vector2 = target - player.global_position
+	if offset.length() > RESONATOR_PLACE_RANGE:
+		target = player.global_position + offset.normalized() * RESONATOR_PLACE_RANGE
+	return target.clamp(PlayerController.ARENA_RECT.position, PlayerController.ARENA_RECT.end)
+
+
+func _place_resonator(target: Vector2) -> void:
+	if is_instance_valid(_resonator):
+		_resonator.queue_free()
+	_resonator = RESONATOR_SCRIPT.new()
+	_resonator.name = "Resonator"
+	_resonator.global_position = target
+	_resonator.expired.connect(_on_resonator_expired)
+	add_child(_resonator)
+	_status_label.text = "RESONATOR SET"
+
+
+func _on_resonator_expired(resonator) -> void:
+	if resonator == _resonator:
+		_resonator = null
 
 
 func _on_player_hit_points_changed(hit_points: int) -> void:
@@ -170,11 +241,11 @@ func _update_ui() -> void:
 	if _state == "combat":
 		if not player.counter_wave_enabled:
 			_status_label.text = "SURVIVE"
-			_hint_label.text = "WASD move | Space dash | LMB click: wave, hold: cascade | R restart"
+			_hint_label.text = "WASD move | Space dash | LMB wave, hold cascade | RMB resonator | R restart"
 		elif player.get_cooldown_ratio() > 0.0:
 			_status_label.text = "RECHARGING"
-			_hint_label.text = "WASD move | Space dash | LMB click: wave, hold: cascade | R restart"
+			_hint_label.text = "WASD move | Space dash | LMB wave, hold cascade | RMB resonator | R restart"
 		else:
 			_status_label.text = "COUNTER READY"
-			_hint_label.text = "WASD move | Space dash | LMB click: wave, hold: cascade | R restart"
+			_hint_label.text = "WASD move | Space dash | LMB wave, hold cascade | RMB resonator | R restart"
 
