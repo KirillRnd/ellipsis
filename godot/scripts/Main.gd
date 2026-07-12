@@ -8,11 +8,36 @@ const DEFAULT_NEXT_EMITTER_DELAY := 2.0
 const HUD_TOP_Y := 8.0
 const HUD_SECOND_Y := 34.0
 const HUD_BOTTOM_Y := 674.0
+const HUD_TIMER_RECT := Rect2(Vector2(24, HUD_TOP_Y), Vector2(330, 28))
+const HUD_CENTER_LABEL_RECT := Rect2(Vector2(360, HUD_TOP_Y), Vector2(560, 36))
+const HUD_CONTROLS_RECT := Rect2(Vector2(70, HUD_BOTTOM_Y), Vector2(1140, 40))
+const HINT_POPUP_SIZE := Vector2(760, 210)
 const ENCOUNTER_CATALOG := preload("res://scripts/EncounterCatalog.gd")
 const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
 const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
 const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
+const DEFAULT_LANGUAGE := "ru"
+const SUPPORTED_LANGUAGES := ["ru", "en"]
+const UI_TEXT := {
+	"blue_source": {"en": "BLUE SOURCE", "ru": "СИНИЙ ИСТОЧНИК"},
+	"controls": {"en": "WASD move | Space dash | LMB wave | RMB resonator | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ волна | ПКМ резонатор | N/P комнаты | F2 язык | R повтор"},
+	"counter_ready": {"en": "COUNTER READY", "ru": "КОНТРВОЛНА ГОТОВА"},
+	"counter_wave": {"en": "COUNTER WAVE", "ru": "КОНТРВОЛНА"},
+	"danger_node": {"en": "DANGER NODE", "ru": "ОПАСНЫЙ УЗЕЛ"},
+	"defeat": {"en": "DEFEAT", "ru": "ПОРАЖЕНИЕ"},
+	"demo_clear": {"en": "DEMO CLEAR", "ru": "ДЕМО ПРОЙДЕНО"},
+	"exit_open": {"en": "EXIT OPEN", "ru": "ВЫХОД ОТКРЫТ"},
+	"hp": {"en": "HP %d/30", "ru": "HP %d/30"},
+	"hint_popup_footer": {"en": "Move, click, or wait to close", "ru": "Двигайся, кликни или подожди, чтобы закрыть"},
+	"recharging": {"en": "RECHARGING", "ru": "ПЕРЕЗАРЯДКА"},
+	"resonator_set": {"en": "RESONATOR SET", "ru": "РЕЗОНАТОР ПОСТАВЛЕН"},
+	"room_clear_timer": {"en": "ROOM %d/%d  KILLS %d/%d", "ru": "КОМ %d/%d  ЦЕЛИ %d/%d"},
+	"room_timer": {"en": "ROOM %d/%d  TIME %05.1f  KILLS %d/%d", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ЦЕЛИ %d/%d"},
+	"safe_lane": {"en": "SAFE LANE", "ru": "БЕЗОПАСНЫЙ ПРОХОД"},
+	"survive": {"en": "SURVIVE", "ru": "ВЫЖИВАЙ"},
+	"target_down": {"en": "TARGET DOWN", "ru": "ЦЕЛЬ УНИЧТОЖЕНА"},
+}
 
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
@@ -25,6 +50,8 @@ var _encounter_index := 0
 var _restart_was_down := false
 var _next_room_was_down := false
 var _previous_room_was_down := false
+var _language_was_down := false
+var _language := DEFAULT_LANGUAGE
 var _resonator_was_down := false
 var _dungeon_sequence: Array[String] = []
 var _current_encounter := {}
@@ -42,6 +69,11 @@ var _exit_trigger_rect := Rect2()
 var _exit_door_rect := Rect2()
 var _exit_door_color := Color(0.22, 0.86, 1.0, 0.78)
 var _door_visual: ColorRect
+var _hint_popup: Panel
+var _hint_popup_title: Label
+var _hint_popup_body: Label
+var _hint_popup_footer: Label
+var _hint_popup_left := 0.0
 var _timer_label: Label
 var _hp_label: Label
 var _status_label: Label
@@ -87,6 +119,7 @@ func _load_encounter(index: int) -> void:
 		emitter.defeated.connect(_on_emitter_defeated)
 
 	_create_blue_beacon(_current_encounter.get("blue_beacon", {}))
+	_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
 	_update_ui()
 
 
@@ -140,6 +173,8 @@ func _create_emitters(emitter_configs: Array) -> void:
 func _process(delta: float) -> void:
 	_handle_restart()
 	_handle_debug_room_navigation()
+	_handle_language_toggle()
+	_update_room_hint_popup(delta)
 	if _state == "room_clear":
 		_update_emitters(false)
 		_update_blue_beacon(false)
@@ -178,6 +213,29 @@ func _handle_debug_room_navigation() -> void:
 	_previous_room_was_down = previous_down
 
 
+func _handle_language_toggle() -> void:
+	var language_down := Input.is_key_pressed(KEY_F2)
+	if language_down and not _language_was_down:
+		_cycle_language()
+	_language_was_down = language_down
+
+
+func _cycle_language() -> void:
+	var current_index := SUPPORTED_LANGUAGES.find(_language)
+	if current_index < 0:
+		current_index = 0
+	_language = SUPPORTED_LANGUAGES[(current_index + 1) % SUPPORTED_LANGUAGES.size()]
+	_refresh_visible_text()
+
+
+func _refresh_visible_text() -> void:
+	if is_instance_valid(_hint_popup_footer):
+		_hint_popup_footer.text = _t("hint_popup_footer")
+	if is_instance_valid(_hint_popup) and _hint_popup.visible:
+		_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
+	_update_ui()
+
+
 func _handle_room_exit() -> void:
 	if not _exit_unlocked:
 		return
@@ -196,8 +254,8 @@ func _unlock_exit() -> void:
 	_update_blue_beacon(false)
 	wave_manager.clear_all_waves()
 	_show_exit_door(true)
-	_status_label.text = "EXIT OPEN"
-	_hint_label.text = "Go north through the open door | N/P debug rooms | R retry room"
+	_status_label.text = _t("exit_open")
+	_set_controls_text()
 
 
 func _create_exit_door_visual() -> void:
@@ -246,12 +304,12 @@ func _on_player_fired_counter_wave(origin: Vector2) -> void:
 	if is_instance_valid(_resonator):
 		wave_manager.spawn_wave("player", "resonator", _resonator.global_position)
 		_resonator.trigger()
-	_status_label.text = "COUNTER WAVE"
+	_status_label.text = _t("counter_wave")
 
 
 func _on_blue_beacon_fired(origin: Vector2) -> void:
 	wave_manager.spawn_wave("player", "blue", origin, _blue_beacon_wave_config)
-	_status_label.text = "BLUE SOURCE"
+	_status_label.text = _t("blue_source")
 
 
 func _handle_resonator_input() -> void:
@@ -277,7 +335,7 @@ func _place_resonator(target: Vector2) -> void:
 	_resonator.global_position = target
 	_resonator.expired.connect(_on_resonator_expired)
 	add_child(_resonator)
-	_status_label.text = "RESONATOR SET"
+	_status_label.text = _t("resonator_set")
 
 
 func _on_resonator_expired(resonator) -> void:
@@ -287,7 +345,7 @@ func _on_resonator_expired(resonator) -> void:
 
 func _on_player_hit_points_changed(hit_points: int) -> void:
 	if is_instance_valid(_hp_label):
-		_hp_label.text = "HP %d/30" % max(hit_points, 0)
+		_hp_label.text = _t("hp") % max(hit_points, 0)
 
 
 func _on_player_died() -> void:
@@ -302,7 +360,7 @@ func _on_emitter_defeated(_emitter) -> void:
 		_unlock_exit()
 		return
 	_accelerate_next_scheduled_emitter()
-	_status_label.text = "TARGET DOWN"
+	_status_label.text = _t("target_down")
 	_update_ui()
 
 
@@ -324,9 +382,9 @@ func _on_danger_changed(danger_value: int) -> void:
 	if _state != "combat":
 		return
 	if danger_value < 0:
-		_status_label.text = "SAFE LANE"
+		_status_label.text = _t("safe_lane")
 	elif danger_value > 1:
-		_status_label.text = "DANGER NODE"
+		_status_label.text = _t("danger_node")
 
 
 func _set_state(new_state: String) -> void:
@@ -336,11 +394,11 @@ func _set_state(new_state: String) -> void:
 	player.counter_wave_enabled = false
 	_show_exit_door(false)
 	if _state == "victory":
-		_status_label.text = "DEMO CLEAR"
-		_hint_label.text = "Dungeon test complete | P previous room | R replay final room."
+		_status_label.text = _t("demo_clear")
+		_set_controls_text()
 	elif _state == "defeat":
-		_status_label.text = "DEFEAT"
-		_hint_label.text = "All HP lost | N/P debug rooms | R retry room."
+		_status_label.text = _t("defeat")
+		_set_controls_text()
 
 
 func _create_ui() -> void:
@@ -349,8 +407,11 @@ func _create_ui() -> void:
 	add_child(ui)
 
 	_timer_label = Label.new()
-	_timer_label.position = Vector2(24, HUD_TOP_Y)
-	_timer_label.add_theme_font_size_override("font_size", 22)
+	_timer_label.position = HUD_TIMER_RECT.position
+	_timer_label.size = HUD_TIMER_RECT.size
+	_timer_label.clip_text = true
+	_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_timer_label.add_theme_font_size_override("font_size", 20)
 	ui.add_child(_timer_label)
 
 	_hp_label = Label.new()
@@ -359,27 +420,135 @@ func _create_ui() -> void:
 	ui.add_child(_hp_label)
 
 	_status_label = Label.new()
-	_status_label.position = Vector2(520, HUD_TOP_Y)
+	_status_label.position = HUD_CENTER_LABEL_RECT.position
+	_status_label.size = HUD_CENTER_LABEL_RECT.size
+	_status_label.clip_text = true
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_status_label.add_theme_font_size_override("font_size", 26)
 	ui.add_child(_status_label)
 
 	_hint_label = Label.new()
-	_hint_label.position = Vector2(430, HUD_BOTTOM_Y)
-	_hint_label.add_theme_font_size_override("font_size", 18)
+	_hint_label.position = HUD_CONTROLS_RECT.position
+	_hint_label.size = HUD_CONTROLS_RECT.size
+	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint_label.add_theme_font_size_override("font_size", 16)
 	ui.add_child(_hint_label)
 
+	_create_hint_popup(ui)
 	_on_player_hit_points_changed(player.hit_points)
+
+
+func _create_hint_popup(ui: CanvasLayer) -> void:
+	_hint_popup = Panel.new()
+	_hint_popup.name = "RoomHintPopup"
+	_hint_popup.size = HINT_POPUP_SIZE
+	_hint_popup.position = (get_viewport_rect().size - HINT_POPUP_SIZE) * 0.5
+	_hint_popup.visible = false
+	_hint_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.025, 0.023, 0.030, 0.86)
+	style.border_color = Color(0.62, 0.82, 0.92, 0.72)
+	style.set_border_width_all(2)
+	style.corner_radius_top_left = 4
+	style.corner_radius_top_right = 4
+	style.corner_radius_bottom_left = 4
+	style.corner_radius_bottom_right = 4
+	_hint_popup.add_theme_stylebox_override("panel", style)
+	ui.add_child(_hint_popup)
+
+	_hint_popup_title = Label.new()
+	_hint_popup_title.position = Vector2(28, 22)
+	_hint_popup_title.size = Vector2(HINT_POPUP_SIZE.x - 48, 30)
+	_hint_popup_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_popup_title.add_theme_font_size_override("font_size", 24)
+	_hint_popup.add_child(_hint_popup_title)
+
+	_hint_popup_body = Label.new()
+	_hint_popup_body.position = Vector2(42, 68)
+	_hint_popup_body.size = Vector2(HINT_POPUP_SIZE.x - 84, 92)
+	_hint_popup_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_popup_body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_hint_popup_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hint_popup_body.add_theme_font_size_override("font_size", 18)
+	_hint_popup.add_child(_hint_popup_body)
+
+	_hint_popup_footer = Label.new()
+	_hint_popup_footer.position = Vector2(28, 172)
+	_hint_popup_footer.size = Vector2(HINT_POPUP_SIZE.x - 56, 24)
+	_hint_popup_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_popup_footer.text = _t("hint_popup_footer")
+	_hint_popup_footer.add_theme_font_size_override("font_size", 14)
+	_hint_popup.add_child(_hint_popup_footer)
+
+
+func _show_room_hint_popup(config: Dictionary) -> void:
+	if not is_instance_valid(_hint_popup):
+		return
+	var body := _localize(config.get("body", ""))
+	if body.is_empty():
+		_hint_popup.visible = false
+		_hint_popup_left = 0.0
+		return
+	_hint_popup_title.text = _localize(config.get("title", _current_encounter.get("title", "")))
+	_hint_popup_body.text = body
+	_hint_popup_left = config.get("duration", 5.0)
+	_hint_popup.visible = true
+
+
+func _update_room_hint_popup(delta: float) -> void:
+	if not is_instance_valid(_hint_popup) or not _hint_popup.visible:
+		return
+	_hint_popup_left -= delta
+	if _hint_popup_left <= 0.0 or _room_hint_dismiss_input():
+		_hint_popup.visible = false
+		_hint_popup_left = 0.0
+
+
+func _room_hint_dismiss_input() -> bool:
+	return (
+		Input.is_key_pressed(KEY_W)
+		or Input.is_key_pressed(KEY_A)
+		or Input.is_key_pressed(KEY_S)
+		or Input.is_key_pressed(KEY_D)
+		or Input.is_key_pressed(KEY_UP)
+		or Input.is_key_pressed(KEY_DOWN)
+		or Input.is_key_pressed(KEY_LEFT)
+		or Input.is_key_pressed(KEY_RIGHT)
+		or Input.is_key_pressed(KEY_SPACE)
+		or Input.is_key_pressed(KEY_ENTER)
+		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+		or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	)
+
+
+func _t(key: String) -> String:
+	return _localize(UI_TEXT.get(key, key))
+
+
+func _set_controls_text() -> void:
+	if is_instance_valid(_hint_label):
+		_hint_label.text = _t("controls")
+
+
+func _localize(value) -> String:
+	if typeof(value) == TYPE_DICTIONARY:
+		var localized: Dictionary = value
+		return str(localized.get(_language, localized.get(DEFAULT_LANGUAGE, localized.get("en", ""))))
+	return str(value)
 
 
 func _update_ui() -> void:
 	if _state == "room_clear":
-		_timer_label.text = "ROOM %d/%d  KILLS %d/%d" % [_encounter_index + 1, _dungeon_sequence.size(), _kills, _kills_to_win]
-		_status_label.text = "EXIT OPEN"
-		_hint_label.text = "Go north through the open door | N/P debug rooms | R retry room"
+		_timer_label.text = _t("room_clear_timer") % [_encounter_index + 1, _dungeon_sequence.size(), _kills, _kills_to_win]
+		_status_label.text = _t("exit_open")
+		_set_controls_text()
 		return
 
 	var time_left := maxf(0.0, _battle_length - _elapsed)
-	_timer_label.text = "ROOM %d/%d  TIME %05.1f  KILLS %d/%d" % [
+	_timer_label.text = _t("room_timer") % [
 		_encounter_index + 1,
 		_dungeon_sequence.size(),
 		time_left,
@@ -389,11 +558,9 @@ func _update_ui() -> void:
 
 	if _state == "combat":
 		if not player.counter_wave_enabled:
-			_status_label.text = "SURVIVE"
-			_hint_label.text = "WASD move | Space dash | LMB wave | RMB resonator | N/P rooms | R retry"
+			_status_label.text = _t("survive")
 		elif player.get_cooldown_ratio() > 0.0:
-			_status_label.text = "RECHARGING"
-			_hint_label.text = "WASD move | Space dash | LMB wave | RMB resonator | N/P rooms | R retry"
+			_status_label.text = _t("recharging")
 		else:
-			_status_label.text = _current_encounter.get("title", "COUNTER READY").to_upper()
-			_hint_label.text = "WASD move | Space dash | LMB wave | RMB resonator | N/P rooms | R retry"
+			_status_label.text = _localize(_current_encounter.get("title", _t("counter_ready"))).to_upper()
+		_set_controls_text()

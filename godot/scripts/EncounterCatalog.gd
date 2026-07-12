@@ -27,7 +27,7 @@ static func get_encounter(encounter_id: String) -> Dictionary:
 			return _old_sluice_room_01_red_reading()
 
 
-static func _base_room(id: String, title: String) -> Dictionary:
+static func _base_room(id: String, title) -> Dictionary:
 	return {
 		"id": id,
 		"title": title,
@@ -37,6 +37,11 @@ static func _base_room(id: String, title: String) -> Dictionary:
 		"next_emitter_delay": 2.0,
 		"player_position": Vector2(640, 570),
 		"resonator_place_range": 190.0,
+		"popup_hint": {
+			"title": title,
+			"body": "",
+			"duration": 5.0,
+		},
 		"exit": {
 			"side": "top",
 			"door_rect": Rect2(Vector2(560, 60), Vector2(160, 26)),
@@ -49,7 +54,21 @@ static func _base_room(id: String, title: String) -> Dictionary:
 
 
 static func _old_sluice_room_01_red_reading() -> Dictionary:
-	var room := _base_room("old_sluice_room_01_red_reading", "Room 1 - Red Reading")
+	var room := _base_room("old_sluice_room_01_red_reading", {
+		"en": "Room 1 - Red Reading",
+		"ru": "Комната 1 - красные фронты",
+	})
+	room["popup_hint"] = {
+		"title": {
+			"en": "Room 1 - Red Reading",
+			"ru": "Комната 1 - красные фронты",
+		},
+		"body": {
+			"en": "Read the red wave front, move around it, then break the emitter.",
+			"ru": "Читай красный фронт, обходи волну и затем сломай эмиттер.",
+		},
+		"duration": 5.5,
+	}
 	room["emitters"] = [
 		{
 			"name": "RedEmitterA",
@@ -65,8 +84,22 @@ static func _old_sluice_room_01_red_reading() -> Dictionary:
 
 
 static func _old_sluice_room_02_blue_gap() -> Dictionary:
-	var room := _base_room("old_sluice_room_02_blue_gap", "Room 2 - Blue Gap")
+	var room := _base_room("old_sluice_room_02_blue_gap", {
+		"en": "Room 2 - Blue Gap",
+		"ru": "Комната 2 - синий проход",
+	})
 	room["battle_length"] = 75.0
+	room["popup_hint"] = {
+		"title": {
+			"en": "Room 2 - Blue Gap",
+			"ru": "Комната 2 - синий проход",
+		},
+		"body": {
+			"en": "Blue is friendly. Use blue and violet waves to open a safe route through red.",
+			"ru": "Синий цвет дружественный. Используй синие и фиолетовые волны, чтобы открыть безопасный путь через красное.",
+		},
+		"duration": 6.0,
+	}
 	room["blue_beacon"] = {
 		"name": "BlueBeacon",
 		"position": Vector2(305, 515),
@@ -93,7 +126,10 @@ static func _old_sluice_room_02_blue_gap() -> Dictionary:
 
 
 static func _mvp_combat_test() -> Dictionary:
-	var room := _base_room("mvp_combat_test", "MVP Combat Test")
+	var room := _base_room("mvp_combat_test", {
+		"en": "MVP Combat Test",
+		"ru": "MVP боевой тест",
+	})
 	room["battle_length"] = 90.0
 	room["kills_to_win"] = 3
 	room["blue_beacon"] = {
