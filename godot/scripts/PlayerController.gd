@@ -15,6 +15,9 @@ const FIRE_COOLDOWN := 0.11
 const HELD_FIRE_INTERVAL := 0.22
 const COUNTER_WAVE_REACH_RADIUS := Wave.PLAYER_MAX_RADIUS
 const PLAYER_TEXTURE := preload("res://assets/actors/player_bescolor_topdown.png")
+const PLAYER_TEXTURE_SIZE := Vector2(710.0, 818.0)
+const PLAYER_SPRITE_SIZE := Vector2(68.0, 78.0)
+const PLAYER_SPRITE_PIVOT_SOURCE := Vector2(309.0, 373.0)
 
 var hit_points := 30
 var counter_wave_enabled := false
@@ -116,19 +119,25 @@ func get_cooldown_ratio() -> float:
 
 func _draw() -> void:
 	var blink := is_invulnerable() and int(Time.get_ticks_msec() / 80) % 2 == 0
-	var body_color := Color(0.45, 0.22, 1.0, 0.45 if blink else 1.0)
-	var core_color := Color(0.85, 0.78, 1.0, 0.75 if blink else 1.0)
+	var center_color := Color(0.45, 0.22, 1.0, 0.55 if blink else 0.85)
 	var hitbox_color := Color(0.30, 0.85, 1.0, 0.95)
 	var sprite_alpha := 0.45 if blink else 1.0
 
 	_draw_counter_wave_reach()
-	draw_circle(Vector2.ZERO, 30.0, Color(0.0, 0.0, 0.0, 0.72))
-	draw_circle(Vector2.ZERO, 22.0, Color(0.25, 0.08, 1.0, 0.30))
-	draw_texture_rect(PLAYER_TEXTURE, Rect2(Vector2(-34, -34), Vector2(68, 68)), false, Color(1.0, 1.0, 1.0, sprite_alpha))
-	draw_circle(Vector2.ZERO, 11.0, body_color)
-	draw_circle(Vector2(0, -3), 5.0, core_color)
+	_draw_player_sprite(sprite_alpha)
+	draw_circle(Vector2.ZERO, 5.0, center_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
-	draw_line(Vector2.ZERO, _last_move_dir * 22.0, Color(0.90, 0.82, 1.0, 0.95), 2.0, true)
+
+
+func _draw_player_sprite(sprite_alpha: float) -> void:
+	var rotation := _last_move_dir.angle() - PI * 0.5
+	var pivot := Vector2(
+		PLAYER_SPRITE_SIZE.x * PLAYER_SPRITE_PIVOT_SOURCE.x / PLAYER_TEXTURE_SIZE.x,
+		PLAYER_SPRITE_SIZE.y * PLAYER_SPRITE_PIVOT_SOURCE.y / PLAYER_TEXTURE_SIZE.y
+	)
+	draw_set_transform(Vector2.ZERO, rotation, Vector2.ONE)
+	draw_texture_rect(PLAYER_TEXTURE, Rect2(-pivot, PLAYER_SPRITE_SIZE), false, Color(1.0, 1.0, 1.0, sprite_alpha))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_counter_wave_reach() -> void:
