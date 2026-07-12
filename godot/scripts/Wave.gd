@@ -3,6 +3,11 @@ extends Node2D
 
 signal expired(wave)
 
+const PLAYER_MAX_RADIUS := 300.0
+const RED_MAX_RADIUS := 425.0
+const GOLD_MAX_RADIUS := 430.0
+const GOLD_LINE_HALF_LENGTH := 700.0
+
 var wave_owner := "enemy"
 var wave_kind := "red"
 var wave_shape := "circle"
@@ -34,7 +39,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		lifetime = 2.35
 		crest_spacing = 42.0
 		crest_width = 14.0
-		max_radius = 640.0
+		max_radius = PLAYER_MAX_RADIUS
 		phase = PI
 	elif wave_kind == "gold":
 		wave_shape = "line"
@@ -43,8 +48,8 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		lifetime = 8.0
 		crest_spacing = 70.0
 		crest_width = 16.0
-		max_radius = 760.0
-		line_half_length = 700.0
+		max_radius = GOLD_MAX_RADIUS
+		line_half_length = GOLD_LINE_HALF_LENGTH
 		phase = PI * 0.35
 	else:
 		color = Color(1.0, 0.06, 0.13)
@@ -52,7 +57,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		lifetime = 7.2
 		crest_spacing = 56.0
 		crest_width = 12.0
-		max_radius = 920.0
+		max_radius = RED_MAX_RADIUS
 		phase = 0.0
 
 	speed = config.get("speed", speed)
@@ -67,9 +72,11 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 func _process(delta: float) -> void:
 	age += delta
 	radius += speed * delta
-	if age >= lifetime or radius > max_radius:
+	if age >= lifetime or radius >= max_radius:
+		radius = minf(radius, max_radius)
 		expired.emit(self)
 		queue_free()
+		return
 	queue_redraw()
 
 
@@ -84,6 +91,8 @@ func is_crest_at(global_point: Vector2, margin: float = 0.0) -> bool:
 		return _line_crest_at(global_point, margin)
 
 	var distance := global_position.distance_to(global_point)
+	if distance > max_radius:
+		return false
 	for crest_radius in get_crest_radii():
 		if absf(distance - crest_radius) <= crest_width * 0.5 + margin:
 			return true
@@ -95,7 +104,9 @@ func _line_crest_at(global_point: Vector2, margin: float) -> bool:
 	var along := local.dot(line_direction)
 	var tangent := Vector2(-line_direction.y, line_direction.x)
 	var side := absf(local.dot(tangent))
-	return absf(along - radius) <= crest_width * 0.5 + margin and side <= line_half_length + margin
+	if along < 0.0 or along > max_radius or side > line_half_length:
+		return false
+	return absf(along - radius) <= crest_width * 0.5 + margin
 
 
 func crest_closeness(global_point: Vector2) -> float:

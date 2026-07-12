@@ -10,6 +10,9 @@ signal defeated(emitter)
 @export var max_hit_points := 8
 
 const TELEGRAPH_TIME := 0.55
+const RED_REACH_RADIUS := Wave.RED_MAX_RADIUS
+const GOLD_REACH_LENGTH := Wave.GOLD_MAX_RADIUS
+const GOLD_REACH_HALF_WIDTH := Wave.GOLD_LINE_HALF_LENGTH
 const RED_EMITTER_TEXTURE := preload("res://assets/actors/emitter_red_base.png")
 const GOLD_BOSS_TEXTURE := preload("res://assets/actors/boss_golden_knight_topdown.png")
 
@@ -94,6 +97,7 @@ func _draw() -> void:
 	var charge_color := base_color
 	charge_color.a = charge * 0.85
 
+	_draw_damage_reach(base_color, active)
 	draw_circle(Vector2.ZERO, 42.0 + charge * 13.0, glow)
 	draw_circle(Vector2.ZERO, 25.0, body)
 	_draw_sprite_body(alpha)
@@ -106,6 +110,35 @@ func _draw() -> void:
 		draw_circle(Vector2.ZERO, 31.0, Color(0.80, 0.92, 1.0, 0.55))
 	draw_line(Vector2(-15, 18), Vector2(15, 18), Color(0.28, 0.26, 0.34, 0.95), 6.0, true)
 	_draw_hp_bar()
+
+
+func _draw_damage_reach(base_color: Color, active: bool) -> void:
+	if is_destroyed():
+		return
+	var fill := base_color
+	fill.a = 0.040 if active else 0.018
+	var edge := base_color
+	edge.a = 0.24 if active else 0.10
+	if wave_kind == "gold":
+		_draw_line_damage_reach(fill, edge)
+	else:
+		draw_circle(Vector2.ZERO, RED_REACH_RADIUS, fill)
+		draw_arc(Vector2.ZERO, RED_REACH_RADIUS, 0.0, TAU, 192, edge, 2.0, true)
+
+
+func _draw_line_damage_reach(fill: Color, edge: Color) -> void:
+	var direction := Vector2.DOWN
+	var tangent := Vector2.RIGHT
+	var front := direction * GOLD_REACH_LENGTH
+	var points: PackedVector2Array = [
+		-tangent * GOLD_REACH_HALF_WIDTH,
+		tangent * GOLD_REACH_HALF_WIDTH,
+		front + tangent * GOLD_REACH_HALF_WIDTH,
+		front - tangent * GOLD_REACH_HALF_WIDTH,
+	]
+	draw_colored_polygon(points, fill)
+	for i in range(points.size()):
+		draw_line(points[i], points[(i + 1) % points.size()], edge, 2.0, true)
 
 
 func _draw_sprite_body(alpha: float) -> void:

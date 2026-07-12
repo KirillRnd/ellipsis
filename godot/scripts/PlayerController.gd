@@ -13,6 +13,7 @@ const DASH_COOLDOWN := 0.55
 const INVULNERABLE_TIME := 1.05
 const FIRE_COOLDOWN := 0.11
 const HELD_FIRE_INTERVAL := 0.22
+const COUNTER_WAVE_REACH_RADIUS := Wave.PLAYER_MAX_RADIUS
 const PLAYER_TEXTURE := preload("res://assets/actors/player_bescolor_topdown.png")
 
 var hit_points := 30
@@ -120,6 +121,7 @@ func _draw() -> void:
 	var hitbox_color := Color(0.30, 0.85, 1.0, 0.95)
 	var sprite_alpha := 0.45 if blink else 1.0
 
+	_draw_counter_wave_reach()
 	draw_circle(Vector2.ZERO, 30.0, Color(0.0, 0.0, 0.0, 0.72))
 	draw_circle(Vector2.ZERO, 22.0, Color(0.25, 0.08, 1.0, 0.30))
 	draw_texture_rect(PLAYER_TEXTURE, Rect2(Vector2(-34, -34), Vector2(68, 68)), false, Color(1.0, 1.0, 1.0, sprite_alpha))
@@ -127,6 +129,11 @@ func _draw() -> void:
 	draw_circle(Vector2(0, -3), 5.0, core_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
 	draw_line(Vector2.ZERO, _last_move_dir * 22.0, Color(0.90, 0.82, 1.0, 0.95), 2.0, true)
+
+
+func _draw_counter_wave_reach() -> void:
+	draw_circle(Vector2.ZERO, COUNTER_WAVE_REACH_RADIUS, Color(0.44, 0.19, 1.0, 0.035))
+	draw_arc(Vector2.ZERO, COUNTER_WAVE_REACH_RADIUS, 0.0, TAU, 192, Color(0.58, 0.34, 1.0, 0.24), 2.0, true)
 
 
 
