@@ -13,6 +13,7 @@ const DASH_COOLDOWN := 0.55
 const INVULNERABLE_TIME := 1.05
 const FIRE_COOLDOWN := 0.11
 const HELD_FIRE_INTERVAL := 0.22
+const PLAYER_TEXTURE := preload("res://assets/actors/player_bescolor_topdown.png")
 
 var hit_points := 30
 var counter_wave_enabled := false
@@ -117,10 +118,11 @@ func _draw() -> void:
 	var body_color := Color(0.45, 0.22, 1.0, 0.45 if blink else 1.0)
 	var core_color := Color(0.85, 0.78, 1.0, 0.75 if blink else 1.0)
 	var hitbox_color := Color(0.30, 0.85, 1.0, 0.95)
+	var sprite_alpha := 0.45 if blink else 1.0
 
 	draw_circle(Vector2.ZERO, 30.0, Color(0.0, 0.0, 0.0, 0.72))
 	draw_circle(Vector2.ZERO, 22.0, Color(0.25, 0.08, 1.0, 0.30))
-	draw_arc(Vector2.ZERO, 14.0, 0.0, TAU, 48, Color(0.95, 0.88, 1.0, 0.90), 3.0, true)
+	draw_texture_rect(PLAYER_TEXTURE, Rect2(Vector2(-34, -34), Vector2(68, 68)), false, Color(1.0, 1.0, 1.0, sprite_alpha))
 	draw_circle(Vector2.ZERO, 11.0, body_color)
 	draw_circle(Vector2(0, -3), 5.0, core_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)

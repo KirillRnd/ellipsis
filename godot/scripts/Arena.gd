@@ -2,10 +2,13 @@ class_name Arena
 extends Node2D
 
 const ARENA_RECT := Rect2(Vector2(80, 60), Vector2(1120, 600))
+const VIEW_RECT := Rect2(Vector2.ZERO, Vector2(1280, 720))
+const BLUE_GUIDES_BG := preload("res://assets/arena/arena_blue_guides_bg.png")
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(1280, 720)), Color(0.012, 0.011, 0.018))
-	draw_rect(ARENA_RECT, Color(0.055, 0.052, 0.070))
+	draw_texture_rect(BLUE_GUIDES_BG, VIEW_RECT, false, Color(1.0, 1.0, 1.0, 0.82))
+	draw_rect(VIEW_RECT, Color(0.008, 0.008, 0.014, 0.26))
+	draw_rect(ARENA_RECT, Color(0.055, 0.052, 0.070, 0.34))
 	_draw_floor_grid()
 	_draw_border()
 

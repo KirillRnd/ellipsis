@@ -10,6 +10,8 @@ signal defeated(emitter)
 @export var max_hit_points := 8
 
 const TELEGRAPH_TIME := 0.55
+const RED_EMITTER_TEXTURE := preload("res://assets/actors/emitter_red_base.png")
+const GOLD_BOSS_TEXTURE := preload("res://assets/actors/boss_golden_knight_topdown.png")
 
 var wave_manager
 var combat_time := 0.0
@@ -94,6 +96,7 @@ func _draw() -> void:
 
 	draw_circle(Vector2.ZERO, 42.0 + charge * 13.0, glow)
 	draw_circle(Vector2.ZERO, 25.0, body)
+	_draw_sprite_body(alpha)
 	draw_arc(Vector2.ZERO, 26.0, 0.0, TAU, 72, rim, 5.0, true)
 	draw_circle(Vector2.ZERO, 11.0 + charge * 3.0, core)
 	if active:
@@ -103,6 +106,12 @@ func _draw() -> void:
 		draw_circle(Vector2.ZERO, 31.0, Color(0.80, 0.92, 1.0, 0.55))
 	draw_line(Vector2(-15, 18), Vector2(15, 18), Color(0.28, 0.26, 0.34, 0.95), 6.0, true)
 	_draw_hp_bar()
+
+
+func _draw_sprite_body(alpha: float) -> void:
+	var texture = GOLD_BOSS_TEXTURE if wave_kind == "gold" else RED_EMITTER_TEXTURE
+	var size := Vector2(76, 76) if wave_kind == "gold" else Vector2(68, 68)
+	draw_texture_rect(texture, Rect2(-size * 0.5, size), false, Color(1.0, 1.0, 1.0, alpha))
 
 
 func _draw_hp_bar() -> void:
