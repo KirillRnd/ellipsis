@@ -35,6 +35,21 @@ func _ready() -> void:
 	hit_points_changed.emit(hit_points)
 
 
+func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = true) -> void:
+	global_position = start_position
+	velocity = Vector2.ZERO
+	_fire_cooldown = 0.0
+	_held_fire_timer = 0.0
+	_dash_time_left = 0.0
+	_dash_cooldown = 0.0
+	_invulnerable_left = 0.0
+	_fire_was_down = false
+	_dash_was_down = false
+	if restore_hit_points:
+		hit_points = 30
+		hit_points_changed.emit(hit_points)
+
+
 func _physics_process(delta: float) -> void:
 	_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)

@@ -44,6 +44,17 @@ func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: 
 	return wave
 
 
+func clear_all_waves() -> void:
+	for wave in waves:
+		if is_instance_valid(wave):
+			wave.queue_free()
+	waves.clear()
+	player_waves.clear()
+	_boost_damage_marks.clear()
+	_last_danger_value = 0
+	queue_redraw()
+
+
 func _process(_delta: float) -> void:
 	_cleanup_dead_waves()
 	_damage_emitters()
