@@ -1,24 +1,21 @@
 extends Node2D
 
-const BATTLE_LENGTH := 90.0
-const GAME_SPEED := 0.333333
-const KILLS_TO_WIN := 3
-const NEXT_EMITTER_DELAY := 2.0
+const ENCOUNTER_ID := "mvp_combat_test"
+const DEFAULT_BATTLE_LENGTH := 90.0
+const DEFAULT_GAME_SPEED := 0.333333
+const DEFAULT_KILLS_TO_WIN := 3
+const DEFAULT_NEXT_EMITTER_DELAY := 2.0
 const HUD_TOP_Y := 8.0
 const HUD_SECOND_Y := 34.0
 const HUD_BOTTOM_Y := 674.0
+const ENCOUNTER_CATALOG := preload("res://scripts/EncounterCatalog.gd")
 const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
 const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
-const BLUE_BEACON_POSITION := Vector2(305, 515)
-const RESONATOR_PLACE_RANGE := 190.0
+const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
+const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
-@onready var emitters: Array = [
-	$RedEmitterA,
-	$RedEmitterB,
-	$GoldEmitter,
-]
 
 var _state := "combat"
 var _elapsed := 0.0
@@ -28,6 +25,12 @@ var _restart_was_down := false
 var _resonator_was_down := false
 var _scheduled_active_times: Array = []
 var _blue_beacon
+var _blue_beacon_wave_config := {}
+var _battle_length := DEFAULT_BATTLE_LENGTH
+var _kills_to_win := DEFAULT_KILLS_TO_WIN
+var _next_emitter_delay := DEFAULT_NEXT_EMITTER_DELAY
+var _resonator_place_range := DEFAULT_RESONATOR_PLACE_RANGE
+var _emitters: Array = []
 var _resonator
 var _timer_label: Label
 var _hp_label: Label
@@ -36,24 +39,50 @@ var _hint_label: Label
 
 
 func _ready() -> void:
-	Engine.time_scale = GAME_SPEED
+	var encounter: Dictionary = ENCOUNTER_CATALOG.get_encounter(ENCOUNTER_ID)
+	_apply_encounter_settings(encounter)
+
 	wave_manager.player = player
-	wave_manager.emitters = emitters
+	_create_emitters(encounter.get("emitters", []))
+	wave_manager.emitters = _emitters
 	player.fired_counter_wave.connect(_on_player_fired_counter_wave)
 	player.hit_points_changed.connect(_on_player_hit_points_changed)
 	player.died.connect(_on_player_died)
 	wave_manager.danger_changed.connect(_on_danger_changed)
 
 	_scheduled_active_times.clear()
-	for i in range(emitters.size()):
-		var emitter = emitters[i]
+	for i in range(_emitters.size()):
+		var emitter = _emitters[i]
 		emitter.wave_manager = wave_manager
 		_scheduled_active_times.append(emitter.active_at)
 		emitter.defeated.connect(_on_emitter_defeated)
 
-	_create_blue_beacon()
+	_create_blue_beacon(encounter.get("blue_beacon", {}))
 	_create_ui()
 	_update_ui()
+
+
+func _apply_encounter_settings(encounter: Dictionary) -> void:
+	Engine.time_scale = encounter.get("game_speed", DEFAULT_GAME_SPEED)
+	_battle_length = encounter.get("battle_length", DEFAULT_BATTLE_LENGTH)
+	_kills_to_win = encounter.get("kills_to_win", DEFAULT_KILLS_TO_WIN)
+	_next_emitter_delay = encounter.get("next_emitter_delay", DEFAULT_NEXT_EMITTER_DELAY)
+	_resonator_place_range = encounter.get("resonator_place_range", DEFAULT_RESONATOR_PLACE_RANGE)
+	player.global_position = encounter.get("player_position", player.global_position)
+
+
+func _create_emitters(emitter_configs: Array) -> void:
+	for emitter_config in emitter_configs:
+		var emitter = WAVE_EMITTER_SCENE.instantiate()
+		emitter.name = emitter_config.get("name", "WaveEmitter")
+		emitter.global_position = emitter_config.get("position", Vector2.ZERO)
+		emitter.wave_kind = emitter_config.get("wave_kind", emitter.wave_kind)
+		emitter.interval = emitter_config.get("interval", emitter.interval)
+		emitter.initial_delay = emitter_config.get("initial_delay", emitter.initial_delay)
+		emitter.active_at = emitter_config.get("active_at", emitter.active_at)
+		emitter.max_hit_points = emitter_config.get("max_hit_points", emitter.max_hit_points)
+		add_child(emitter)
+		_emitters.append(emitter)
 
 
 func _process(delta: float) -> void:
@@ -79,7 +108,7 @@ func _handle_restart() -> void:
 
 
 func _update_emitters(running: bool) -> void:
-	for emitter in emitters:
+	for emitter in _emitters:
 		emitter.combat_time = _elapsed
 		emitter.combat_running = running
 
@@ -91,10 +120,13 @@ func _update_blue_beacon(running: bool) -> void:
 	_blue_beacon.combat_running = running
 
 
-func _create_blue_beacon() -> void:
+func _create_blue_beacon(config: Dictionary) -> void:
+	if config.is_empty():
+		return
 	_blue_beacon = BLUE_BEACON_SCRIPT.new()
-	_blue_beacon.name = "BlueBeacon"
-	_blue_beacon.global_position = BLUE_BEACON_POSITION
+	_blue_beacon.name = config.get("name", "BlueBeacon")
+	_blue_beacon.global_position = config.get("position", Vector2.ZERO)
+	_blue_beacon_wave_config = config.get("wave", {})
 	_blue_beacon.fired_friendly_wave.connect(_on_blue_beacon_fired)
 	add_child(_blue_beacon)
 
@@ -108,13 +140,7 @@ func _on_player_fired_counter_wave(origin: Vector2) -> void:
 
 
 func _on_blue_beacon_fired(origin: Vector2) -> void:
-	wave_manager.spawn_wave("player", "blue", origin, {
-		"speed": 190.0,
-		"lifetime": 2.6,
-		"max_radius": Wave.RED_MAX_RADIUS,
-		"can_damage_emitters": false,
-		"can_create_boost": false,
-	})
+	wave_manager.spawn_wave("player", "blue", origin, _blue_beacon_wave_config)
 	_status_label.text = "BLUE SOURCE"
 
 
@@ -128,8 +154,8 @@ func _handle_resonator_input() -> void:
 func _get_resonator_target_position() -> Vector2:
 	var target: Vector2 = get_global_mouse_position()
 	var offset: Vector2 = target - player.global_position
-	if offset.length() > RESONATOR_PLACE_RANGE:
-		target = player.global_position + offset.normalized() * RESONATOR_PLACE_RANGE
+	if offset.length() > _resonator_place_range:
+		target = player.global_position + offset.normalized() * _resonator_place_range
 	return target.clamp(PlayerController.ARENA_RECT.position, PlayerController.ARENA_RECT.end)
 
 
@@ -162,7 +188,7 @@ func _on_emitter_defeated(_emitter) -> void:
 	if _state != "combat":
 		return
 	_kills += 1
-	if _kills >= KILLS_TO_WIN:
+	if _kills >= _kills_to_win:
 		_set_state("victory")
 		return
 	_accelerate_next_scheduled_emitter()
@@ -171,15 +197,15 @@ func _on_emitter_defeated(_emitter) -> void:
 
 
 func _accelerate_next_scheduled_emitter() -> void:
-	while _next_emitter_index < emitters.size():
-		var next_emitter = emitters[_next_emitter_index]
+	while _next_emitter_index < _emitters.size():
+		var next_emitter = _emitters[_next_emitter_index]
 		if not is_instance_valid(next_emitter) or next_emitter.is_destroyed():
 			_next_emitter_index += 1
 			continue
 		if _elapsed >= next_emitter.active_at:
 			_next_emitter_index += 1
 			continue
-		next_emitter.active_at = minf(next_emitter.active_at, _elapsed + NEXT_EMITTER_DELAY)
+		next_emitter.active_at = minf(next_emitter.active_at, _elapsed + _next_emitter_delay)
 		_next_emitter_index += 1
 		return
 
@@ -200,7 +226,7 @@ func _set_state(new_state: String) -> void:
 	player.counter_wave_enabled = false
 	if _state == "victory":
 		_status_label.text = "VICTORY"
-		_hint_label.text = "3 emitters defeated. Press R to restart."
+		_hint_label.text = "%d emitters defeated. Press R to restart." % _kills_to_win
 	elif _state == "defeat":
 		_status_label.text = "DEFEAT"
 		_hint_label.text = "All HP lost. Press R to restart."
@@ -235,8 +261,8 @@ func _create_ui() -> void:
 
 
 func _update_ui() -> void:
-	var time_left := maxf(0.0, BATTLE_LENGTH - _elapsed)
-	_timer_label.text = "TIME %05.1f  KILLS %d/%d" % [time_left, _kills, KILLS_TO_WIN]
+	var time_left := maxf(0.0, _battle_length - _elapsed)
+	_timer_label.text = "TIME %05.1f  KILLS %d/%d" % [time_left, _kills, _kills_to_win]
 
 	if _state == "combat":
 		if not player.counter_wave_enabled:
@@ -248,4 +274,3 @@ func _update_ui() -> void:
 		else:
 			_status_label.text = "COUNTER READY"
 			_hint_label.text = "WASD move | Space dash | LMB wave, hold cascade | RMB resonator | R restart"
-

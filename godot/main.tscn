@@ -1,10 +1,9 @@
-﻿[gd_scene load_steps=6 format=3 uid="uid://cm11yqxjwnwtb"]
+﻿[gd_scene load_steps=5 format=3 uid="uid://cm11yqxjwnwtb"]
 
 [ext_resource type="Script" path="res://scripts/Main.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/Arena.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/WaveManager.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/Player.tscn" id="4"]
-[ext_resource type="PackedScene" path="res://scenes/WaveEmitter.tscn" id="5"]
 
 [node name="Main" type="Node2D" unique_id=220752404]
 script = ExtResource("1")
@@ -14,25 +13,3 @@ script = ExtResource("1")
 [node name="WaveManager" parent="." instance=ExtResource("3")]
 
 [node name="Player" parent="." instance=ExtResource("4")]
-position = Vector2(640, 570)
-
-[node name="RedEmitterA" parent="." instance=ExtResource("5")]
-position = Vector2(355, 170)
-wave_kind = "red"
-interval = 2.25
-initial_delay = 0.35
-active_at = 0.0
-
-[node name="RedEmitterB" parent="." instance=ExtResource("5")]
-position = Vector2(925, 170)
-wave_kind = "red"
-interval = 2.6
-initial_delay = 0.75
-active_at = 30.0
-
-[node name="GoldEmitter" parent="." instance=ExtResource("5")]
-position = Vector2(640, 150)
-wave_kind = "gold"
-interval = 3.0
-initial_delay = 0.5
-active_at = 60.0
