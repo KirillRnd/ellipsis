@@ -4,6 +4,9 @@ const BATTLE_LENGTH := 90.0
 const GAME_SPEED := 0.333333
 const KILLS_TO_WIN := 3
 const NEXT_EMITTER_DELAY := 2.0
+const HUD_TOP_Y := 8.0
+const HUD_SECOND_Y := 34.0
+const HUD_BOTTOM_Y := 674.0
 
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
@@ -138,22 +141,22 @@ func _create_ui() -> void:
 	add_child(ui)
 
 	_timer_label = Label.new()
-	_timer_label.position = Vector2(24, 18)
-	_timer_label.add_theme_font_size_override("font_size", 24)
+	_timer_label.position = Vector2(24, HUD_TOP_Y)
+	_timer_label.add_theme_font_size_override("font_size", 22)
 	ui.add_child(_timer_label)
 
 	_hp_label = Label.new()
-	_hp_label.position = Vector2(24, 48)
-	_hp_label.add_theme_font_size_override("font_size", 20)
+	_hp_label.position = Vector2(24, HUD_SECOND_Y)
+	_hp_label.add_theme_font_size_override("font_size", 18)
 	ui.add_child(_hp_label)
 
 	_status_label = Label.new()
-	_status_label.position = Vector2(520, 18)
-	_status_label.add_theme_font_size_override("font_size", 28)
+	_status_label.position = Vector2(520, HUD_TOP_Y)
+	_status_label.add_theme_font_size_override("font_size", 26)
 	ui.add_child(_status_label)
 
 	_hint_label = Label.new()
-	_hint_label.position = Vector2(430, 680)
+	_hint_label.position = Vector2(430, HUD_BOTTOM_Y)
 	_hint_label.add_theme_font_size_override("font_size", 18)
 	ui.add_child(_hint_label)
 

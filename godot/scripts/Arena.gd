@@ -32,15 +32,5 @@ func _draw_floor_grid() -> void:
 
 
 func _draw_border() -> void:
-	var outer := ARENA_RECT.grow(24.0)
-	draw_rect(outer, Color(0.025, 0.024, 0.038), false, 28.0)
-	draw_rect(ARENA_RECT, Color(0.24, 0.23, 0.33), false, 4.0)
-	draw_rect(ARENA_RECT.grow(-12.0), Color(0.09, 0.085, 0.12), false, 2.0)
-
-	var cap_color := Color(0.055, 0.052, 0.075)
-	for x in range(110, 1180, 110):
-		draw_rect(Rect2(Vector2(x, 42), Vector2(54, 28)), cap_color)
-		draw_rect(Rect2(Vector2(x + 45, 650), Vector2(54, 28)), cap_color)
-	for y in range(100, 620, 110):
-		draw_rect(Rect2(Vector2(52, y), Vector2(28, 54)), cap_color)
-		draw_rect(Rect2(Vector2(1200, y + 45), Vector2(28, 54)), cap_color)
+	draw_rect(ARENA_RECT, Color(0.0, 0.0, 0.0, 0.96), false, 5.0)
+	draw_rect(ARENA_RECT.grow(-5.0), Color(0.08, 0.08, 0.11, 0.55), false, 1.0)
