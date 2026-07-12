@@ -12,6 +12,12 @@ const NODE_HIT_RADIUS = 26.0
 const EMITTER_HITBOX_RADIUS := WaveEmitter.HITBOX_RADIUS
 const MIN_ERASE_SEGMENT = 72.0
 const ERASE_ARC_WIDTH = 0.30
+const SAFE_GAP_CLEAR_WIDTH := 48.0
+const SAFE_GAP_CORE_WIDTH := 20.0
+const SAFE_GAP_JAMB_DEPTH := 28.0
+const SAFE_GAP_BOUNDARY_GLOW_WIDTH := Wave.SHARED_CREST_WIDTH
+const SAFE_GAP_BOUNDARY_LINE_WIDTH := Wave.SHARED_CREST_WIDTH * 0.425
+const SAFE_GAP_BOUNDARY_CORE_WIDTH := 1.0
 
 var player
 var emitters: Array = []
@@ -178,7 +184,7 @@ func _enemy_waves() -> Array:
 func _draw_erasure_between(enemy_wave, counter_wave) -> void:
 	for point in _front_intersections(enemy_wave, counter_wave):
 		if ARENA_RECT.has_point(point):
-			_draw_erased_front(enemy_wave, point)
+			_draw_erased_front(enemy_wave, counter_wave, point)
 
 
 func _front_intersections(a, b) -> Array[Vector2]:
@@ -261,25 +267,30 @@ func _line_line_intersections(a, ar: float, b, br: float) -> Array[Vector2]:
 	return result
 
 
-func _draw_erased_front(enemy_wave, point: Vector2) -> void:
+func _draw_erased_front(enemy_wave, counter_wave, point: Vector2) -> void:
 	if enemy_wave.wave_shape == "line":
-		_draw_erased_line(enemy_wave, point)
+		_draw_erased_line(enemy_wave, counter_wave, point)
 	else:
-		_draw_erased_arc(enemy_wave.global_position, enemy_wave.radius, point)
+		_draw_erased_arc(enemy_wave.global_position, enemy_wave.radius, enemy_wave, counter_wave, point)
 
 
-func _draw_erased_arc(center: Vector2, radius: float, point: Vector2) -> void:
+func _draw_erased_arc(center: Vector2, radius: float, enemy_wave, counter_wave, point: Vector2) -> void:
 	if radius * ERASE_ARC_WIDTH * 2.0 < MIN_ERASE_SEGMENT:
 		return
 	var angle = (point - center).angle()
-	var arena_fill = Color(0.055, 0.052, 0.070, 0.98)
-	var edge = Color(0.12, 0.30, 0.90, 0.70)
-	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, arena_fill, 54.0, true)
-	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, edge, 5.0, true)
-	draw_circle(point, 12.0, Color(0.025, 0.035, 0.075, 0.92))
+	var clear := Color(0.42, 0.41, 0.39, 0.96)
+	var calm := _safe_gap_suppress_color(counter_wave)
+	calm.a = 0.14
+	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, clear, SAFE_GAP_CLEAR_WIDTH, true)
+	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, calm, SAFE_GAP_CORE_WIDTH, true)
+
+	var left_angle: float = angle - ERASE_ARC_WIDTH
+	var right_angle: float = angle + ERASE_ARC_WIDTH
+	_draw_arc_safe_gap_jamb(center, radius, left_angle, 1.0, enemy_wave, counter_wave)
+	_draw_arc_safe_gap_jamb(center, radius, right_angle, -1.0, enemy_wave, counter_wave)
 
 
-func _draw_erased_line(enemy_wave, point: Vector2) -> void:
+func _draw_erased_line(enemy_wave, counter_wave, point: Vector2) -> void:
 	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
 	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
 	var side = (point - base).dot(tangent)
@@ -289,8 +300,62 @@ func _draw_erased_line(enemy_wave, point: Vector2) -> void:
 	var half_len = 56.0
 	var start = point - tangent * half_len
 	var end = point + tangent * half_len
-	draw_line(start, end, Color(0.055, 0.052, 0.070, 0.98), 54.0, true)
-	draw_line(start, end, Color(0.12, 0.30, 0.90, 0.70), 5.0, true)
+	var clear := Color(0.42, 0.41, 0.39, 0.96)
+	var calm := _safe_gap_suppress_color(counter_wave)
+	calm.a = 0.14
+	draw_line(start, end, clear, SAFE_GAP_CLEAR_WIDTH, true)
+	draw_line(start, end, calm, SAFE_GAP_CORE_WIDTH, true)
+	_draw_line_safe_gap_jamb(start, tangent, 1.0, enemy_wave, counter_wave)
+	_draw_line_safe_gap_jamb(end, tangent, -1.0, enemy_wave, counter_wave)
+
+
+func _draw_arc_safe_gap_jamb(center: Vector2, radius: float, edge_angle: float, inner_sign: float, enemy_wave, counter_wave) -> void:
+	var direction := Vector2.from_angle(edge_angle)
+	var tangent := Vector2(-direction.y, direction.x)
+	var jamb_center := center + direction * radius
+	_draw_safe_gap_jamb(jamb_center, direction, tangent * inner_sign, enemy_wave, counter_wave)
+
+
+func _draw_line_safe_gap_jamb(center: Vector2, tangent: Vector2, inner_sign: float, enemy_wave, counter_wave) -> void:
+	_draw_safe_gap_jamb(center, enemy_wave.line_direction, tangent * inner_sign, enemy_wave, counter_wave)
+
+
+func _draw_safe_gap_jamb(center: Vector2, direction: Vector2, inner_offset_direction: Vector2, enemy_wave, counter_wave) -> void:
+	var from := center - direction * SAFE_GAP_JAMB_DEPTH
+	var to := center + direction * SAFE_GAP_JAMB_DEPTH
+	var normal := inner_offset_direction.normalized()
+	_draw_safe_gap_boundary_half(from, to, -normal, enemy_wave.color, _safe_gap_wave_alpha(enemy_wave))
+	_draw_safe_gap_boundary_half(from, to, normal, _safe_gap_suppress_color(counter_wave), _safe_gap_wave_alpha(counter_wave))
+
+
+func _draw_safe_gap_boundary_half(from: Vector2, to: Vector2, side: Vector2, base_color: Color, local_alpha: float) -> void:
+	var glow_color := base_color
+	glow_color.a = 0.10 * local_alpha
+	var line_color := base_color
+	line_color.a = 0.78 * local_alpha
+	var core_color := base_color.lerp(Color.WHITE, 0.68)
+	core_color.a = 0.42 * local_alpha
+	_draw_safe_gap_boundary_layer(from, to, side, glow_color, SAFE_GAP_BOUNDARY_GLOW_WIDTH)
+	_draw_safe_gap_boundary_layer(from, to, side, line_color, SAFE_GAP_BOUNDARY_LINE_WIDTH)
+	_draw_safe_gap_boundary_layer(from, to, side, core_color, SAFE_GAP_BOUNDARY_CORE_WIDTH)
+
+
+func _draw_safe_gap_boundary_layer(from: Vector2, to: Vector2, side: Vector2, color: Color, width: float) -> void:
+	var offset := side * width * 0.5
+	draw_line(from + offset, to + offset, color, width, true)
+
+
+func _safe_gap_wave_alpha(wave) -> float:
+	if not is_instance_valid(wave):
+		return 1.0
+	var fade := clampf(1.0 - wave.age / wave.lifetime, 0.0, 1.0)
+	return fade * clampf(wave.radius / 90.0, 0.35, 1.0)
+
+
+func _safe_gap_suppress_color(counter_wave) -> Color:
+	if is_instance_valid(counter_wave) and counter_wave.wave_kind == "blue":
+		return Color(0.26, 0.76, 1.0)
+	return Color(0.62, 0.36, 1.0)
 
 
 func _draw_enemy_danger_node(point: Vector2) -> void:
@@ -321,5 +386,3 @@ func _cleanup_dead_waves() -> void:
 	for i in range(player_waves.size() - 1, -1, -1):
 		if not is_instance_valid(player_waves[i]):
 			player_waves.remove_at(i)
-
-
