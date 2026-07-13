@@ -29,10 +29,12 @@ const UI_TEXT := {
 	"demo_clear": {"en": "DEMO CLEAR", "ru": "ДЕМО ПРОЙДЕНО"},
 	"exit_open": {"en": "EXIT OPEN", "ru": "ВЫХОД ОТКРЫТ"},
 	"hp": {"en": "HP %d/30", "ru": "HP %d/30"},
+	"reach_exit": {"en": "REACH THE EXIT", "ru": "ДОЙДИ ДО ВЫХОДА"},
 	"hint_popup_footer": {"en": "Move, click, or wait to close", "ru": "Двигайся, кликни или подожди, чтобы закрыть"},
 	"recharging": {"en": "RECHARGING", "ru": "ПЕРЕЗАРЯДКА"},
 	"resonator_set": {"en": "RESONATOR SET", "ru": "РЕЗОНАТОР ПОСТАВЛЕН"},
 	"room_clear_timer": {"en": "ROOM %d/%d  KILLS %d/%d", "ru": "КОМ %d/%d  ЦЕЛИ %d/%d"},
+	"room_route_timer": {"en": "ROOM %d/%d  TIME %05.1f  EXIT", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ВЫХОД"},
 	"room_timer": {"en": "ROOM %d/%d  TIME %05.1f  KILLS %d/%d", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ЦЕЛИ %d/%d"},
 	"safe_lane": {"en": "SAFE LANE", "ru": "БЕЗОПАСНЫЙ ПРОХОД"},
 	"survive": {"en": "SURVIVE", "ru": "ВЫЖИВАЙ"},
@@ -62,6 +64,10 @@ var _battle_length := DEFAULT_BATTLE_LENGTH
 var _kills_to_win := DEFAULT_KILLS_TO_WIN
 var _next_emitter_delay := DEFAULT_NEXT_EMITTER_DELAY
 var _resonator_place_range := DEFAULT_RESONATOR_PLACE_RANGE
+var _objective := "defeat_emitters"
+var _player_wave_available := true
+var _dash_available := true
+var _resonator_available := true
 var _emitters: Array = []
 var _resonator
 var _exit_unlocked := false
@@ -105,9 +111,10 @@ func _load_encounter(index: int) -> void:
 	_kills = 0
 	_next_emitter_index = 1
 	_state = "combat"
-	_exit_unlocked = false
-	player.counter_wave_enabled = true
-	_show_exit_door(false)
+	_exit_unlocked = _objective == "reach_exit"
+	player.counter_wave_enabled = _player_wave_available
+	player.dash_enabled = _dash_available
+	_show_exit_door(_exit_unlocked)
 
 	_create_emitters(_current_encounter.get("emitters", []))
 	wave_manager.emitters = _emitters
@@ -148,7 +155,13 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 	_kills_to_win = encounter.get("kills_to_win", DEFAULT_KILLS_TO_WIN)
 	_next_emitter_delay = encounter.get("next_emitter_delay", DEFAULT_NEXT_EMITTER_DELAY)
 	_resonator_place_range = encounter.get("resonator_place_range", DEFAULT_RESONATOR_PLACE_RANGE)
+	_objective = encounter.get("objective", "defeat_emitters")
+	_player_wave_available = encounter.get("player_wave_enabled", true)
+	_dash_available = encounter.get("dash_enabled", true)
+	_resonator_available = encounter.get("resonator_enabled", true)
 	player.reset_for_encounter(encounter.get("player_position", player.global_position))
+	player.counter_wave_enabled = _player_wave_available
+	player.dash_enabled = _dash_available
 
 	var exit_config: Dictionary = encounter.get("exit", {})
 	_exit_door_rect = exit_config.get("door_rect", Rect2())
@@ -166,6 +179,7 @@ func _create_emitters(emitter_configs: Array) -> void:
 		emitter.initial_delay = emitter_config.get("initial_delay", emitter.initial_delay)
 		emitter.active_at = emitter_config.get("active_at", emitter.active_at)
 		emitter.max_hit_points = emitter_config.get("max_hit_points", emitter.max_hit_points)
+		emitter.wave_config = emitter_config.get("wave", {})
 		add_child(emitter)
 		_emitters.append(emitter)
 
@@ -187,10 +201,14 @@ func _process(delta: float) -> void:
 		return
 
 	_elapsed += delta
-	player.counter_wave_enabled = true
+	player.counter_wave_enabled = _player_wave_available
+	player.dash_enabled = _dash_available
 	_update_emitters(true)
 	_update_blue_beacon(true)
-	_handle_resonator_input()
+	if _resonator_available:
+		_handle_resonator_input()
+	if _objective == "reach_exit":
+		_handle_room_exit()
 	_update_ui()
 
 
@@ -294,6 +312,9 @@ func _create_blue_beacon(config: Dictionary) -> void:
 	_blue_beacon = BLUE_BEACON_SCRIPT.new()
 	_blue_beacon.name = config.get("name", "BlueBeacon")
 	_blue_beacon.global_position = config.get("position", Vector2.ZERO)
+	_blue_beacon.interval = config.get("interval", _blue_beacon.interval)
+	_blue_beacon.initial_delay = config.get("initial_delay", _blue_beacon.initial_delay)
+	_blue_beacon.active_at = config.get("active_at", _blue_beacon.active_at)
 	_blue_beacon_wave_config = config.get("wave", {})
 	_blue_beacon.fired_friendly_wave.connect(_on_blue_beacon_fired)
 	add_child(_blue_beacon)
@@ -356,6 +377,9 @@ func _on_emitter_defeated(_emitter) -> void:
 	if _state != "combat":
 		return
 	_kills += 1
+	if _objective != "defeat_emitters":
+		_update_ui()
+		return
 	if _kills >= _kills_to_win:
 		_unlock_exit()
 		return
@@ -548,16 +572,25 @@ func _update_ui() -> void:
 		return
 
 	var time_left := maxf(0.0, _battle_length - _elapsed)
-	_timer_label.text = _t("room_timer") % [
-		_encounter_index + 1,
-		_dungeon_sequence.size(),
-		time_left,
-		_kills,
-		_kills_to_win,
-	]
+	if _objective == "reach_exit":
+		_timer_label.text = _t("room_route_timer") % [
+			_encounter_index + 1,
+			_dungeon_sequence.size(),
+			time_left,
+		]
+	else:
+		_timer_label.text = _t("room_timer") % [
+			_encounter_index + 1,
+			_dungeon_sequence.size(),
+			time_left,
+			_kills,
+			_kills_to_win,
+		]
 
 	if _state == "combat":
-		if not player.counter_wave_enabled:
+		if _objective == "reach_exit":
+			_status_label.text = _t("reach_exit")
+		elif not _player_wave_available:
 			_status_label.text = _t("survive")
 		elif player.get_cooldown_ratio() > 0.0:
 			_status_label.text = _t("recharging")

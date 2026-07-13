@@ -21,6 +21,7 @@ const PLAYER_SPRITE_PIVOT_SOURCE := Vector2(309.0, 373.0)
 
 var hit_points := 30
 var counter_wave_enabled := false
+var dash_enabled := true
 var _fire_cooldown := 0.0
 var _held_fire_timer := 0.0
 var _dash_time_left := 0.0
@@ -61,7 +62,7 @@ func _physics_process(delta: float) -> void:
 		_last_move_dir = input_dir
 
 	var dash_down := Input.is_key_pressed(KEY_SPACE)
-	if dash_down and not _dash_was_down and _dash_cooldown <= 0.0:
+	if dash_enabled and dash_down and not _dash_was_down and _dash_cooldown <= 0.0:
 		_dash_time_left = DASH_TIME
 		_dash_cooldown = DASH_COOLDOWN
 	_dash_was_down = dash_down
@@ -156,6 +157,8 @@ func _draw_player_sprite(sprite_alpha: float) -> void:
 
 
 func _draw_counter_wave_reach() -> void:
+	if not counter_wave_enabled:
+		return
 	draw_circle(Vector2.ZERO, COUNTER_WAVE_REACH_RADIUS, Color(0.44, 0.19, 1.0, 0.035))
 	draw_arc(Vector2.ZERO, COUNTER_WAVE_REACH_RADIUS, 0.0, TAU, 192, Color(0.58, 0.34, 1.0, 0.24), 2.0, true)
 

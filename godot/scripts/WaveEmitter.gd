@@ -20,6 +20,7 @@ const RED_EMITTER_TEXTURE := preload("res://assets/actors/emitter_red_base.png")
 const GOLD_BOSS_TEXTURE := preload("res://assets/actors/boss_golden_knight_topdown.png")
 
 var wave_manager
+var wave_config := {}
 var combat_time := 0.0
 var combat_running := false
 var hit_points := 8
@@ -78,7 +79,7 @@ func take_damage(amount: int) -> void:
 func _fire_wave() -> void:
 	if not is_instance_valid(wave_manager):
 		return
-	wave_manager.spawn_wave("enemy", wave_kind, global_position)
+	wave_manager.spawn_wave("enemy", wave_kind, global_position, wave_config)
 
 
 func _draw() -> void:
@@ -110,19 +111,22 @@ func _draw_damage_reach(base_color: Color, active: bool) -> void:
 	if wave_kind == "gold":
 		_draw_line_damage_reach(fill, edge)
 	else:
-		draw_circle(Vector2.ZERO, RED_REACH_RADIUS, fill)
-		draw_arc(Vector2.ZERO, RED_REACH_RADIUS, 0.0, TAU, 192, edge, 2.0, true)
+		var reach_radius: float = wave_config.get("max_radius", RED_REACH_RADIUS)
+		draw_circle(Vector2.ZERO, reach_radius, fill)
+		draw_arc(Vector2.ZERO, reach_radius, 0.0, TAU, 192, edge, 2.0, true)
 
 
 func _draw_line_damage_reach(fill: Color, edge: Color) -> void:
 	var direction := Vector2.DOWN
 	var tangent := Vector2.RIGHT
-	var front := direction * GOLD_REACH_LENGTH
+	var reach_length: float = wave_config.get("max_radius", GOLD_REACH_LENGTH)
+	var half_width: float = wave_config.get("line_half_length", GOLD_REACH_HALF_WIDTH)
+	var front := direction * reach_length
 	var points: PackedVector2Array = [
-		-tangent * GOLD_REACH_HALF_WIDTH,
-		tangent * GOLD_REACH_HALF_WIDTH,
-		front + tangent * GOLD_REACH_HALF_WIDTH,
-		front - tangent * GOLD_REACH_HALF_WIDTH,
+		-tangent * half_width,
+		tangent * half_width,
+		front + tangent * half_width,
+		front - tangent * half_width,
 	]
 	draw_colored_polygon(points, fill)
 	for i in range(points.size()):
