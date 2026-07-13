@@ -6,7 +6,7 @@ signal hit_points_changed(hit_points: int)
 signal died
 
 const ARENA_RECT := Rect2(Vector2(110, 90), Vector2(1060, 560))
-const SPEED := 245.0
+const SPEED := 318.5
 const DASH_SPEED := 650.0
 const DASH_TIME := 0.13
 const DASH_COOLDOWN := 0.55

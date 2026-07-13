@@ -21,6 +21,7 @@ const GOLD_BOSS_TEXTURE := preload("res://assets/actors/boss_golden_knight_topdo
 
 var wave_manager
 var wave_config := {}
+var damage_mode := "direct"
 var combat_time := 0.0
 var combat_running := false
 var hit_points := 8
@@ -61,7 +62,15 @@ func is_destroyed() -> bool:
 
 
 func can_take_damage() -> bool:
-	return _is_active()
+	return _is_active() and damage_mode != "none"
+
+
+func can_take_direct_damage() -> bool:
+	return can_take_damage() and damage_mode == "direct"
+
+
+func can_take_boost_damage() -> bool:
+	return can_take_damage() and damage_mode in ["direct", "boost_only"]
 
 
 func take_damage(amount: int) -> void:
@@ -98,7 +107,8 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, HITBOX_RADIUS + 8.0, 0.0, TAU, 48, Color(0.80, 0.92, 1.0, 0.70), 3.0, true)
 	_draw_hitbox(base_color, alpha)
 	_draw_wave_timer(base_color, active, charge)
-	_draw_hp_bar()
+	if damage_mode != "none":
+		_draw_hp_bar()
 
 
 func _draw_damage_reach(base_color: Color, active: bool) -> void:

@@ -74,7 +74,6 @@ static func _base_room(id: String, title) -> Dictionary:
 
 static func _small_red_wave(radius: float = 235.0) -> Dictionary:
 	return {
-		"speed": 108.0,
 		"lifetime": 4.2,
 		"max_radius": radius,
 	}
@@ -88,7 +87,6 @@ static func _old_sluice_room_01_red_route() -> Dictionary:
 	room["objective"] = "reach_exit"
 	room["battle_length"] = 70.0
 	room["player_wave_enabled"] = false
-	room["dash_enabled"] = false
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
@@ -100,30 +98,33 @@ static func _old_sluice_room_01_red_route() -> Dictionary:
 	room["emitters"] = [
 		{
 			"name": "RedRouteLeft",
-			"position": Vector2(340, 210),
+			"position": Vector2(360, 205),
 			"wave_kind": "red",
-			"interval": 2.35,
+			"interval": 3.45,
 			"initial_delay": 0.30,
 			"active_at": 0.0,
-			"wave": _small_red_wave(225.0),
+			"damage_mode": "none",
+			"wave": _small_red_wave(190.0),
 		},
 		{
 			"name": "RedRouteMid",
-			"position": Vector2(650, 255),
+			"position": Vector2(640, 370),
 			"wave_kind": "red",
-			"interval": 2.55,
-			"initial_delay": 1.10,
+			"interval": 3.45,
+			"initial_delay": 1.45,
 			"active_at": 0.0,
-			"wave": _small_red_wave(215.0),
+			"damage_mode": "none",
+			"wave": _small_red_wave(185.0),
 		},
 		{
 			"name": "RedRouteRight",
-			"position": Vector2(945, 210),
+			"position": Vector2(920, 205),
 			"wave_kind": "red",
-			"interval": 2.45,
-			"initial_delay": 0.75,
+			"interval": 3.45,
+			"initial_delay": 2.60,
 			"active_at": 0.0,
-			"wave": _small_red_wave(225.0),
+			"damage_mode": "none",
+			"wave": _small_red_wave(190.0),
 		},
 	]
 	return room
@@ -137,7 +138,6 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 	room["objective"] = "reach_exit"
 	room["battle_length"] = 75.0
 	room["player_wave_enabled"] = false
-	room["dash_enabled"] = false
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
@@ -148,12 +148,11 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 	}
 	room["blue_beacon"] = {
 		"name": "BlueBeacon",
-		"position": Vector2(365, 510),
-		"interval": 2.9,
-		"initial_delay": 0.35,
+		"position": Vector2(480, 330),
+		"interval": 3.0,
+		"initial_delay": 0.0,
 		"wave": {
-			"speed": 180.0,
-			"lifetime": 2.8,
+			"lifetime": 7.2,
 			"max_radius": Wave.RED_MAX_RADIUS,
 			"can_damage_emitters": false,
 			"can_create_boost": false,
@@ -162,12 +161,17 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 	room["emitters"] = [
 		{
 			"name": "RedEmitterA",
-			"position": Vector2(760, 185),
+			"position": Vector2(800, 330),
 			"wave_kind": "red",
-			"interval": 2.25,
-			"initial_delay": 0.35,
+			"interval": 3.0,
+			"initial_delay": 0.0,
 			"active_at": 0.0,
+			"damage_mode": "none",
 			"max_hit_points": 5,
+			"wave": {
+				"lifetime": 7.2,
+				"max_radius": Wave.RED_MAX_RADIUS,
+			},
 		},
 	]
 	return room
@@ -180,15 +184,23 @@ static func _old_sluice_room_03_make_gap() -> Dictionary:
 	})
 	room["objective"] = "reach_exit"
 	room["battle_length"] = 75.0
-	room["dash_enabled"] = false
+	room["player_wave_enabled"] = false
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
-			"en": "Now do it yourself. Fire violet into red and walk through the gap you made.",
-			"ru": "Теперь сделай это сам. Пусти фиолетовую волну в красную и пройди через созданный разрыв.",
+			"en": "Pick up the violet emitter, then cut a route through red. The red source is not a target yet.",
+			"ru": "Подбери фиолетовый эмиттер и прорежь маршрут через красное. Красный источник пока не цель.",
 		},
 		"duration": 6.5,
 	}
+	room["pickups"] = [
+		{
+			"name": "VioletEmitterPickup",
+			"kind": "violet_emitter",
+			"position": Vector2(640, 500),
+			"color": Color(0.62, 0.32, 1.0, 0.82),
+		},
+	]
 	room["emitters"] = [
 		{
 			"name": "RedEmitterA",
@@ -197,6 +209,7 @@ static func _old_sluice_room_03_make_gap() -> Dictionary:
 			"interval": 2.25,
 			"initial_delay": 0.45,
 			"active_at": 0.0,
+			"damage_mode": "none",
 			"max_hit_points": 4,
 		},
 	]
@@ -221,20 +234,22 @@ static func _old_sluice_room_04_wave_dash() -> Dictionary:
 	room["emitters"] = [
 		{
 			"name": "RedEmitterA",
-			"position": Vector2(520, 170),
+			"position": Vector2(480, 185),
 			"wave_kind": "red",
-			"interval": 2.05,
+			"interval": 2.35,
 			"initial_delay": 0.35,
 			"active_at": 0.0,
+			"damage_mode": "none",
 			"max_hit_points": 4,
 		},
 		{
 			"name": "RedEmitterB",
-			"position": Vector2(825, 185),
+			"position": Vector2(800, 185),
 			"wave_kind": "red",
-			"interval": 2.55,
-			"initial_delay": 1.10,
-			"active_at": 8.0,
+			"interval": 2.35,
+			"initial_delay": 1.50,
+			"active_at": 0.0,
+			"damage_mode": "none",
 			"max_hit_points": 4,
 		},
 	]
@@ -264,6 +279,7 @@ static func _old_sluice_room_05_active_emitter() -> Dictionary:
 			"interval": 2.35,
 			"initial_delay": 0.40,
 			"active_at": 0.0,
+			"damage_mode": "direct",
 			"max_hit_points": 4,
 		},
 	]
@@ -287,12 +303,11 @@ static func _old_sluice_room_06_blue_resonance() -> Dictionary:
 	}
 	room["blue_beacon"] = {
 		"name": "BlueBeacon",
-		"position": Vector2(330, 510),
-		"interval": 2.8,
-		"initial_delay": 0.35,
+		"position": Vector2(480, 330),
+		"interval": 3.0,
+		"initial_delay": 0.0,
 		"wave": {
-			"speed": 190.0,
-			"lifetime": 2.6,
+			"lifetime": 7.2,
 			"max_radius": Wave.RED_MAX_RADIUS,
 			"can_damage_emitters": false,
 			"can_create_boost": true,
@@ -301,12 +316,17 @@ static func _old_sluice_room_06_blue_resonance() -> Dictionary:
 	room["emitters"] = [
 		{
 			"name": "RedEmitterA",
-			"position": Vector2(835, 185),
+			"position": Vector2(800, 330),
 			"wave_kind": "red",
-			"interval": 2.4,
-			"initial_delay": 0.40,
+			"interval": 3.0,
+			"initial_delay": 0.0,
 			"active_at": 0.0,
+			"damage_mode": "boost_only",
 			"max_hit_points": 6,
+			"wave": {
+				"lifetime": 7.2,
+				"max_radius": Wave.RED_MAX_RADIUS,
+			},
 		},
 	]
 	return room
@@ -319,34 +339,44 @@ static func _old_sluice_room_07_resonator() -> Dictionary:
 	})
 	room["battle_length"] = 90.0
 	room["kills_to_win"] = 2
-	room["resonator_enabled"] = true
+	room["resonator_enabled"] = false
 	room["resonator_place_range"] = 260.0
 	room["player_position"] = Vector2(940, 570)
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
-			"en": "Place a resonator with RMB. LMB fires from you and from the resonator together.",
-			"ru": "Поставь резонатор ПКМ. ЛКМ запускает волну от тебя и от резонатора одновременно.",
+			"en": "Pick up the resonator, place it with RMB, then fire from you and from it together.",
+			"ru": "Подбери резонатор, поставь его ПКМ, затем запускай волну от себя и от него одновременно.",
 		},
 		"duration": 7.0,
 	}
+	room["pickups"] = [
+		{
+			"name": "ResonatorPickup",
+			"kind": "resonator",
+			"position": Vector2(640, 500),
+			"color": Color(0.62, 0.40, 1.0, 0.82),
+		},
+	]
 	room["emitters"] = [
 		{
 			"name": "RedEmitterA",
-			"position": Vector2(330, 180),
+			"position": Vector2(480, 185),
 			"wave_kind": "red",
 			"interval": 2.35,
-			"initial_delay": 0.50,
+			"initial_delay": 0.35,
 			"active_at": 0.0,
+			"damage_mode": "direct",
 			"max_hit_points": 5,
 		},
 		{
 			"name": "RedEmitterB",
-			"position": Vector2(720, 180),
+			"position": Vector2(800, 185),
 			"wave_kind": "red",
-			"interval": 2.75,
-			"initial_delay": 1.15,
-			"active_at": 10.0,
+			"interval": 2.35,
+			"initial_delay": 1.50,
+			"active_at": 0.0,
+			"damage_mode": "direct",
 			"max_hit_points": 4,
 		},
 	]
@@ -365,7 +395,6 @@ static func _mvp_combat_test() -> Dictionary:
 		"name": "BlueBeacon",
 		"position": Vector2(305, 515),
 		"wave": {
-			"speed": 190.0,
 			"lifetime": 2.6,
 			"max_radius": Wave.RED_MAX_RADIUS,
 			"can_damage_emitters": false,

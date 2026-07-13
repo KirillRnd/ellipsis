@@ -9,6 +9,7 @@ const PLAYER_WAVE_DAMAGE = 1
 const PLAYER_NODE_DAMAGE = 3
 const ENEMY_NODE_DAMAGE = 3
 const NODE_HIT_RADIUS = 26.0
+const BOOST_NODE_RADIUS = 28.0
 const EMITTER_HITBOX_RADIUS := WaveEmitter.HITBOX_RADIUS
 const MIN_ERASE_SEGMENT = 72.0
 const ERASE_ARC_WIDTH = 0.30
@@ -111,26 +112,28 @@ func _damage_emitters() -> void:
 		if not is_instance_valid(emitter) or not emitter.can_take_damage():
 			continue
 		var emitter_id = emitter.get_instance_id()
-		for wave in player_waves:
-			if not is_instance_valid(wave):
-				continue
-			if not wave.can_damage_emitters:
-				continue
-			if wave.damaged_emitters.has(emitter_id):
-				continue
-			if wave.is_crest_at(emitter.global_position, EMITTER_HITBOX_RADIUS):
-				wave.damaged_emitters[emitter_id] = true
-				emitter.take_damage(PLAYER_WAVE_DAMAGE)
+		if emitter.can_take_direct_damage():
+			for wave in player_waves:
+				if not is_instance_valid(wave):
+					continue
+				if not wave.can_damage_emitters:
+					continue
+				if wave.damaged_emitters.has(emitter_id):
+					continue
+				if wave.is_crest_at(emitter.global_position, EMITTER_HITBOX_RADIUS):
+					wave.damaged_emitters[emitter_id] = true
+					emitter.take_damage(PLAYER_WAVE_DAMAGE)
 
-		for pair in _player_intersection_pairs():
-			var key = "%s:%s:%s" % [pair[0].get_instance_id(), pair[1].get_instance_id(), emitter_id]
-			if _boost_damage_marks.has(key):
-				continue
-			for point in _front_intersections(pair[0], pair[1]):
-				if point.distance_to(emitter.global_position) <= EMITTER_HITBOX_RADIUS:
-					_boost_damage_marks[key] = true
-					emitter.take_damage(PLAYER_NODE_DAMAGE)
-					break
+		if emitter.can_take_boost_damage():
+			for pair in _player_intersection_pairs():
+				var key = "%s:%s:%s" % [pair[0].get_instance_id(), pair[1].get_instance_id(), emitter_id]
+				if _boost_damage_marks.has(key):
+					continue
+				for point in _front_intersections(pair[0], pair[1]):
+					if point.distance_to(emitter.global_position) <= BOOST_NODE_RADIUS:
+						_boost_damage_marks[key] = true
+						emitter.take_damage(PLAYER_NODE_DAMAGE)
+						break
 
 
 func _draw() -> void:
@@ -378,7 +381,7 @@ func _draw_enemy_danger_node(point: Vector2) -> void:
 
 
 func _draw_player_boost_node(point: Vector2) -> void:
-	draw_circle(point, 28.0, Color(0.10, 0.45, 1.0, 0.22))
+	draw_circle(point, BOOST_NODE_RADIUS, Color(0.10, 0.45, 1.0, 0.22))
 	draw_circle(point, 14.0, Color(0.24, 0.72, 1.0, 0.58))
 	draw_circle(point, 5.0, Color(0.88, 0.98, 1.0, 0.95))
 	draw_line(point + Vector2(-16, 0), point + Vector2(16, 0), Color(0.72, 0.94, 1.0, 0.72), 2.0, true)

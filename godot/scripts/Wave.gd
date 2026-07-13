@@ -7,13 +7,14 @@ const PLAYER_MAX_RADIUS := 300.0
 const RED_MAX_RADIUS := 425.0
 const GOLD_MAX_RADIUS := 430.0
 const GOLD_LINE_HALF_LENGTH := 700.0
+const SHARED_SPEED := 118.0
 const SHARED_CREST_WIDTH := 14.0
 
 var wave_owner := "enemy"
 var wave_kind := "red"
 var wave_shape := "circle"
 var radius := 0.0
-var speed := 120.0
+var speed := SHARED_SPEED
 var lifetime := 7.0
 var max_radius := 900.0
 var crest_spacing := 54.0
@@ -45,7 +46,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 			can_create_boost = false
 		else:
 			color = Color(0.44, 0.19, 1.0)
-		speed = 255.0
+		speed = SHARED_SPEED
 		lifetime = 2.35
 		crest_spacing = 42.0
 		crest_width = SHARED_CREST_WIDTH
@@ -54,7 +55,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 	elif wave_kind == "gold":
 		wave_shape = "line"
 		color = Color(1.0, 0.78, 0.33)
-		speed = 105.0
+		speed = SHARED_SPEED
 		lifetime = 8.0
 		crest_spacing = 70.0
 		crest_width = SHARED_CREST_WIDTH
@@ -63,14 +64,13 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 		phase = PI * 0.35
 	else:
 		color = Color(1.0, 0.06, 0.13)
-		speed = 118.0
+		speed = SHARED_SPEED
 		lifetime = 7.2
 		crest_spacing = 56.0
 		crest_width = SHARED_CREST_WIDTH
 		max_radius = RED_MAX_RADIUS
 		phase = 0.0
 
-	speed = config.get("speed", speed)
 	lifetime = config.get("lifetime", lifetime)
 	crest_spacing = config.get("crest_spacing", crest_spacing)
 	crest_width = config.get("crest_width", crest_width)

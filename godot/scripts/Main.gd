@@ -32,6 +32,8 @@ const UI_TEXT := {
 	"reach_exit": {"en": "REACH THE EXIT", "ru": "ДОЙДИ ДО ВЫХОДА"},
 	"hint_popup_footer": {"en": "Move, click, or wait to close", "ru": "Двигайся, кликни или подожди, чтобы закрыть"},
 	"recharging": {"en": "RECHARGING", "ru": "ПЕРЕЗАРЯДКА"},
+	"violet_emitter_pickup": {"en": "VIOLET EMITTER ACQUIRED", "ru": "ФИОЛЕТОВЫЙ ЭМИТТЕР ПОЛУЧЕН"},
+	"resonator_pickup": {"en": "RESONATOR ACQUIRED", "ru": "РЕЗОНАТОР ПОЛУЧЕН"},
 	"resonator_set": {"en": "RESONATOR SET", "ru": "РЕЗОНАТОР ПОСТАВЛЕН"},
 	"room_clear_timer": {"en": "ROOM %d/%d  KILLS %d/%d", "ru": "КОМ %d/%d  ЦЕЛИ %d/%d"},
 	"room_route_timer": {"en": "ROOM %d/%d  TIME %05.1f  EXIT", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ВЫХОД"},
@@ -80,6 +82,7 @@ var _hint_popup_title: Label
 var _hint_popup_body: Label
 var _hint_popup_footer: Label
 var _hint_popup_left := 0.0
+var _pickup_items: Array = []
 var _timer_label: Label
 var _hp_label: Label
 var _status_label: Label
@@ -126,6 +129,7 @@ func _load_encounter(index: int) -> void:
 		emitter.defeated.connect(_on_emitter_defeated)
 
 	_create_blue_beacon(_current_encounter.get("blue_beacon", {}))
+	_create_pickups(_current_encounter.get("pickups", []))
 	_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
 	_update_ui()
 
@@ -147,6 +151,12 @@ func _clear_current_encounter() -> void:
 
 	if is_instance_valid(wave_manager):
 		wave_manager.clear_all_waves()
+
+	for pickup in _pickup_items:
+		var visual = pickup.get("visual")
+		if is_instance_valid(visual):
+			visual.queue_free()
+	_pickup_items.clear()
 
 
 func _apply_encounter_settings(encounter: Dictionary) -> void:
@@ -180,8 +190,49 @@ func _create_emitters(emitter_configs: Array) -> void:
 		emitter.active_at = emitter_config.get("active_at", emitter.active_at)
 		emitter.max_hit_points = emitter_config.get("max_hit_points", emitter.max_hit_points)
 		emitter.wave_config = emitter_config.get("wave", {})
+		emitter.damage_mode = emitter_config.get("damage_mode", emitter.damage_mode)
 		add_child(emitter)
 		_emitters.append(emitter)
+
+
+func _create_pickups(pickup_configs: Array) -> void:
+	for pickup_config in pickup_configs:
+		var position: Vector2 = pickup_config.get("position", Vector2.ZERO)
+		var size := Vector2(36, 36)
+		var visual := ColorRect.new()
+		visual.name = pickup_config.get("name", "Pickup")
+		visual.position = position - size * 0.5
+		visual.size = size
+		visual.color = pickup_config.get("color", Color(0.62, 0.40, 1.0, 0.82))
+		add_child(visual)
+		_pickup_items.append({
+			"kind": pickup_config.get("kind", ""),
+			"rect": Rect2(position - size * 0.75, size * 1.5),
+			"visual": visual,
+		})
+
+
+func _update_pickups() -> void:
+	for i in range(_pickup_items.size() - 1, -1, -1):
+		var pickup: Dictionary = _pickup_items[i]
+		var rect: Rect2 = pickup.get("rect", Rect2())
+		if not rect.has_point(player.global_position):
+			continue
+		_apply_pickup(pickup.get("kind", ""))
+		var visual = pickup.get("visual")
+		if is_instance_valid(visual):
+			visual.queue_free()
+		_pickup_items.remove_at(i)
+
+
+func _apply_pickup(kind: String) -> void:
+	if kind == "violet_emitter":
+		_player_wave_available = true
+		player.counter_wave_enabled = true
+		_status_label.text = _t("violet_emitter_pickup")
+	elif kind == "resonator":
+		_resonator_available = true
+		_status_label.text = _t("resonator_pickup")
 
 
 func _process(delta: float) -> void:
@@ -205,6 +256,7 @@ func _process(delta: float) -> void:
 	player.dash_enabled = _dash_available
 	_update_emitters(true)
 	_update_blue_beacon(true)
+	_update_pickups()
 	if _resonator_available:
 		_handle_resonator_input()
 	if _objective == "reach_exit":
