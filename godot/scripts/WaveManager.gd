@@ -111,6 +111,7 @@ func _point_on_enemy_interference_node(global_point: Vector2) -> bool:
 
 
 func _damage_emitters() -> void:
+	var safe_gaps := _build_safe_gaps()
 	for emitter in emitters:
 		if not is_instance_valid(emitter) or not emitter.can_take_damage():
 			continue
@@ -124,6 +125,8 @@ func _damage_emitters() -> void:
 				if wave.damaged_emitters.has(emitter_id):
 					continue
 				if wave.is_crest_at(emitter.global_position, EMITTER_HITBOX_RADIUS):
+					if _point_inside_safe_gap(emitter.global_position, wave, safe_gaps):
+						continue
 					wave.damaged_emitters[emitter_id] = true
 					emitter.take_damage(PLAYER_WAVE_DAMAGE)
 
@@ -134,6 +137,8 @@ func _damage_emitters() -> void:
 					continue
 				for point in _front_intersections(pair[0], pair[1]):
 					if point.distance_to(emitter.global_position) <= BOOST_NODE_RADIUS:
+						if _point_inside_safe_gap(point, pair[0], safe_gaps) or _point_inside_safe_gap(point, pair[1], safe_gaps):
+							continue
 						_boost_damage_marks[key] = true
 						emitter.take_damage(PLAYER_NODE_DAMAGE)
 						break
@@ -169,9 +174,12 @@ func _draw_enemy_interference_nodes() -> void:
 
 
 func _draw_player_interference_nodes() -> void:
+	var safe_gaps := _build_safe_gaps()
 	for pair in _player_intersection_pairs():
 		for point in _front_intersections(pair[0], pair[1]):
 			if ARENA_RECT.has_point(point):
+				if _point_inside_safe_gap(point, pair[0], safe_gaps) or _point_inside_safe_gap(point, pair[1], safe_gaps):
+					continue
 				_draw_player_boost_node(point)
 
 
@@ -197,78 +205,83 @@ func _enemy_waves() -> Array:
 
 
 func _build_safe_gaps() -> Array:
-	var raw_by_enemy := {}
+	var raw_by_wave := {}
 	for enemy_wave in _enemy_waves():
-		raw_by_enemy[enemy_wave.get_instance_id()] = {
-			"enemy_wave": enemy_wave,
-			"circle": [],
-			"line": [],
-		}
-
-	for enemy_wave in _enemy_waves():
-		var enemy_id = enemy_wave.get_instance_id()
 		for counter_wave in player_waves:
 			if not is_instance_valid(counter_wave):
 				continue
 			for point in _front_intersections(enemy_wave, counter_wave):
 				if not ARENA_RECT.has_point(point):
 					continue
-				if enemy_wave.wave_shape == "line":
-					_append_line_safe_gap(raw_by_enemy[enemy_id]["line"], enemy_wave, counter_wave, point)
-				else:
-					_append_arc_safe_gap(raw_by_enemy[enemy_id]["circle"], enemy_wave, counter_wave, point)
+				_append_safe_gap(raw_by_wave, enemy_wave, counter_wave, point)
+				_append_safe_gap(raw_by_wave, counter_wave, enemy_wave, point)
 
 	var result := []
-	for enemy_id in raw_by_enemy.keys():
-		var entry = raw_by_enemy[enemy_id]
+	for wave_id in raw_by_wave.keys():
+		var entry = raw_by_wave[wave_id]
 		result.append_array(_merge_safe_gap_intervals(entry["circle"], SAFE_GAP_ARC_MERGE_TOLERANCE, true))
 		result.append_array(_merge_safe_gap_intervals(entry["line"], SAFE_GAP_LINE_MERGE_TOLERANCE, false))
 	return result
 
 
-func _append_arc_safe_gap(gaps: Array, enemy_wave, counter_wave, point: Vector2) -> void:
-	var radius: float = enemy_wave.radius
+func _append_safe_gap(raw_by_wave: Dictionary, protected_wave, suppress_wave, point: Vector2) -> void:
+	var wave_id = protected_wave.get_instance_id()
+	if not raw_by_wave.has(wave_id):
+		raw_by_wave[wave_id] = {
+			"protected_wave": protected_wave,
+			"circle": [],
+			"line": [],
+		}
+
+	if protected_wave.wave_shape == "line":
+		_append_line_safe_gap(raw_by_wave[wave_id]["line"], protected_wave, suppress_wave, point)
+	else:
+		_append_arc_safe_gap(raw_by_wave[wave_id]["circle"], protected_wave, suppress_wave, point)
+
+
+func _append_arc_safe_gap(gaps: Array, protected_wave, suppress_wave, point: Vector2) -> void:
+	var radius: float = protected_wave.radius
 	if radius * ERASE_ARC_WIDTH * 2.0 < MIN_ERASE_SEGMENT:
 		return
 
-	var angle := _normalize_angle_positive((point - enemy_wave.global_position).angle())
+	var angle := _normalize_angle_positive((point - protected_wave.global_position).angle())
 	var start := angle - ERASE_ARC_WIDTH
 	var end := angle + ERASE_ARC_WIDTH
-	_append_normalized_arc_interval(gaps, enemy_wave, counter_wave, start, end)
+	_append_normalized_arc_interval(gaps, protected_wave, suppress_wave, start, end)
 
 
-func _append_normalized_arc_interval(gaps: Array, enemy_wave, counter_wave, start: float, end: float) -> void:
+func _append_normalized_arc_interval(gaps: Array, protected_wave, suppress_wave, start: float, end: float) -> void:
 	if start < 0.0:
-		gaps.append(_make_safe_gap(enemy_wave, "circle", start + TAU, TAU, counter_wave, counter_wave))
-		gaps.append(_make_safe_gap(enemy_wave, "circle", 0.0, end, counter_wave, counter_wave))
+		gaps.append(_make_safe_gap(protected_wave, "circle", start + TAU, TAU, suppress_wave, suppress_wave))
+		gaps.append(_make_safe_gap(protected_wave, "circle", 0.0, end, suppress_wave, suppress_wave))
 	elif end > TAU:
-		gaps.append(_make_safe_gap(enemy_wave, "circle", start, TAU, counter_wave, counter_wave))
-		gaps.append(_make_safe_gap(enemy_wave, "circle", 0.0, end - TAU, counter_wave, counter_wave))
+		gaps.append(_make_safe_gap(protected_wave, "circle", start, TAU, suppress_wave, suppress_wave))
+		gaps.append(_make_safe_gap(protected_wave, "circle", 0.0, end - TAU, suppress_wave, suppress_wave))
 	else:
-		gaps.append(_make_safe_gap(enemy_wave, "circle", start, end, counter_wave, counter_wave))
+		gaps.append(_make_safe_gap(protected_wave, "circle", start, end, suppress_wave, suppress_wave))
 
 
-func _append_line_safe_gap(gaps: Array, enemy_wave, counter_wave, point: Vector2) -> void:
-	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
-	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
+func _append_line_safe_gap(gaps: Array, protected_wave, suppress_wave, point: Vector2) -> void:
+	var tangent = Vector2(-protected_wave.line_direction.y, protected_wave.line_direction.x)
+	var base = protected_wave.global_position + protected_wave.line_direction * protected_wave.radius
 	var side = (point - base).dot(tangent)
-	var edge_room = enemy_wave.line_half_length - absf(side)
+	var edge_room = protected_wave.line_half_length - absf(side)
 	if edge_room < MIN_ERASE_SEGMENT * 0.5:
 		return
 
-	var start = clampf(side - SAFE_GAP_LINE_HALF_LENGTH, -enemy_wave.line_half_length, enemy_wave.line_half_length)
-	var end = clampf(side + SAFE_GAP_LINE_HALF_LENGTH, -enemy_wave.line_half_length, enemy_wave.line_half_length)
-	gaps.append(_make_safe_gap(enemy_wave, "line", start, end, counter_wave, counter_wave))
+	var start = clampf(side - SAFE_GAP_LINE_HALF_LENGTH, -protected_wave.line_half_length, protected_wave.line_half_length)
+	var end = clampf(side + SAFE_GAP_LINE_HALF_LENGTH, -protected_wave.line_half_length, protected_wave.line_half_length)
+	gaps.append(_make_safe_gap(protected_wave, "line", start, end, suppress_wave, suppress_wave))
 
 
-func _make_safe_gap(enemy_wave, shape: String, start: float, end: float, start_wave, end_wave) -> Dictionary:
+func _make_safe_gap(protected_wave, shape: String, start: float, end: float, start_suppress_wave, end_suppress_wave) -> Dictionary:
 	return {
-		"enemy_wave": enemy_wave,
+		"protected_wave": protected_wave,
 		"shape": shape,
 		"start": start,
 		"end": end,
-		"start_wave": start_wave,
-		"end_wave": end_wave,
+		"start_suppress_wave": start_suppress_wave,
+		"end_suppress_wave": end_suppress_wave,
 	}
 
 
@@ -287,7 +300,7 @@ func _merge_safe_gap_intervals(gaps: Array, tolerance: float, wraps: bool) -> Ar
 		if gap["start"] <= current["end"] + tolerance:
 			if gap["end"] > current["end"]:
 				current["end"] = gap["end"]
-				current["end_wave"] = gap["end_wave"]
+				current["end_suppress_wave"] = gap["end_suppress_wave"]
 		else:
 			merged.append(gap.duplicate())
 
@@ -296,15 +309,15 @@ func _merge_safe_gap_intervals(gaps: Array, tolerance: float, wraps: bool) -> Ar
 		var last = merged[merged.size() - 1]
 		if first["start"] <= tolerance and last["end"] >= TAU - tolerance:
 			last["end"] = first["end"] + TAU
-			last["end_wave"] = first["end_wave"]
+			last["end_suppress_wave"] = first["end_suppress_wave"]
 			merged.remove_at(0)
 
 	return merged
 
 
-func _point_inside_safe_gap(global_point: Vector2, enemy_wave, safe_gaps: Array) -> bool:
+func _point_inside_safe_gap(global_point: Vector2, protected_wave, safe_gaps: Array) -> bool:
 	for gap in safe_gaps:
-		if not is_instance_valid(gap["enemy_wave"]) or gap["enemy_wave"] != enemy_wave:
+		if not is_instance_valid(gap["protected_wave"]) or gap["protected_wave"] != protected_wave:
 			continue
 		if gap["shape"] == "line":
 			if _point_inside_line_safe_gap(global_point, gap):
@@ -315,8 +328,8 @@ func _point_inside_safe_gap(global_point: Vector2, enemy_wave, safe_gaps: Array)
 
 
 func _point_inside_arc_safe_gap(global_point: Vector2, gap: Dictionary) -> bool:
-	var enemy_wave = gap["enemy_wave"]
-	var angle := _normalize_angle_positive((global_point - enemy_wave.global_position).angle())
+	var protected_wave = gap["protected_wave"]
+	var angle := _normalize_angle_positive((global_point - protected_wave.global_position).angle())
 	var start: float = gap["start"]
 	var end: float = gap["end"]
 	if end > TAU and angle < start:
@@ -325,9 +338,9 @@ func _point_inside_arc_safe_gap(global_point: Vector2, gap: Dictionary) -> bool:
 
 
 func _point_inside_line_safe_gap(global_point: Vector2, gap: Dictionary) -> bool:
-	var enemy_wave = gap["enemy_wave"]
-	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
-	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
+	var protected_wave = gap["protected_wave"]
+	var tangent = Vector2(-protected_wave.line_direction.y, protected_wave.line_direction.x)
+	var base = protected_wave.global_position + protected_wave.line_direction * protected_wave.radius
 	var side = (global_point - base).dot(tangent)
 	return side >= gap["start"] and side <= gap["end"]
 
@@ -417,11 +430,11 @@ func _line_line_intersections(a, ar: float, b, br: float) -> Array[Vector2]:
 
 
 func _draw_merged_arc_safe_gap(gap: Dictionary) -> void:
-	var enemy_wave = gap["enemy_wave"]
-	if not is_instance_valid(enemy_wave):
+	var protected_wave = gap["protected_wave"]
+	if not is_instance_valid(protected_wave):
 		return
-	var center: Vector2 = enemy_wave.global_position
-	var radius: float = enemy_wave.radius
+	var center: Vector2 = protected_wave.global_position
+	var radius: float = protected_wave.radius
 	var start_angle: float = gap["start"]
 	var end_angle: float = gap["end"]
 	var point_count = maxi(8, int(ceil(absf(end_angle - start_angle) / TAU * 160.0)))
@@ -431,16 +444,16 @@ func _draw_merged_arc_safe_gap(gap: Dictionary) -> void:
 	draw_arc(center, radius, start_angle, end_angle, point_count, clear, SAFE_GAP_CLEAR_WIDTH, true)
 	draw_arc(center, radius, start_angle, end_angle, point_count, calm, SAFE_GAP_CORE_WIDTH, true)
 
-	_draw_arc_safe_gap_jamb(center, radius, start_angle, 1.0, enemy_wave, gap["start_wave"])
-	_draw_arc_safe_gap_jamb(center, radius, end_angle, -1.0, enemy_wave, gap["end_wave"])
+	_draw_arc_safe_gap_jamb(center, radius, start_angle, 1.0, protected_wave, gap["start_suppress_wave"])
+	_draw_arc_safe_gap_jamb(center, radius, end_angle, -1.0, protected_wave, gap["end_suppress_wave"])
 
 
 func _draw_merged_line_safe_gap(gap: Dictionary) -> void:
-	var enemy_wave = gap["enemy_wave"]
-	if not is_instance_valid(enemy_wave):
+	var protected_wave = gap["protected_wave"]
+	if not is_instance_valid(protected_wave):
 		return
-	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
-	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
+	var tangent = Vector2(-protected_wave.line_direction.y, protected_wave.line_direction.x)
+	var base = protected_wave.global_position + protected_wave.line_direction * protected_wave.radius
 	var start = base + tangent * float(gap["start"])
 	var end = base + tangent * float(gap["end"])
 	var clear := Color(0.42, 0.41, 0.39, 0.96)
@@ -448,27 +461,27 @@ func _draw_merged_line_safe_gap(gap: Dictionary) -> void:
 	calm.a = 0.14
 	draw_line(start, end, clear, SAFE_GAP_CLEAR_WIDTH, true)
 	draw_line(start, end, calm, SAFE_GAP_CORE_WIDTH, true)
-	_draw_line_safe_gap_jamb(start, tangent, 1.0, enemy_wave, gap["start_wave"])
-	_draw_line_safe_gap_jamb(end, tangent, -1.0, enemy_wave, gap["end_wave"])
+	_draw_line_safe_gap_jamb(start, tangent, 1.0, protected_wave, gap["start_suppress_wave"])
+	_draw_line_safe_gap_jamb(end, tangent, -1.0, protected_wave, gap["end_suppress_wave"])
 
 
-func _draw_arc_safe_gap_jamb(center: Vector2, radius: float, edge_angle: float, inner_sign: float, enemy_wave, counter_wave) -> void:
+func _draw_arc_safe_gap_jamb(center: Vector2, radius: float, edge_angle: float, inner_sign: float, protected_wave, suppress_wave) -> void:
 	var direction := Vector2.from_angle(edge_angle)
 	var tangent := Vector2(-direction.y, direction.x)
 	var jamb_center := center + direction * radius
-	_draw_safe_gap_jamb(jamb_center, direction, tangent * inner_sign, enemy_wave, counter_wave)
+	_draw_safe_gap_jamb(jamb_center, direction, tangent * inner_sign, protected_wave, suppress_wave)
 
 
-func _draw_line_safe_gap_jamb(center: Vector2, tangent: Vector2, inner_sign: float, enemy_wave, counter_wave) -> void:
-	_draw_safe_gap_jamb(center, enemy_wave.line_direction, tangent * inner_sign, enemy_wave, counter_wave)
+func _draw_line_safe_gap_jamb(center: Vector2, tangent: Vector2, inner_sign: float, protected_wave, suppress_wave) -> void:
+	_draw_safe_gap_jamb(center, protected_wave.line_direction, tangent * inner_sign, protected_wave, suppress_wave)
 
 
-func _draw_safe_gap_jamb(center: Vector2, direction: Vector2, inner_offset_direction: Vector2, enemy_wave, counter_wave) -> void:
+func _draw_safe_gap_jamb(center: Vector2, direction: Vector2, inner_offset_direction: Vector2, protected_wave, suppress_wave) -> void:
 	var from := center - direction * SAFE_GAP_JAMB_DEPTH
 	var to := center + direction * SAFE_GAP_JAMB_DEPTH
 	var normal := inner_offset_direction.normalized()
-	_draw_safe_gap_boundary_half(from, to, -normal, enemy_wave.color, _safe_gap_wave_alpha(enemy_wave))
-	_draw_safe_gap_boundary_half(from, to, normal, _safe_gap_suppress_color(counter_wave), _safe_gap_wave_alpha(counter_wave))
+	_draw_safe_gap_boundary_half(from, to, -normal, protected_wave.color, _safe_gap_wave_alpha(protected_wave))
+	_draw_safe_gap_boundary_half(from, to, normal, _safe_gap_suppress_color(suppress_wave), _safe_gap_wave_alpha(suppress_wave))
 
 
 func _draw_safe_gap_boundary_half(from: Vector2, to: Vector2, side: Vector2, base_color: Color, local_alpha: float) -> void:
@@ -495,15 +508,19 @@ func _safe_gap_wave_alpha(wave) -> float:
 	return fade * clampf(wave.radius / 90.0, 0.35, 1.0)
 
 
-func _safe_gap_suppress_color(counter_wave) -> Color:
-	if is_instance_valid(counter_wave) and counter_wave.wave_kind == "blue":
+func _safe_gap_suppress_color(suppress_wave) -> Color:
+	if not is_instance_valid(suppress_wave):
+		return Color(0.62, 0.36, 1.0)
+	if suppress_wave.wave_owner == "enemy":
+		return suppress_wave.color
+	if suppress_wave.wave_kind == "blue":
 		return Color(0.26, 0.76, 1.0)
 	return Color(0.62, 0.36, 1.0)
 
 
 func _safe_gap_body_color(gap: Dictionary) -> Color:
-	var start_color := _safe_gap_suppress_color(gap["start_wave"])
-	var end_color := _safe_gap_suppress_color(gap["end_wave"])
+	var start_color := _safe_gap_suppress_color(gap["start_suppress_wave"])
+	var end_color := _safe_gap_suppress_color(gap["end_suppress_wave"])
 	if start_color == end_color:
 		return start_color
 	return start_color.lerp(end_color, 0.5)
