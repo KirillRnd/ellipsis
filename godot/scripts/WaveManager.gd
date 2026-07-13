@@ -19,6 +19,9 @@ const SAFE_GAP_JAMB_DEPTH := 28.0
 const SAFE_GAP_BOUNDARY_GLOW_WIDTH := Wave.SHARED_CREST_WIDTH
 const SAFE_GAP_BOUNDARY_LINE_WIDTH := Wave.SHARED_CREST_WIDTH * 0.425
 const SAFE_GAP_BOUNDARY_CORE_WIDTH := 1.0
+const SAFE_GAP_LINE_HALF_LENGTH := 56.0
+const SAFE_GAP_ARC_MERGE_TOLERANCE := 0.015
+const SAFE_GAP_LINE_MERGE_TOLERANCE := 3.0
 
 var player
 var emitters: Array = []
@@ -70,14 +73,13 @@ func _process(_delta: float) -> void:
 
 
 func get_point_danger(global_point: Vector2) -> int:
-	var enemy_wave = _first_enemy_crest_at(global_point, 7.0)
-	if enemy_wave == null:
+	var enemy_waves = _enemy_crests_at(global_point, 7.0)
+	if enemy_waves.is_empty():
 		return 0
 
-	for counter_wave in player_waves:
-		if not is_instance_valid(counter_wave):
-			continue
-		if counter_wave.is_crest_at(global_point, 24.0):
+	var safe_gaps := _build_safe_gaps()
+	for enemy_wave in enemy_waves:
+		if _point_inside_safe_gap(global_point, enemy_wave, safe_gaps):
 			return -1
 
 	if _point_on_enemy_interference_node(global_point):
@@ -86,13 +88,14 @@ func get_point_danger(global_point: Vector2) -> int:
 	return 1
 
 
-func _first_enemy_crest_at(global_point: Vector2, margin: float):
+func _enemy_crests_at(global_point: Vector2, margin: float) -> Array:
+	var result = []
 	for wave in waves:
 		if not is_instance_valid(wave):
 			continue
 		if wave.wave_owner == "enemy" and wave.is_crest_at(global_point, margin):
-			return wave
-	return null
+			result.append(wave)
+	return result
 
 
 func _point_on_enemy_interference_node(global_point: Vector2) -> bool:
@@ -143,13 +146,11 @@ func _draw() -> void:
 
 
 func _draw_player_erasure() -> void:
-	for enemy_wave in waves:
-		if not is_instance_valid(enemy_wave) or enemy_wave.wave_owner != "enemy":
-			continue
-		for counter_wave in player_waves:
-			if not is_instance_valid(counter_wave):
-				continue
-			_draw_erasure_between(enemy_wave, counter_wave)
+	for gap in _build_safe_gaps():
+		if gap.get("shape", "") == "line":
+			_draw_merged_line_safe_gap(gap)
+		else:
+			_draw_merged_arc_safe_gap(gap)
 
 
 func _draw_enemy_interference_nodes() -> void:
@@ -195,10 +196,144 @@ func _enemy_waves() -> Array:
 	return enemies
 
 
-func _draw_erasure_between(enemy_wave, counter_wave) -> void:
-	for point in _front_intersections(enemy_wave, counter_wave):
-		if ARENA_RECT.has_point(point):
-			_draw_erased_front(enemy_wave, counter_wave, point)
+func _build_safe_gaps() -> Array:
+	var raw_by_enemy := {}
+	for enemy_wave in _enemy_waves():
+		raw_by_enemy[enemy_wave.get_instance_id()] = {
+			"enemy_wave": enemy_wave,
+			"circle": [],
+			"line": [],
+		}
+
+	for enemy_wave in _enemy_waves():
+		var enemy_id = enemy_wave.get_instance_id()
+		for counter_wave in player_waves:
+			if not is_instance_valid(counter_wave):
+				continue
+			for point in _front_intersections(enemy_wave, counter_wave):
+				if not ARENA_RECT.has_point(point):
+					continue
+				if enemy_wave.wave_shape == "line":
+					_append_line_safe_gap(raw_by_enemy[enemy_id]["line"], enemy_wave, counter_wave, point)
+				else:
+					_append_arc_safe_gap(raw_by_enemy[enemy_id]["circle"], enemy_wave, counter_wave, point)
+
+	var result := []
+	for enemy_id in raw_by_enemy.keys():
+		var entry = raw_by_enemy[enemy_id]
+		result.append_array(_merge_safe_gap_intervals(entry["circle"], SAFE_GAP_ARC_MERGE_TOLERANCE, true))
+		result.append_array(_merge_safe_gap_intervals(entry["line"], SAFE_GAP_LINE_MERGE_TOLERANCE, false))
+	return result
+
+
+func _append_arc_safe_gap(gaps: Array, enemy_wave, counter_wave, point: Vector2) -> void:
+	var radius: float = enemy_wave.radius
+	if radius * ERASE_ARC_WIDTH * 2.0 < MIN_ERASE_SEGMENT:
+		return
+
+	var angle := _normalize_angle_positive((point - enemy_wave.global_position).angle())
+	var start := angle - ERASE_ARC_WIDTH
+	var end := angle + ERASE_ARC_WIDTH
+	_append_normalized_arc_interval(gaps, enemy_wave, counter_wave, start, end)
+
+
+func _append_normalized_arc_interval(gaps: Array, enemy_wave, counter_wave, start: float, end: float) -> void:
+	if start < 0.0:
+		gaps.append(_make_safe_gap(enemy_wave, "circle", start + TAU, TAU, counter_wave, counter_wave))
+		gaps.append(_make_safe_gap(enemy_wave, "circle", 0.0, end, counter_wave, counter_wave))
+	elif end > TAU:
+		gaps.append(_make_safe_gap(enemy_wave, "circle", start, TAU, counter_wave, counter_wave))
+		gaps.append(_make_safe_gap(enemy_wave, "circle", 0.0, end - TAU, counter_wave, counter_wave))
+	else:
+		gaps.append(_make_safe_gap(enemy_wave, "circle", start, end, counter_wave, counter_wave))
+
+
+func _append_line_safe_gap(gaps: Array, enemy_wave, counter_wave, point: Vector2) -> void:
+	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
+	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
+	var side = (point - base).dot(tangent)
+	var edge_room = enemy_wave.line_half_length - absf(side)
+	if edge_room < MIN_ERASE_SEGMENT * 0.5:
+		return
+
+	var start = clampf(side - SAFE_GAP_LINE_HALF_LENGTH, -enemy_wave.line_half_length, enemy_wave.line_half_length)
+	var end = clampf(side + SAFE_GAP_LINE_HALF_LENGTH, -enemy_wave.line_half_length, enemy_wave.line_half_length)
+	gaps.append(_make_safe_gap(enemy_wave, "line", start, end, counter_wave, counter_wave))
+
+
+func _make_safe_gap(enemy_wave, shape: String, start: float, end: float, start_wave, end_wave) -> Dictionary:
+	return {
+		"enemy_wave": enemy_wave,
+		"shape": shape,
+		"start": start,
+		"end": end,
+		"start_wave": start_wave,
+		"end_wave": end_wave,
+	}
+
+
+func _merge_safe_gap_intervals(gaps: Array, tolerance: float, wraps: bool) -> Array:
+	if gaps.is_empty():
+		return []
+
+	gaps.sort_custom(func(a, b): return a["start"] < b["start"])
+	var merged := []
+	for gap in gaps:
+		if merged.is_empty():
+			merged.append(gap.duplicate())
+			continue
+
+		var current = merged[merged.size() - 1]
+		if gap["start"] <= current["end"] + tolerance:
+			if gap["end"] > current["end"]:
+				current["end"] = gap["end"]
+				current["end_wave"] = gap["end_wave"]
+		else:
+			merged.append(gap.duplicate())
+
+	if wraps and merged.size() > 1:
+		var first = merged[0]
+		var last = merged[merged.size() - 1]
+		if first["start"] <= tolerance and last["end"] >= TAU - tolerance:
+			last["end"] = first["end"] + TAU
+			last["end_wave"] = first["end_wave"]
+			merged.remove_at(0)
+
+	return merged
+
+
+func _point_inside_safe_gap(global_point: Vector2, enemy_wave, safe_gaps: Array) -> bool:
+	for gap in safe_gaps:
+		if not is_instance_valid(gap["enemy_wave"]) or gap["enemy_wave"] != enemy_wave:
+			continue
+		if gap["shape"] == "line":
+			if _point_inside_line_safe_gap(global_point, gap):
+				return true
+		elif _point_inside_arc_safe_gap(global_point, gap):
+			return true
+	return false
+
+
+func _point_inside_arc_safe_gap(global_point: Vector2, gap: Dictionary) -> bool:
+	var enemy_wave = gap["enemy_wave"]
+	var angle := _normalize_angle_positive((global_point - enemy_wave.global_position).angle())
+	var start: float = gap["start"]
+	var end: float = gap["end"]
+	if end > TAU and angle < start:
+		angle += TAU
+	return angle >= start and angle <= end
+
+
+func _point_inside_line_safe_gap(global_point: Vector2, gap: Dictionary) -> bool:
+	var enemy_wave = gap["enemy_wave"]
+	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
+	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
+	var side = (global_point - base).dot(tangent)
+	return side >= gap["start"] and side <= gap["end"]
+
+
+func _normalize_angle_positive(angle: float) -> float:
+	return fposmod(angle, TAU)
 
 
 func _front_intersections(a, b) -> Array[Vector2]:
@@ -281,46 +416,40 @@ func _line_line_intersections(a, ar: float, b, br: float) -> Array[Vector2]:
 	return result
 
 
-func _draw_erased_front(enemy_wave, counter_wave, point: Vector2) -> void:
-	if enemy_wave.wave_shape == "line":
-		_draw_erased_line(enemy_wave, counter_wave, point)
-	else:
-		_draw_erased_arc(enemy_wave.global_position, enemy_wave.radius, enemy_wave, counter_wave, point)
-
-
-func _draw_erased_arc(center: Vector2, radius: float, enemy_wave, counter_wave, point: Vector2) -> void:
-	if radius * ERASE_ARC_WIDTH * 2.0 < MIN_ERASE_SEGMENT:
+func _draw_merged_arc_safe_gap(gap: Dictionary) -> void:
+	var enemy_wave = gap["enemy_wave"]
+	if not is_instance_valid(enemy_wave):
 		return
-	var angle = (point - center).angle()
+	var center: Vector2 = enemy_wave.global_position
+	var radius: float = enemy_wave.radius
+	var start_angle: float = gap["start"]
+	var end_angle: float = gap["end"]
+	var point_count = maxi(8, int(ceil(absf(end_angle - start_angle) / TAU * 160.0)))
 	var clear := Color(0.42, 0.41, 0.39, 0.96)
-	var calm := _safe_gap_suppress_color(counter_wave)
+	var calm := _safe_gap_body_color(gap)
 	calm.a = 0.14
-	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, clear, SAFE_GAP_CLEAR_WIDTH, true)
-	draw_arc(center, radius, angle - ERASE_ARC_WIDTH, angle + ERASE_ARC_WIDTH, 32, calm, SAFE_GAP_CORE_WIDTH, true)
+	draw_arc(center, radius, start_angle, end_angle, point_count, clear, SAFE_GAP_CLEAR_WIDTH, true)
+	draw_arc(center, radius, start_angle, end_angle, point_count, calm, SAFE_GAP_CORE_WIDTH, true)
 
-	var left_angle: float = angle - ERASE_ARC_WIDTH
-	var right_angle: float = angle + ERASE_ARC_WIDTH
-	_draw_arc_safe_gap_jamb(center, radius, left_angle, 1.0, enemy_wave, counter_wave)
-	_draw_arc_safe_gap_jamb(center, radius, right_angle, -1.0, enemy_wave, counter_wave)
+	_draw_arc_safe_gap_jamb(center, radius, start_angle, 1.0, enemy_wave, gap["start_wave"])
+	_draw_arc_safe_gap_jamb(center, radius, end_angle, -1.0, enemy_wave, gap["end_wave"])
 
 
-func _draw_erased_line(enemy_wave, counter_wave, point: Vector2) -> void:
+func _draw_merged_line_safe_gap(gap: Dictionary) -> void:
+	var enemy_wave = gap["enemy_wave"]
+	if not is_instance_valid(enemy_wave):
+		return
 	var tangent = Vector2(-enemy_wave.line_direction.y, enemy_wave.line_direction.x)
 	var base = enemy_wave.global_position + enemy_wave.line_direction * enemy_wave.radius
-	var side = (point - base).dot(tangent)
-	var edge_room = enemy_wave.line_half_length - absf(side)
-	if edge_room < MIN_ERASE_SEGMENT * 0.5:
-		return
-	var half_len = 56.0
-	var start = point - tangent * half_len
-	var end = point + tangent * half_len
+	var start = base + tangent * float(gap["start"])
+	var end = base + tangent * float(gap["end"])
 	var clear := Color(0.42, 0.41, 0.39, 0.96)
-	var calm := _safe_gap_suppress_color(counter_wave)
+	var calm := _safe_gap_body_color(gap)
 	calm.a = 0.14
 	draw_line(start, end, clear, SAFE_GAP_CLEAR_WIDTH, true)
 	draw_line(start, end, calm, SAFE_GAP_CORE_WIDTH, true)
-	_draw_line_safe_gap_jamb(start, tangent, 1.0, enemy_wave, counter_wave)
-	_draw_line_safe_gap_jamb(end, tangent, -1.0, enemy_wave, counter_wave)
+	_draw_line_safe_gap_jamb(start, tangent, 1.0, enemy_wave, gap["start_wave"])
+	_draw_line_safe_gap_jamb(end, tangent, -1.0, enemy_wave, gap["end_wave"])
 
 
 func _draw_arc_safe_gap_jamb(center: Vector2, radius: float, edge_angle: float, inner_sign: float, enemy_wave, counter_wave) -> void:
@@ -370,6 +499,14 @@ func _safe_gap_suppress_color(counter_wave) -> Color:
 	if is_instance_valid(counter_wave) and counter_wave.wave_kind == "blue":
 		return Color(0.26, 0.76, 1.0)
 	return Color(0.62, 0.36, 1.0)
+
+
+func _safe_gap_body_color(gap: Dictionary) -> Color:
+	var start_color := _safe_gap_suppress_color(gap["start_wave"])
+	var end_color := _safe_gap_suppress_color(gap["end_wave"])
+	if start_color == end_color:
+		return start_color
+	return start_color.lerp(end_color, 0.5)
 
 
 func _draw_enemy_danger_node(point: Vector2) -> void:
