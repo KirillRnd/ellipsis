@@ -408,6 +408,7 @@ func _place_resonator(target: Vector2) -> void:
 	_resonator.global_position = target
 	_resonator.expired.connect(_on_resonator_expired)
 	add_child(_resonator)
+	player.play_action(&"place_resonator", target - player.global_position)
 	_status_label.text = _t("resonator_set")
 
 

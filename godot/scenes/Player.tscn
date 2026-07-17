@@ -1,6 +1,150 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/PlayerController.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_idle_sheet.png" id="2_idle"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_move_sheet.png" id="3_move"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_hit_sheet.png" id="4_hit"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_dash_sheet.png" id="5_dash"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_place_resonator_two_state_sheet.png" id="6_place"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dash_0"]
+atlas = ExtResource("5_dash")
+region = Rect2(0, 0, 256, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dash_1"]
+atlas = ExtResource("5_dash")
+region = Rect2(256, 0, 256, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dash_2"]
+atlas = ExtResource("5_dash")
+region = Rect2(512, 0, 256, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_idle_0"]
+atlas = ExtResource("2_idle")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_idle_1"]
+atlas = ExtResource("2_idle")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_move_0"]
+atlas = ExtResource("3_move")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_move_1"]
+atlas = ExtResource("3_move")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_move_2"]
+atlas = ExtResource("3_move")
+region = Rect2(512, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_move_3"]
+atlas = ExtResource("3_move")
+region = Rect2(768, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hit_0"]
+atlas = ExtResource("4_hit")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hit_1"]
+atlas = ExtResource("4_hit")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_place_0"]
+atlas = ExtResource("6_place")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_place_1"]
+atlas = ExtResource("6_place")
+region = Rect2(256, 0, 256, 256)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_colorless"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dash_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dash_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dash_2")
+}],
+"loop": false,
+"name": &"dash",
+"speed": 24.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hit_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hit_1")
+}],
+"loop": false,
+"name": &"hit",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_0")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 2.4
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_move_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_move_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_move_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_move_2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_move_3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_move_2")
+}],
+"loop": true,
+"name": &"move",
+"speed": 7.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_place_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_place_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_place_0")
+}],
+"loop": false,
+"name": &"place_resonator",
+"speed": 5.0
+}]
 
 [node name="Player" type="CharacterBody2D"]
 script = ExtResource("1")
+
+[node name="VisualRoot" type="Node2D" parent="."]
+scale = Vector2(0.35, 0.35)
+
+[node name="Body" type="AnimatedSprite2D" parent="VisualRoot"]
+sprite_frames = SubResource("SpriteFrames_colorless")
+animation = &"idle"
+centered = true

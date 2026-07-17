@@ -14,10 +14,10 @@ const INVULNERABLE_TIME := 1.05
 const FIRE_COOLDOWN := 0.11
 const HELD_FIRE_INTERVAL := 0.22
 const COUNTER_WAVE_REACH_RADIUS := Wave.PLAYER_MAX_RADIUS
-const PLAYER_TEXTURE := preload("res://assets/actors/player_bescolor_topdown.png")
-const PLAYER_TEXTURE_SIZE := Vector2(710.0, 818.0)
-const PLAYER_SPRITE_SIZE := Vector2(68.0, 78.0)
-const PLAYER_SPRITE_PIVOT_SOURCE := Vector2(309.0, 373.0)
+const DASH_VISUAL_OFFSET := Vector2(0.0, -128.0)
+
+@onready var _visual_root: Node2D = $VisualRoot
+@onready var _body: AnimatedSprite2D = $VisualRoot/Body
 
 var hit_points := 30
 var counter_wave_enabled := false
@@ -30,9 +30,13 @@ var _invulnerable_left := 0.0
 var _last_move_dir := Vector2.UP
 var _fire_was_down := false
 var _dash_was_down := false
+var _base_animation := &"idle"
+var _action_animation := &""
 
 
 func _ready() -> void:
+	_body.animation_finished.connect(_on_body_animation_finished)
+	_body.play(&"idle")
 	hit_points_changed.emit(hit_points)
 
 
@@ -46,6 +50,11 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 	_invulnerable_left = 0.0
 	_fire_was_down = false
 	_dash_was_down = false
+	_action_animation = &""
+	_base_animation = &"idle"
+	if is_instance_valid(_body):
+		_body.offset = Vector2.ZERO
+		_body.play(&"idle")
 	if restore_hit_points:
 		hit_points = 30
 		hit_points_changed.emit(hit_points)
@@ -65,6 +74,7 @@ func _physics_process(delta: float) -> void:
 	if dash_enabled and dash_down and not _dash_was_down and _dash_cooldown <= 0.0:
 		_dash_time_left = DASH_TIME
 		_dash_cooldown = DASH_COOLDOWN
+		play_action(&"dash")
 	_dash_was_down = dash_down
 
 	var move_speed := DASH_SPEED if _dash_time_left > 0.0 else SPEED
@@ -72,6 +82,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	global_position = global_position.clamp(ARENA_RECT.position, ARENA_RECT.end)
 
+	_update_visual_state(input_dir)
 	_update_counter_wave_input(delta)
 	queue_redraw()
 
@@ -118,6 +129,7 @@ func take_hit(amount: int = 1) -> void:
 		return
 	hit_points -= amount
 	_invulnerable_left = INVULNERABLE_TIME
+	play_action(&"hit")
 	hit_points_changed.emit(hit_points)
 	if hit_points <= 0:
 		died.emit()
@@ -133,27 +145,50 @@ func get_cooldown_ratio() -> float:
 	return clampf(_fire_cooldown / FIRE_COOLDOWN, 0.0, 1.0)
 
 
+func play_action(animation_name: StringName, facing_direction: Vector2 = Vector2.ZERO) -> void:
+	if not is_instance_valid(_body):
+		return
+	if not _body.sprite_frames.has_animation(animation_name):
+		return
+	if facing_direction.length_squared() > 0.0:
+		_last_move_dir = facing_direction.normalized()
+		_update_visual_rotation()
+	_action_animation = animation_name
+	_body.offset = DASH_VISUAL_OFFSET if animation_name == &"dash" else Vector2.ZERO
+	_body.play(animation_name)
+
+
+func _update_visual_state(input_dir: Vector2) -> void:
+	if not is_instance_valid(_visual_root) or not is_instance_valid(_body):
+		return
+	_update_visual_rotation()
+	var blink := is_invulnerable() and int(Time.get_ticks_msec() / 80) % 2 == 0
+	_body.modulate.a = 0.45 if blink else 1.0
+	_base_animation = &"move" if input_dir.length_squared() > 0.0 or _dash_time_left > 0.0 else &"idle"
+	if _action_animation == &"" and _body.animation != _base_animation:
+		_body.play(_base_animation)
+
+
+func _update_visual_rotation() -> void:
+	_visual_root.rotation = _last_move_dir.angle() + PI * 0.5
+
+
+func _on_body_animation_finished() -> void:
+	if _action_animation == &"":
+		return
+	_action_animation = &""
+	_body.offset = Vector2.ZERO
+	_body.play(_base_animation)
+
+
 func _draw() -> void:
 	var blink := is_invulnerable() and int(Time.get_ticks_msec() / 80) % 2 == 0
 	var center_color := Color(0.45, 0.22, 1.0, 0.55 if blink else 0.85)
 	var hitbox_color := Color(0.30, 0.85, 1.0, 0.95)
-	var sprite_alpha := 0.45 if blink else 1.0
 
 	_draw_counter_wave_reach()
-	_draw_player_sprite(sprite_alpha)
 	draw_circle(Vector2.ZERO, 5.0, center_color)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
-
-
-func _draw_player_sprite(sprite_alpha: float) -> void:
-	var rotation := _last_move_dir.angle() - PI * 0.5
-	var pivot := Vector2(
-		PLAYER_SPRITE_SIZE.x * PLAYER_SPRITE_PIVOT_SOURCE.x / PLAYER_TEXTURE_SIZE.x,
-		PLAYER_SPRITE_SIZE.y * PLAYER_SPRITE_PIVOT_SOURCE.y / PLAYER_TEXTURE_SIZE.y
-	)
-	draw_set_transform(Vector2.ZERO, rotation, Vector2.ONE)
-	draw_texture_rect(PLAYER_TEXTURE, Rect2(-pivot, PLAYER_SPRITE_SIZE), false, Color(1.0, 1.0, 1.0, sprite_alpha))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_counter_wave_reach() -> void:
