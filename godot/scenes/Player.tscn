@@ -1,4 +1,4 @@
-[gd_scene load_steps=25 format=3]
+[gd_scene load_steps=26 format=3]
 
 [ext_resource type="Script" path="res://scripts/PlayerController.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_idle_sheet.png" id="2_idle"]
@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_dash_sheet.png" id="5_dash"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_place_resonator_two_state_sheet.png" id="6_place"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_crossbar_empty_hands_two_state_sheet.png" id="7_crossbar"]
+[ext_resource type="PackedScene" path="res://scenes/SteelCrossbarTopdown.tscn" id="8_crossbar_scene"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_dash_0"]
 atlas = ExtResource("5_dash")
@@ -198,6 +199,14 @@ shape = SubResource("CircleShape2D_player")
 
 [node name="VisualRoot" type="Node2D" parent="."]
 scale = Vector2(0.35, 0.35)
+
+[node name="CrossbarPivot" type="Node2D" parent="VisualRoot"]
+visible = false
+position = Vector2(0, -104)
+z_index = -1
+
+[node name="Crossbar" parent="VisualRoot/CrossbarPivot" instance=ExtResource("8_crossbar_scene")]
+scale = Vector2(0.149143, 0.149143)
 
 [node name="Body" type="AnimatedSprite2D" parent="VisualRoot"]
 sprite_frames = SubResource("SpriteFrames_colorless")

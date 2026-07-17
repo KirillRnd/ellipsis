@@ -30,6 +30,7 @@ const CROSSBAR_AIM_SPEED_FACTOR := 0.55
 const CROSSBAR_HOLD_FRAME := 2
 
 @onready var _visual_root: Node2D = $VisualRoot
+@onready var _crossbar_pivot: Node2D = $VisualRoot/CrossbarPivot
 @onready var _body: AnimatedSprite2D = $VisualRoot/Body
 
 var hit_points := 30
@@ -53,6 +54,7 @@ var _crossbar_aim_direction := Vector2.UP
 func _ready() -> void:
 	_body.animation_finished.connect(_on_body_animation_finished)
 	_body.frame_changed.connect(_on_body_frame_changed)
+	_crossbar_pivot.visible = false
 	_body.play(&"idle")
 	hit_points_changed.emit(hit_points)
 
@@ -74,6 +76,8 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 	if is_instance_valid(_body):
 		_body.offset = Vector2.ZERO
 		_body.play(&"idle")
+	if is_instance_valid(_crossbar_pivot):
+		_crossbar_pivot.visible = false
 	if restore_hit_points:
 		hit_points = 30
 		hit_points_changed.emit(hit_points)
@@ -170,6 +174,7 @@ func _start_crossbar_aim() -> void:
 	_crossbar_state = CrossbarInputState.PRESSING
 	_crossbar_hold_time = 0.0
 	_update_crossbar_aim_direction()
+	_crossbar_pivot.visible = true
 	play_action(&"crossbar_aim", _crossbar_aim_direction)
 
 
@@ -233,6 +238,7 @@ func _cancel_crossbar_aim() -> void:
 		return
 	_crossbar_state = CrossbarInputState.CANCELLED
 	_crossbar_hold_time = 0.0
+	_crossbar_pivot.visible = false
 	crossbar_aim_cancelled.emit()
 
 
@@ -250,6 +256,10 @@ func take_hit(amount: int = 1) -> void:
 		return
 	if _is_crossbar_aim_active():
 		_cancel_crossbar_aim()
+	elif _crossbar_state == CrossbarInputState.RECOVERING:
+		_crossbar_state = CrossbarInputState.READY
+		_crossbar_hold_time = 0.0
+		_crossbar_pivot.visible = false
 	hit_points -= amount
 	_invulnerable_left = INVULNERABLE_TIME
 	play_action(&"hit")
@@ -307,6 +317,7 @@ func _on_body_animation_finished() -> void:
 	if _action_animation in [&"crossbar_aim", &"crossbar_drive"]:
 		_crossbar_state = CrossbarInputState.READY
 		_crossbar_hold_time = 0.0
+		_crossbar_pivot.visible = false
 	_action_animation = &""
 	_body.offset = Vector2.ZERO
 	_body.play(_base_animation)
