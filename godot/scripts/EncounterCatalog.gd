@@ -8,11 +8,11 @@ static func get_dungeon_sequence(dungeon_id: String) -> Array[String]:
 			return [
 				"old_sluice_room_01_red_route",
 				"old_sluice_room_02_blue_safe_route",
-				"old_sluice_room_03_make_gap",
-				"old_sluice_room_04_wave_dash",
-				"old_sluice_room_05_active_emitter",
-				"old_sluice_room_06_blue_resonance",
-				"old_sluice_room_07_resonator",
+				"old_sluice_room_03_one_resonator",
+				"old_sluice_room_04_blue_violet_resonance",
+				"old_sluice_room_05_two_resonators",
+				"old_sluice_room_06_crossbar",
+				"old_sluice_room_07_red_pair",
 			]
 		_:
 			push_error("Unknown dungeon id: %s" % dungeon_id)
@@ -25,16 +25,16 @@ static func get_encounter(encounter_id: String) -> Dictionary:
 			return _old_sluice_room_01_red_route()
 		"old_sluice_room_02_blue_safe_route", "old_sluice_room_02_blue_gap":
 			return _old_sluice_room_02_blue_safe_route()
-		"old_sluice_room_03_make_gap", "old_sluice_room_02_violet_cut":
-			return _old_sluice_room_03_make_gap()
-		"old_sluice_room_04_wave_dash", "old_sluice_room_03_dash_gate":
-			return _old_sluice_room_04_wave_dash()
-		"old_sluice_room_05_active_emitter":
-			return _old_sluice_room_05_active_emitter()
-		"old_sluice_room_06_blue_resonance", "old_sluice_room_04_blue_gap":
-			return _old_sluice_room_06_blue_resonance()
-		"old_sluice_room_07_resonator", "old_sluice_room_05_resonator_geometry":
-			return _old_sluice_room_07_resonator()
+		"old_sluice_room_03_one_resonator", "old_sluice_room_03_make_gap", "old_sluice_room_02_violet_cut":
+			return _old_sluice_room_03_one_resonator()
+		"old_sluice_room_04_blue_violet_resonance", "old_sluice_room_04_wave_dash", "old_sluice_room_03_dash_gate":
+			return _old_sluice_room_04_blue_violet_resonance()
+		"old_sluice_room_05_two_resonators", "old_sluice_room_05_active_emitter":
+			return _old_sluice_room_05_two_resonators()
+		"old_sluice_room_06_crossbar", "old_sluice_room_06_blue_resonance", "old_sluice_room_04_blue_gap":
+			return _old_sluice_room_06_crossbar()
+		"old_sluice_room_07_red_pair", "old_sluice_room_07_resonator", "old_sluice_room_05_resonator_geometry":
+			return _old_sluice_room_07_red_pair()
 		"mvp_combat_test":
 			return _mvp_combat_test()
 		_:
@@ -53,9 +53,10 @@ static func _base_room(id: String, title) -> Dictionary:
 		"kills_to_win": 1,
 		"next_emitter_delay": 2.0,
 		"player_position": Vector2(640, 570),
-		"player_wave_enabled": true,
 		"dash_enabled": true,
+		"crossbar_enabled": false,
 		"resonator_enabled": false,
+		"resonator_limit": 1,
 		"resonator_place_range": 190.0,
 		"popup_hint": {
 			"title": title,
@@ -86,7 +87,6 @@ static func _old_sluice_room_01_red_route() -> Dictionary:
 	})
 	room["objective"] = "reach_exit"
 	room["battle_length"] = 70.0
-	room["player_wave_enabled"] = false
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
@@ -138,7 +138,6 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 	room["objective"] = "reach_exit"
 	room["arena_background"] = "blue_guides"
 	room["battle_length"] = 75.0
-	room["player_wave_enabled"] = false
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
@@ -178,133 +177,63 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 	return room
 
 
-static func _old_sluice_room_03_make_gap() -> Dictionary:
-	var room := _base_room("old_sluice_room_03_make_gap", {
-		"en": "Room 3 - Make The Gap",
-		"ru": "Комната 3 - сделай проход",
-	})
-	room["objective"] = "reach_exit"
-	room["battle_length"] = 75.0
-	room["player_wave_enabled"] = false
-	room["popup_hint"] = {
-		"title": room["title"],
-		"body": {
-			"en": "Pick up the violet emitter, then cut a route through red. The red source is not a target yet.",
-			"ru": "Подбери фиолетовый эмиттер и прорежь маршрут через красное. Красный источник пока не цель.",
-		},
-		"duration": 6.5,
-	}
-	room["pickups"] = [
-		{
-			"name": "VioletEmitterPickup",
-			"kind": "violet_emitter",
-			"position": Vector2(640, 500),
-		},
-	]
-	room["emitters"] = [
-		{
-			"name": "RedEmitterA",
-			"position": Vector2(495, 185),
-			"wave_kind": "red",
-			"interval": 2.25,
-			"initial_delay": 0.45,
-			"active_at": 0.0,
-			"damage_mode": "none",
-			"max_hit_points": 4,
-		},
-	]
-	return room
-
-
-static func _old_sluice_room_04_wave_dash() -> Dictionary:
-	var room := _base_room("old_sluice_room_04_wave_dash", {
-		"en": "Room 4 - Wave And Dash",
-		"ru": "Комната 4 - волна и рывок",
-	})
-	room["objective"] = "reach_exit"
-	room["battle_length"] = 75.0
-	room["popup_hint"] = {
-		"title": room["title"],
-		"body": {
-			"en": "Open a safe gap, then dash into it before the next red front closes the route.",
-			"ru": "Открой safe gap и войди в него рывком, пока следующий красный фронт не закрыл маршрут.",
-		},
-		"duration": 6.5,
-	}
-	room["emitters"] = [
-		{
-			"name": "RedEmitterA",
-			"position": Vector2(480, 185),
-			"wave_kind": "red",
-			"interval": 2.35,
-			"initial_delay": 0.35,
-			"active_at": 0.0,
-			"damage_mode": "none",
-			"max_hit_points": 4,
-		},
-		{
-			"name": "RedEmitterB",
-			"position": Vector2(800, 185),
-			"wave_kind": "red",
-			"interval": 2.35,
-			"initial_delay": 1.50,
-			"active_at": 0.0,
-			"damage_mode": "none",
-			"max_hit_points": 4,
-		},
-	]
-	return room
-
-
-static func _old_sluice_room_05_active_emitter() -> Dictionary:
-	var room := _base_room("old_sluice_room_05_active_emitter", {
-		"en": "Room 5 - Active Emitter",
-		"ru": "Комната 5 - активный эмиттер",
+static func _old_sluice_room_03_one_resonator() -> Dictionary:
+	var room := _base_room("old_sluice_room_03_one_resonator", {
+		"en": "Room 3 - One Resonator",
+		"ru": "Комната 3 - один резонатор",
 	})
 	room["battle_length"] = 80.0
-	room["kills_to_win"] = 1
+	room["resonator_enabled"] = false
+	room["resonator_limit"] = 1
+	room["resonator_place_range"] = 260.0
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
-			"en": "The violet wave is both shield and attack. Hit the active emitter with the wave front.",
-			"ru": "Фиолетовая волна теперь и защита, и атака. Попади фронтом по активному эмиттеру.",
+			"en": "Take the resonator. E places it; RMB fires one wave and held RMB repeats.",
+			"ru": "Возьми резонатор. E ставит его, ПКМ даёт одну волну, удержание ПКМ повторяет залпы.",
 		},
-		"duration": 6.5,
+		"duration": 7.0,
 	}
-	room["emitters"] = [
-		{
-			"name": "RedEmitterA",
-			"position": Vector2(640, 185),
-			"wave_kind": "red",
-			"interval": 2.35,
-			"initial_delay": 0.40,
-			"active_at": 0.0,
-			"damage_mode": "direct",
-			"max_hit_points": 4,
-		},
-	]
+	room["pickups"] = [{
+		"name": "FirstResonatorPickup",
+		"kind": "resonator",
+		"position": Vector2(640, 500),
+	}]
+	room["emitters"] = [{
+		"name": "RedResonatorTarget",
+		"position": Vector2(640, 185),
+		"wave_kind": "red",
+		"visual_kind": "resonator_red",
+		"interval": 2.35,
+		"initial_delay": 0.45,
+		"active_at": 0.0,
+		"damage_mode": "direct",
+		"max_hit_points": 4,
+	}]
 	return room
 
 
-static func _old_sluice_room_06_blue_resonance() -> Dictionary:
-	var room := _base_room("old_sluice_room_06_blue_resonance", {
-		"en": "Room 6 - Blue Resonance",
-		"ru": "Комната 6 - синий резонанс",
+static func _old_sluice_room_04_blue_violet_resonance() -> Dictionary:
+	var room := _base_room("old_sluice_room_04_blue_violet_resonance", {
+		"en": "Room 4 - Blue/Violet Resonance",
+		"ru": "Комната 4 - сине-фиолетовый Резонанс",
 	})
 	room["battle_length"] = 85.0
 	room["arena_background"] = "blue_guides"
-	room["kills_to_win"] = 1
+	room["resonator_enabled"] = true
+	room["resonator_limit"] = 1
+	room["resonator_place_range"] = 280.0
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
-			"en": "Friendly waves can resonate. Cross violet with blue to create a stronger point.",
-			"ru": "Дружественные волны могут резонировать. Пересекай фиолетовую с синей, чтобы получить усиленную точку.",
+			"en": "Cross your violet front with blue. The S/F Resonance deals much more damage.",
+			"ru": "Пересеки свой фиолетовый фронт с синим. С/Ф Резонанс наносит намного больше урона.",
 		},
 		"duration": 7.0,
 	}
 	room["blue_beacon"] = {
 		"name": "BlueBeacon",
-		"position": Vector2(480, 330),
+		"position": Vector2(420, 340),
 		"interval": 3.0,
 		"initial_delay": 0.0,
 		"wave": {
@@ -314,70 +243,138 @@ static func _old_sluice_room_06_blue_resonance() -> Dictionary:
 			"can_create_resonance": true,
 		},
 	}
-	room["emitters"] = [
-		{
-			"name": "RedEmitterA",
-			"position": Vector2(800, 330),
-			"wave_kind": "red",
-			"interval": 3.0,
-			"initial_delay": 0.0,
-			"active_at": 0.0,
-			"damage_mode": "resonance_only",
-			"max_hit_points": 6,
-			"wave": {
-				"lifetime": 7.2,
-				"max_radius": Wave.RED_MAX_RADIUS,
-			},
+	room["emitters"] = [{
+		"name": "RedResonatorTarget",
+		"position": Vector2(820, 340),
+		"wave_kind": "red",
+		"visual_kind": "resonator_red",
+		"interval": 3.0,
+		"initial_delay": 0.0,
+		"active_at": 0.0,
+		"damage_mode": "direct",
+		"max_hit_points": 12,
+		"wave": {
+			"lifetime": 7.2,
+			"max_radius": Wave.RED_MAX_RADIUS,
 		},
-	]
+	}]
 	return room
 
 
-static func _old_sluice_room_07_resonator() -> Dictionary:
-	var room := _base_room("old_sluice_room_07_resonator", {
-		"en": "Room 7 - Resonator",
-		"ru": "Комната 7 - резонатор",
+static func _old_sluice_room_05_two_resonators() -> Dictionary:
+	var room := _base_room("old_sluice_room_05_two_resonators", {
+		"en": "Room 5 - Two Resonators",
+		"ru": "Комната 5 - два резонатора",
 	})
 	room["battle_length"] = 90.0
-	room["kills_to_win"] = 2
-	room["resonator_enabled"] = false
-	room["resonator_place_range"] = 260.0
-	room["player_position"] = Vector2(940, 570)
+	room["resonator_enabled"] = true
+	room["resonator_limit"] = 1
+	room["resonator_place_range"] = 280.0
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
-			"en": "Place two resonators with E; a third replaces the oldest. RMB fires from both.",
-			"ru": "Поставь два резонатора клавишей E; третий заменяет старейший. ПКМ стреляет из обоих.",
+			"en": "Take the second resonator. One RMB command fires both and creates F/F Resonance.",
+			"ru": "Возьми второй резонатор. Одна команда ПКМ стреляет из обоих и создаёт Ф/Ф Резонанс.",
 		},
 		"duration": 7.0,
 	}
-	room["pickups"] = [
-		{
-			"name": "ResonatorPickup",
-			"kind": "resonator",
-			"position": Vector2(640, 500),
+	room["pickups"] = [{
+		"name": "SecondResonatorPickup",
+		"kind": "resonator_capacity",
+		"position": Vector2(640, 500),
+	}]
+	room["emitters"] = [{
+		"name": "RedResonatorTarget",
+		"position": Vector2(640, 185),
+		"wave_kind": "red",
+		"visual_kind": "resonator_red",
+		"interval": 2.6,
+		"initial_delay": 0.4,
+		"active_at": 0.0,
+		"damage_mode": "direct",
+		"max_hit_points": 14,
+	}]
+	return room
+
+
+static func _old_sluice_room_06_crossbar() -> Dictionary:
+	var room := _base_room("old_sluice_room_06_crossbar", {
+		"en": "Room 6 - Steel Crossbar",
+		"ru": "Комната 6 - Стальная Поперечина",
+	})
+	room["objective"] = "reach_exit"
+	room["battle_length"] = 80.0
+	room["resonator_enabled"] = true
+	room["resonator_limit"] = 2
+	room["crossbar_enabled"] = false
+	room["popup_hint"] = {
+		"title": room["title"],
+		"body": {
+			"en": "Take the Crossbar. Short LMB cuts one front; hold and release LMB for a wider lasting gap.",
+			"ru": "Возьми Поперечину. Короткий ЛКМ режет один фронт; удержи и отпусти ЛКМ для широкого долгого прохода.",
 		},
-	]
+		"duration": 7.5,
+	}
+	room["pickups"] = [{
+		"name": "SteelCrossbarPickup",
+		"kind": "steel_crossbar",
+		"position": Vector2(640, 500),
+	}]
+	room["emitters"] = [{
+		"name": "CrossbarPressure",
+		"position": Vector2(640, 185),
+		"wave_kind": "red",
+		"visual_kind": "resonator_red",
+		"interval": 1.85,
+		"initial_delay": 0.55,
+		"active_at": 0.0,
+		"damage_mode": "none",
+		"wave": _small_red_wave(430.0),
+	}]
+	return room
+
+
+static func _old_sluice_room_07_red_pair() -> Dictionary:
+	var room := _base_room("old_sluice_room_07_red_pair", {
+		"en": "Room 7 - Red Pair",
+		"ru": "Комната 7 - красная пара",
+	})
+	room["battle_length"] = 90.0
+	room["kills_to_win"] = 2
+	room["resonator_enabled"] = true
+	room["resonator_limit"] = 2
+	room["crossbar_enabled"] = true
+	room["resonator_place_range"] = 280.0
+	room["popup_hint"] = {
+		"title": room["title"],
+		"body": {
+			"en": "Two red resonators. Use your full scheme; no new rule is introduced here.",
+			"ru": "Два красных резонатора. Используй всю свою схему — новых правил здесь нет.",
+		},
+		"duration": 6.0,
+	}
 	room["emitters"] = [
 		{
-			"name": "RedEmitterA",
+			"name": "RedResonatorLeft",
 			"position": Vector2(480, 185),
 			"wave_kind": "red",
+			"visual_kind": "resonator_red",
 			"interval": 2.35,
 			"initial_delay": 0.35,
 			"active_at": 0.0,
 			"damage_mode": "direct",
-			"max_hit_points": 5,
+			"max_hit_points": 10,
 		},
 		{
-			"name": "RedEmitterB",
+			"name": "RedResonatorRight",
 			"position": Vector2(800, 185),
 			"wave_kind": "red",
+			"visual_kind": "resonator_red",
 			"interval": 2.35,
 			"initial_delay": 1.50,
 			"active_at": 0.0,
 			"damage_mode": "direct",
-			"max_hit_points": 4,
+			"max_hit_points": 10,
 		},
 	]
 	return room
@@ -392,6 +389,8 @@ static func _mvp_combat_test() -> Dictionary:
 	room["arena_background"] = "gold_boss"
 	room["kills_to_win"] = 3
 	room["resonator_enabled"] = true
+	room["resonator_limit"] = 2
+	room["crossbar_enabled"] = true
 	room["blue_beacon"] = {
 		"name": "BlueBeacon",
 		"position": Vector2(305, 515),

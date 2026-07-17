@@ -39,9 +39,10 @@ const UI_TEXT := {
 	"reach_exit": {"en": "REACH THE EXIT", "ru": "ДОЙДИ ДО ВЫХОДА"},
 	"hint_popup_footer": {"en": "Move, click, or wait to close", "ru": "Двигайся, кликни или подожди, чтобы закрыть"},
 	"recharging": {"en": "RECHARGING", "ru": "ПЕРЕЗАРЯДКА"},
-	"violet_emitter_pickup": {"en": "VIOLET EMITTER ACQUIRED", "ru": "ФИОЛЕТОВЫЙ ЭМИТТЕР ПОЛУЧЕН"},
 	"resonator_pickup": {"en": "RESONATOR ACQUIRED", "ru": "РЕЗОНАТОР ПОЛУЧЕН"},
+	"second_resonator_pickup": {"en": "SECOND RESONATOR ACQUIRED", "ru": "ВТОРОЙ РЕЗОНАТОР ПОЛУЧЕН"},
 	"resonator_set": {"en": "RESONATOR SET", "ru": "РЕЗОНАТОР ПОСТАВЛЕН"},
+	"steel_crossbar_pickup": {"en": "STEEL CROSSBAR ACQUIRED", "ru": "СТАЛЬНАЯ ПОПЕРЕЧИНА ПОЛУЧЕНА"},
 	"room_clear_timer": {"en": "ROOM %d/%d  KILLS %d/%d", "ru": "КОМ %d/%d  ЦЕЛИ %d/%d"},
 	"room_route_timer": {"en": "ROOM %d/%d  TIME %05.1f  EXIT", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ВЫХОД"},
 	"room_timer": {"en": "ROOM %d/%d  TIME %05.1f  KILLS %d/%d", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ЦЕЛИ %d/%d"},
@@ -78,9 +79,10 @@ var _battle_length := DEFAULT_BATTLE_LENGTH
 var _kills_to_win := DEFAULT_KILLS_TO_WIN
 var _next_emitter_delay := DEFAULT_NEXT_EMITTER_DELAY
 var _resonator_place_range := DEFAULT_RESONATOR_PLACE_RANGE
+var _resonator_limit := MAX_ACTIVE_RESONATORS
 var _objective := "defeat_emitters"
-var _player_wave_available := true
 var _dash_available := true
+var _crossbar_available := true
 var _resonator_available := true
 var _emitters: Array = []
 var _resonators: Array[Resonator] = []
@@ -130,7 +132,6 @@ func _load_encounter(index: int) -> void:
 	_next_emitter_index = 1
 	_state = "combat"
 	_exit_unlocked = _objective == "reach_exit"
-	player.counter_wave_enabled = _player_wave_available
 	player.dash_enabled = _dash_available
 	arena.set_background(_current_encounter.get("arena_background", "red_fault"))
 	_set_exit_gate_open(_exit_unlocked)
@@ -185,18 +186,23 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 	_kills_to_win = encounter.get("kills_to_win", DEFAULT_KILLS_TO_WIN)
 	_next_emitter_delay = encounter.get("next_emitter_delay", DEFAULT_NEXT_EMITTER_DELAY)
 	_resonator_place_range = encounter.get("resonator_place_range", DEFAULT_RESONATOR_PLACE_RANGE)
+	_resonator_limit = clampi(
+		encounter.get("resonator_limit", MAX_ACTIVE_RESONATORS),
+		1,
+		MAX_ACTIVE_RESONATORS
+	)
 	_resonator_place_was_down = Input.is_key_pressed(KEY_E)
 	_resonator_place_cooldown = 0.0
 	_resonator_volley_was_down = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 	_resonator_volley_active = false
 	_resonator_volley_cooldown = 0.0
 	_objective = encounter.get("objective", "defeat_emitters")
-	_player_wave_available = encounter.get("player_wave_enabled", true)
 	_dash_available = encounter.get("dash_enabled", true)
+	_crossbar_available = encounter.get("crossbar_enabled", true)
 	_resonator_available = encounter.get("resonator_enabled", true)
 	player.reset_for_encounter(encounter.get("player_position", player.global_position))
-	player.counter_wave_enabled = _player_wave_available
 	player.dash_enabled = _dash_available
+	player.crossbar_enabled = _crossbar_available
 
 	var exit_config: Dictionary = encounter.get("exit", {})
 	_exit_door_rect = exit_config.get("door_rect", Rect2())
@@ -209,6 +215,7 @@ func _create_emitters(emitter_configs: Array) -> void:
 		emitter.name = emitter_config.get("name", "WaveEmitter")
 		emitter.global_position = emitter_config.get("position", Vector2.ZERO)
 		emitter.wave_kind = emitter_config.get("wave_kind", emitter.wave_kind)
+		emitter.visual_kind = emitter_config.get("visual_kind", emitter.visual_kind)
 		emitter.interval = emitter_config.get("interval", emitter.interval)
 		emitter.initial_delay = emitter_config.get("initial_delay", emitter.initial_delay)
 		emitter.active_at = emitter_config.get("active_at", emitter.active_at)
@@ -277,13 +284,16 @@ func _update_pickups() -> void:
 
 
 func _apply_pickup(kind: String) -> void:
-	if kind == "violet_emitter":
-		_player_wave_available = true
-		player.counter_wave_enabled = true
-		_status_label.text = _t("violet_emitter_pickup")
-	elif kind == "resonator":
+	if kind == "resonator":
 		_resonator_available = true
 		_status_label.text = _t("resonator_pickup")
+	elif kind == "resonator_capacity":
+		_resonator_limit = MAX_ACTIVE_RESONATORS
+		_status_label.text = _t("second_resonator_pickup")
+	elif kind == "steel_crossbar":
+		_crossbar_available = true
+		player.crossbar_enabled = true
+		_status_label.text = _t("steel_crossbar_pickup")
 
 
 func _process(delta: float) -> void:
@@ -305,8 +315,8 @@ func _process(delta: float) -> void:
 	_elapsed += delta
 	_resonator_place_cooldown = maxf(0.0, _resonator_place_cooldown - delta)
 	_resonator_volley_cooldown = maxf(0.0, _resonator_volley_cooldown - delta)
-	player.counter_wave_enabled = _player_wave_available
 	player.dash_enabled = _dash_available
+	player.crossbar_enabled = _crossbar_available
 	_update_emitters(true)
 	_update_blue_beacon(true)
 	_update_pickups()
@@ -371,7 +381,6 @@ func _handle_room_exit() -> void:
 func _unlock_exit() -> void:
 	_state = "room_clear"
 	_exit_unlocked = true
-	player.counter_wave_enabled = false
 	_update_emitters(false)
 	_update_blue_beacon(false)
 	wave_manager.clear_all_waves()
@@ -487,7 +496,7 @@ func _get_resonator_target_position() -> Vector2:
 
 func _place_resonator(target: Vector2) -> bool:
 	_remove_invalid_resonators()
-	if _resonators.size() >= MAX_ACTIVE_RESONATORS:
+	if _resonators.size() >= _resonator_limit:
 		var oldest_resonator: Resonator = _resonators.pop_front()
 		if is_instance_valid(oldest_resonator):
 			oldest_resonator.visible = false
@@ -574,7 +583,6 @@ func _set_state(new_state: String) -> void:
 	if _state == new_state:
 		return
 	_state = new_state
-	player.counter_wave_enabled = false
 	_set_exit_gate_open(false)
 	if _state == "victory":
 		_status_label.text = _t("demo_clear")
@@ -750,8 +758,6 @@ func _update_ui() -> void:
 	if _state == "combat":
 		if _objective == "reach_exit":
 			_status_label.text = _t("reach_exit")
-		elif not _player_wave_available:
-			_status_label.text = _t("survive")
 		elif _resonator_volley_cooldown > 0.0:
 			_status_label.text = _t("recharging")
 		else:

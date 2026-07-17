@@ -4,6 +4,7 @@ extends Node2D
 signal defeated(emitter)
 
 @export var wave_kind := "red"
+@export var visual_kind := "emitter"
 @export var interval := 2.4
 @export var initial_delay := 0.5
 @export var active_at := 0.0
@@ -17,6 +18,7 @@ const HITBOX_RADIUS := 7.0
 const HITBOX_DOT_RADIUS := 5.0
 const TIMER_BAR_HEIGHT := 7.0
 const RED_EMITTER_TEXTURE := preload("res://assets/actors/emitter_red_base.png")
+const RED_RESONATOR_TEXTURE := preload("res://assets/actors/resonator_red_base.png")
 const GOLD_BOSS_TEXTURE := preload("res://assets/actors/boss_golden_knight_topdown.png")
 
 var wave_manager
@@ -146,6 +148,9 @@ func _draw_line_damage_reach(fill: Color, edge: Color) -> void:
 func _draw_sprite_body(alpha: float) -> void:
 	var texture = GOLD_BOSS_TEXTURE if wave_kind == "gold" else RED_EMITTER_TEXTURE
 	var size := Vector2(76, 76) if wave_kind == "gold" else Vector2(68, 68)
+	if visual_kind == "resonator_red":
+		texture = RED_RESONATOR_TEXTURE
+		size = Vector2(64, 64)
 	draw_texture_rect(texture, Rect2(-size * 0.5, size), false, Color(1.0, 1.0, 1.0, alpha))
 
 
