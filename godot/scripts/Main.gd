@@ -20,12 +20,13 @@ const EXIT_GATE_SCENE := preload("res://scenes/ExitGate.tscn")
 const STEEL_CROSSBAR_DRIVEN_SCENE := preload("res://scenes/SteelCrossbarDriven.tscn")
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
+const RESONATOR_PLACE_COOLDOWN := 0.55
 const PICKUP_VISUAL_HEIGHT := 64.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
 const UI_TEXT := {
 	"blue_source": {"en": "BLUE SOURCE", "ru": "СИНИЙ ИСТОЧНИК"},
-	"controls": {"en": "WASD move | Space dash | LMB crossbar | RMB resonator | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | ПКМ резонатор | N/P комнаты | F2 язык | R повтор"},
+	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | N/P комнаты | F2 язык | R повтор"},
 	"counter_ready": {"en": "COUNTER READY", "ru": "КОНТРВОЛНА ГОТОВА"},
 	"counter_wave": {"en": "COUNTER WAVE", "ru": "КОНТРВОЛНА"},
 	"danger_node": {"en": "DANGER NODE", "ru": "ОПАСНЫЙ УЗЕЛ"},
@@ -61,7 +62,8 @@ var _next_room_was_down := false
 var _previous_room_was_down := false
 var _language_was_down := false
 var _language := DEFAULT_LANGUAGE
-var _resonator_was_down := false
+var _resonator_place_was_down := false
+var _resonator_place_cooldown := 0.0
 var _dungeon_sequence: Array[String] = []
 var _current_encounter := {}
 var _scheduled_active_times: Array = []
@@ -175,6 +177,8 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 	_kills_to_win = encounter.get("kills_to_win", DEFAULT_KILLS_TO_WIN)
 	_next_emitter_delay = encounter.get("next_emitter_delay", DEFAULT_NEXT_EMITTER_DELAY)
 	_resonator_place_range = encounter.get("resonator_place_range", DEFAULT_RESONATOR_PLACE_RANGE)
+	_resonator_place_was_down = Input.is_key_pressed(KEY_E)
+	_resonator_place_cooldown = 0.0
 	_objective = encounter.get("objective", "defeat_emitters")
 	_player_wave_available = encounter.get("player_wave_enabled", true)
 	_dash_available = encounter.get("dash_enabled", true)
@@ -288,13 +292,13 @@ func _process(delta: float) -> void:
 		return
 
 	_elapsed += delta
+	_resonator_place_cooldown = maxf(0.0, _resonator_place_cooldown - delta)
 	player.counter_wave_enabled = _player_wave_available
 	player.dash_enabled = _dash_available
 	_update_emitters(true)
 	_update_blue_beacon(true)
 	_update_pickups()
-	if _resonator_available:
-		_handle_resonator_input()
+	_handle_resonator_input()
 	if _objective == "reach_exit":
 		_handle_room_exit()
 	_update_ui()
@@ -418,10 +422,19 @@ func _on_blue_beacon_fired(origin: Vector2) -> void:
 
 
 func _handle_resonator_input() -> void:
-	var resonator_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-	if resonator_down and not _resonator_was_down:
+	_advance_resonator_place_input(Input.is_key_pressed(KEY_E))
+
+
+func _advance_resonator_place_input(resonator_place_down: bool) -> void:
+	if (
+		resonator_place_down
+		and not _resonator_place_was_down
+		and _resonator_available
+		and _resonator_place_cooldown <= 0.0
+	):
 		_place_resonator(_get_resonator_target_position())
-	_resonator_was_down = resonator_down
+		_resonator_place_cooldown = RESONATOR_PLACE_COOLDOWN
+	_resonator_place_was_down = resonator_place_down
 
 
 func _get_resonator_target_position() -> Vector2:
@@ -627,6 +640,7 @@ func _room_hint_dismiss_input() -> bool:
 		or Input.is_key_pressed(KEY_LEFT)
 		or Input.is_key_pressed(KEY_RIGHT)
 		or Input.is_key_pressed(KEY_SPACE)
+		or Input.is_key_pressed(KEY_E)
 		or Input.is_key_pressed(KEY_ENTER)
 		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 		or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
