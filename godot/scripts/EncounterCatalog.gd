@@ -156,7 +156,7 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 			"lifetime": 7.2,
 			"max_radius": Wave.RED_MAX_RADIUS,
 			"can_damage_emitters": false,
-			"can_create_boost": false,
+			"can_create_resonance": false,
 		},
 	}
 	room["emitters"] = [
@@ -311,7 +311,7 @@ static func _old_sluice_room_06_blue_resonance() -> Dictionary:
 			"lifetime": 7.2,
 			"max_radius": Wave.RED_MAX_RADIUS,
 			"can_damage_emitters": false,
-			"can_create_boost": true,
+			"can_create_resonance": true,
 		},
 	}
 	room["emitters"] = [
@@ -322,7 +322,7 @@ static func _old_sluice_room_06_blue_resonance() -> Dictionary:
 			"interval": 3.0,
 			"initial_delay": 0.0,
 			"active_at": 0.0,
-			"damage_mode": "boost_only",
+			"damage_mode": "resonance_only",
 			"max_hit_points": 6,
 			"wave": {
 				"lifetime": 7.2,
@@ -399,7 +399,7 @@ static func _mvp_combat_test() -> Dictionary:
 			"lifetime": 2.6,
 			"max_radius": Wave.RED_MAX_RADIUS,
 			"can_damage_emitters": false,
-			"can_create_boost": false,
+			"can_create_resonance": false,
 		},
 	}
 	room["emitters"] = [

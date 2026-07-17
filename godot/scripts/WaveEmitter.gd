@@ -69,8 +69,8 @@ func can_take_direct_damage() -> bool:
 	return can_take_damage() and damage_mode == "direct"
 
 
-func can_take_boost_damage() -> bool:
-	return can_take_damage() and damage_mode in ["direct", "boost_only"]
+func can_take_resonance_damage() -> bool:
+	return can_take_damage() and damage_mode in ["direct", "resonance_only"]
 
 
 func take_damage(amount: int) -> void:

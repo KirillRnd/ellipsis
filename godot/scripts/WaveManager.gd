@@ -6,10 +6,11 @@ signal danger_changed(danger_value: int)
 const WAVE_SCENE = preload("res://scenes/Wave.tscn")
 const ARENA_RECT = Rect2(Vector2(80, 60), Vector2(1120, 600))
 const PLAYER_WAVE_DAMAGE = 1
-const PLAYER_NODE_DAMAGE = 3
+const BLUE_VIOLET_RESONANCE_DAMAGE := 6
+const VIOLET_VIOLET_RESONANCE_DAMAGE := 7
 const ENEMY_NODE_DAMAGE = 3
 const NODE_HIT_RADIUS = 26.0
-const BOOST_NODE_RADIUS = 28.0
+const RESONANCE_NODE_RADIUS = 28.0
 const EMITTER_HITBOX_RADIUS := WaveEmitter.HITBOX_RADIUS
 const MIN_ERASE_SEGMENT = 72.0
 const ERASE_ARC_WIDTH = 0.30
@@ -30,7 +31,7 @@ var emitters: Array = []
 var waves: Array = []
 var player_waves: Array = []
 var _last_danger_value = 0
-var _boost_damage_marks = {}
+var _resonance_damage_marks = {}
 
 
 func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: Dictionary = {}):
@@ -56,7 +57,7 @@ func clear_all_waves() -> void:
 			wave.queue_free()
 	waves.clear()
 	player_waves.clear()
-	_boost_damage_marks.clear()
+	_resonance_damage_marks.clear()
 	_last_danger_value = 0
 	queue_redraw()
 
@@ -136,17 +137,20 @@ func _damage_emitters() -> void:
 					wave.damaged_emitters[emitter_id] = true
 					emitter.take_damage(PLAYER_WAVE_DAMAGE)
 
-		if emitter.can_take_boost_damage():
-			for pair in _player_intersection_pairs():
-				var key = "%s:%s:%s" % [pair[0].get_instance_id(), pair[1].get_instance_id(), emitter_id]
-				if _boost_damage_marks.has(key):
+		if emitter.can_take_resonance_damage():
+			for pair in _player_resonance_pairs():
+				var first = pair["first"]
+				var second = pair["second"]
+				var resonance_type: String = pair["type"]
+				var key = "%s:%s:%s" % [first.get_instance_id(), second.get_instance_id(), emitter_id]
+				if _resonance_damage_marks.has(key):
 					continue
-				for point in _front_intersections(pair[0], pair[1]):
-					if point.distance_to(emitter.global_position) <= BOOST_NODE_RADIUS:
-						if _point_inside_safe_gap(point, pair[0], safe_gaps) or _point_inside_safe_gap(point, pair[1], safe_gaps):
+				for point in _front_intersections(first, second):
+					if point.distance_to(emitter.global_position) <= RESONANCE_NODE_RADIUS:
+						if _point_inside_safe_gap(point, first, safe_gaps) or _point_inside_safe_gap(point, second, safe_gaps):
 							continue
-						_boost_damage_marks[key] = true
-						emitter.take_damage(PLAYER_NODE_DAMAGE)
+						_resonance_damage_marks[key] = true
+						emitter.take_damage(_resonance_damage(resonance_type))
 						break
 
 
@@ -181,25 +185,49 @@ func _draw_enemy_interference_nodes() -> void:
 
 func _draw_player_interference_nodes() -> void:
 	var safe_gaps := _build_safe_gaps()
-	for pair in _player_intersection_pairs():
-		for point in _front_intersections(pair[0], pair[1]):
+	for pair in _player_resonance_pairs():
+		var first = pair["first"]
+		var second = pair["second"]
+		for point in _front_intersections(first, second):
 			if ARENA_RECT.has_point(point):
-				if _point_inside_safe_gap(point, pair[0], safe_gaps) or _point_inside_safe_gap(point, pair[1], safe_gaps):
+				if _point_inside_safe_gap(point, first, safe_gaps) or _point_inside_safe_gap(point, second, safe_gaps):
 					continue
-				_draw_player_boost_node(point)
+				_draw_player_resonance_node(point, pair["type"])
 
 
-func _player_intersection_pairs() -> Array:
+func _player_resonance_pairs() -> Array:
 	var result = []
 	for a_index in range(player_waves.size()):
 		var a = player_waves[a_index]
-		if not is_instance_valid(a) or not a.can_create_boost:
+		if not is_instance_valid(a) or not a.can_create_resonance:
 			continue
 		for b_index in range(a_index + 1, player_waves.size()):
 			var b = player_waves[b_index]
-			if is_instance_valid(b) and b.can_create_boost:
-				result.append([a, b])
+			if not is_instance_valid(b) or not b.can_create_resonance:
+				continue
+			var resonance_type := _resonance_type(a, b)
+			if not resonance_type.is_empty():
+				result.append({
+					"first": a,
+					"second": b,
+					"type": resonance_type,
+				})
 	return result
+
+
+func _resonance_type(first, second) -> String:
+	var kinds := [first.wave_kind, second.wave_kind]
+	if "blue" in kinds and "resonator" in kinds:
+		return "blue_violet"
+	if first.wave_kind == "resonator" and second.wave_kind == "resonator":
+		return "violet_violet"
+	return ""
+
+
+func _resonance_damage(resonance_type: String) -> int:
+	if resonance_type == "violet_violet":
+		return VIOLET_VIOLET_RESONANCE_DAMAGE
+	return BLUE_VIOLET_RESONANCE_DAMAGE
 
 
 func _enemy_waves() -> Array:
@@ -667,12 +695,19 @@ func _draw_enemy_danger_node(point: Vector2) -> void:
 	draw_line(point + Vector2(0, -17), point + Vector2(0, 17), Color(1.0, 0.68, 0.72, 0.72), 2.0, true)
 
 
-func _draw_player_boost_node(point: Vector2) -> void:
-	draw_circle(point, BOOST_NODE_RADIUS, Color(0.10, 0.45, 1.0, 0.22))
-	draw_circle(point, 14.0, Color(0.24, 0.72, 1.0, 0.58))
-	draw_circle(point, 5.0, Color(0.88, 0.98, 1.0, 0.95))
-	draw_line(point + Vector2(-16, 0), point + Vector2(16, 0), Color(0.72, 0.94, 1.0, 0.72), 2.0, true)
-	draw_line(point + Vector2(0, -16), point + Vector2(0, 16), Color(0.72, 0.94, 1.0, 0.72), 2.0, true)
+func _draw_player_resonance_node(point: Vector2, resonance_type: String) -> void:
+	var outer := Color(0.10, 0.45, 1.0, 0.22)
+	var middle := Color(0.24, 0.72, 1.0, 0.58)
+	var line := Color(0.72, 0.94, 1.0, 0.72)
+	if resonance_type == "violet_violet":
+		outer = Color(0.52, 0.12, 0.86, 0.26)
+		middle = Color(0.78, 0.26, 1.0, 0.66)
+		line = Color(0.92, 0.68, 1.0, 0.80)
+	draw_circle(point, RESONANCE_NODE_RADIUS, outer)
+	draw_circle(point, 14.0, middle)
+	draw_circle(point, 5.0, Color(0.96, 0.94, 1.0, 0.96))
+	draw_line(point + Vector2(-16, 0), point + Vector2(16, 0), line, 2.0, true)
+	draw_line(point + Vector2(0, -16), point + Vector2(0, 16), line, 2.0, true)
 
 
 func _on_wave_expired(wave) -> void:

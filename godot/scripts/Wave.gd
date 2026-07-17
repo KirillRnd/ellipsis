@@ -25,9 +25,8 @@ var age := 0.0
 var line_direction := Vector2.DOWN
 var line_half_length := 720.0
 var can_damage_emitters := true
-var can_create_boost := true
+var can_create_resonance := true
 var damaged_emitters := {}
-var boosted_emitters := {}
 
 
 func setup(new_owner: String, new_kind: String, origin: Vector2, config: Dictionary = {}) -> void:
@@ -37,13 +36,13 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 	wave_shape = "circle"
 	line_direction = Vector2.DOWN
 	can_damage_emitters = true
-	can_create_boost = true
+	can_create_resonance = true
 
 	if wave_owner == "player":
 		if wave_kind == "blue":
 			color = Color(0.24, 0.72, 1.0)
 			can_damage_emitters = false
-			can_create_boost = false
+			can_create_resonance = false
 		else:
 			color = Color(0.44, 0.19, 1.0)
 		speed = SHARED_SPEED
@@ -78,7 +77,7 @@ func setup(new_owner: String, new_kind: String, origin: Vector2, config: Diction
 	line_direction = config.get("line_direction", line_direction).normalized()
 	line_half_length = config.get("line_half_length", line_half_length)
 	can_damage_emitters = config.get("can_damage_emitters", can_damage_emitters)
-	can_create_boost = config.get("can_create_boost", can_create_boost)
+	can_create_resonance = config.get("can_create_resonance", can_create_resonance)
 
 
 func _process(delta: float) -> void:
