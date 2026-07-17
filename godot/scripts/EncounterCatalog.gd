@@ -13,6 +13,7 @@ static func get_dungeon_sequence(dungeon_id: String) -> Array[String]:
 				"old_sluice_room_05_two_resonators",
 				"old_sluice_room_06_crossbar",
 				"old_sluice_room_07_red_pair",
+				"old_sluice_room_08_rahn",
 			]
 		_:
 			push_error("Unknown dungeon id: %s" % dungeon_id)
@@ -35,6 +36,8 @@ static func get_encounter(encounter_id: String) -> Dictionary:
 			return _old_sluice_room_06_crossbar()
 		"old_sluice_room_07_red_pair", "old_sluice_room_07_resonator", "old_sluice_room_05_resonator_geometry":
 			return _old_sluice_room_07_red_pair()
+		"old_sluice_room_08_rahn":
+			return _old_sluice_room_08_rahn()
 		"mvp_combat_test":
 			return _mvp_combat_test()
 		_:
@@ -69,6 +72,7 @@ static func _base_room(id: String, title) -> Dictionary:
 			"trigger_rect": Rect2(Vector2(600, 90), Vector2(80, 38)),
 		},
 		"blue_beacon": {},
+		"boss": {},
 		"emitters": [],
 	}
 
@@ -377,6 +381,36 @@ static func _old_sluice_room_07_red_pair() -> Dictionary:
 			"max_hit_points": 10,
 		},
 	]
+	return room
+
+
+static func _old_sluice_room_08_rahn() -> Dictionary:
+	var room := _base_room("old_sluice_room_08_rahn", {
+		"en": "Room 8 - Red Driver Rahn",
+		"ru": "Комната 8 - Красный Погонщик Рахн",
+	})
+	room["objective"] = "defeat_boss"
+	room["battle_length"] = 120.0
+	room["resonator_enabled"] = true
+	room["resonator_limit"] = 2
+	room["crossbar_enabled"] = true
+	room["resonator_place_range"] = 280.0
+	room["popup_hint"] = {
+		"title": room["title"],
+		"body": {
+			"en": "Rahn drives his own resonator pair. Read their FIFO replacement and answer with your full scheme.",
+			"ru": "Рахн ведёт собственную пару резонаторов. Читай их FIFO-замену и отвечай всей своей схемой.",
+		},
+		"duration": 7.0,
+	}
+	room["boss"] = {
+		"name": "RahnBoss",
+		"position": Vector2(640, 190),
+		"max_hit_points": 70,
+		"move_speed": 185.0,
+		"volley_interval": 2.35,
+		"reposition_interval": 6.8,
+	}
 	return room
 
 

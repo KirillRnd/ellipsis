@@ -27,6 +27,7 @@ const CROSSBAR_SAFE_GAP_INNER_COLOR := Color(0.56, 0.57, 0.58)
 
 var player
 var driven_crossbar: SteelCrossbarDriven
+var boss_target
 var emitters: Array = []
 var waves: Array = []
 var player_waves: Array = []
@@ -79,6 +80,10 @@ func set_driven_crossbar(crossbar: SteelCrossbarDriven) -> void:
 	driven_crossbar = crossbar
 
 
+func set_boss_target(target) -> void:
+	boss_target = target
+
+
 func get_point_danger(global_point: Vector2) -> int:
 	var enemy_waves = _enemy_crests_at(global_point, 7.0)
 	if enemy_waves.is_empty():
@@ -119,38 +124,44 @@ func _point_on_enemy_interference_node(global_point: Vector2) -> bool:
 
 func _damage_emitters() -> void:
 	var safe_gaps := _build_safe_gaps()
-	for emitter in emitters:
-		if not is_instance_valid(emitter) or not emitter.can_take_damage():
+	var targets := emitters.duplicate()
+	if is_instance_valid(boss_target):
+		targets.append(boss_target)
+	for target in targets:
+		if not is_instance_valid(target) or not target.can_take_damage():
 			continue
-		var emitter_id = emitter.get_instance_id()
-		if emitter.can_take_direct_damage():
+		var target_id = target.get_instance_id()
+		var hitbox_radius := EMITTER_HITBOX_RADIUS
+		if target.has_method("get_hitbox_radius"):
+			hitbox_radius = target.get_hitbox_radius()
+		if target.can_take_direct_damage():
 			for wave in player_waves:
 				if not is_instance_valid(wave):
 					continue
 				if not wave.can_damage_emitters:
 					continue
-				if wave.damaged_emitters.has(emitter_id):
+				if wave.damaged_emitters.has(target_id):
 					continue
-				if wave.is_crest_at(emitter.global_position, EMITTER_HITBOX_RADIUS):
-					if _point_inside_safe_gap(emitter.global_position, wave, safe_gaps):
+				if wave.is_crest_at(target.global_position, hitbox_radius):
+					if _point_inside_safe_gap(target.global_position, wave, safe_gaps):
 						continue
-					wave.damaged_emitters[emitter_id] = true
-					emitter.take_damage(PLAYER_WAVE_DAMAGE)
+					wave.damaged_emitters[target_id] = true
+					target.take_damage(PLAYER_WAVE_DAMAGE)
 
-		if emitter.can_take_resonance_damage():
+		if target.can_take_resonance_damage():
 			for pair in _player_resonance_pairs():
 				var first = pair["first"]
 				var second = pair["second"]
 				var resonance_type: String = pair["type"]
-				var key = "%s:%s:%s" % [first.get_instance_id(), second.get_instance_id(), emitter_id]
+				var key = "%s:%s:%s" % [first.get_instance_id(), second.get_instance_id(), target_id]
 				if _resonance_damage_marks.has(key):
 					continue
 				for point in _front_intersections(first, second):
-					if point.distance_to(emitter.global_position) <= RESONANCE_NODE_RADIUS:
+					if point.distance_to(target.global_position) <= RESONANCE_NODE_RADIUS:
 						if _point_inside_safe_gap(point, first, safe_gaps) or _point_inside_safe_gap(point, second, safe_gaps):
 							continue
 						_resonance_damage_marks[key] = true
-						emitter.take_damage(_resonance_damage(resonance_type))
+						target.take_damage(_resonance_damage(resonance_type))
 						break
 
 

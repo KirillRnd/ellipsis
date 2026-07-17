@@ -18,6 +18,7 @@ const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
 const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
 const EXIT_GATE_SCENE := preload("res://scenes/ExitGate.tscn")
 const STEEL_CROSSBAR_DRIVEN_SCENE := preload("res://scenes/SteelCrossbarDriven.tscn")
+const RAHN_BOSS_SCENE := preload("res://scenes/RahnBoss.tscn")
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
@@ -44,6 +45,7 @@ const UI_TEXT := {
 	"resonator_set": {"en": "RESONATOR SET", "ru": "РЕЗОНАТОР ПОСТАВЛЕН"},
 	"steel_crossbar_pickup": {"en": "STEEL CROSSBAR ACQUIRED", "ru": "СТАЛЬНАЯ ПОПЕРЕЧИНА ПОЛУЧЕНА"},
 	"room_clear_timer": {"en": "ROOM %d/%d  KILLS %d/%d", "ru": "КОМ %d/%d  ЦЕЛИ %d/%d"},
+	"room_boss_timer": {"en": "ROOM %d/%d  TIME %05.1f", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f"},
 	"room_route_timer": {"en": "ROOM %d/%d  TIME %05.1f  EXIT", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ВЫХОД"},
 	"room_timer": {"en": "ROOM %d/%d  TIME %05.1f  KILLS %d/%d", "ru": "КОМ %d/%d  ВРЕМЯ %05.1f  ЦЕЛИ %d/%d"},
 	"safe_lane": {"en": "SAFE LANE", "ru": "БЕЗОПАСНЫЙ ПРОХОД"},
@@ -88,6 +90,7 @@ var _emitters: Array = []
 var _resonators: Array[Resonator] = []
 var _next_resonator_number := 1
 var _driven_crossbar: SteelCrossbarDriven
+var _rahn_boss: RahnBoss
 var _exit_unlocked := false
 var _exit_trigger_rect := Rect2()
 var _exit_door_rect := Rect2()
@@ -102,6 +105,8 @@ var _timer_label: Label
 var _hp_label: Label
 var _status_label: Label
 var _hint_label: Label
+var _boss_hp_bar: ProgressBar
+var _boss_hp_label: Label
 
 
 func _ready() -> void:
@@ -145,6 +150,7 @@ func _load_encounter(index: int) -> void:
 		_scheduled_active_times.append(emitter.active_at)
 		emitter.defeated.connect(_on_emitter_defeated)
 
+	_create_boss(_current_encounter.get("boss", {}))
 	_create_blue_beacon(_current_encounter.get("blue_beacon", {}))
 	_create_pickups(_current_encounter.get("pickups", []))
 	_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
@@ -156,6 +162,14 @@ func _clear_current_encounter() -> void:
 		if is_instance_valid(emitter):
 			emitter.queue_free()
 	_emitters.clear()
+	wave_manager.emitters = []
+
+	if is_instance_valid(_rahn_boss):
+		_rahn_boss.queue_free()
+	_rahn_boss = null
+	if is_instance_valid(wave_manager):
+		wave_manager.set_boss_target(null)
+	_set_boss_hp_visible(false)
 
 	if is_instance_valid(_blue_beacon):
 		_blue_beacon.queue_free()
@@ -224,6 +238,30 @@ func _create_emitters(emitter_configs: Array) -> void:
 		emitter.damage_mode = emitter_config.get("damage_mode", emitter.damage_mode)
 		add_child(emitter)
 		_emitters.append(emitter)
+
+
+func _create_boss(config: Dictionary) -> void:
+	if config.is_empty():
+		_set_boss_hp_visible(false)
+		return
+	_rahn_boss = RAHN_BOSS_SCENE.instantiate()
+	_rahn_boss.name = config.get("name", "RahnBoss")
+	_rahn_boss.global_position = config.get("position", Vector2(640.0, 190.0))
+	_rahn_boss.max_hit_points = config.get("max_hit_points", _rahn_boss.max_hit_points)
+	_rahn_boss.move_speed = config.get("move_speed", _rahn_boss.move_speed)
+	_rahn_boss.volley_interval = config.get("volley_interval", _rahn_boss.volley_interval)
+	_rahn_boss.reposition_interval = config.get(
+		"reposition_interval",
+		_rahn_boss.reposition_interval
+	)
+	_rahn_boss.player = player
+	_rahn_boss.wave_manager = wave_manager
+	_rahn_boss.hit_points_changed.connect(_on_boss_hit_points_changed)
+	_rahn_boss.defeated.connect(_on_rahn_defeated)
+	add_child(_rahn_boss)
+	wave_manager.set_boss_target(_rahn_boss)
+	_on_boss_hit_points_changed(_rahn_boss.hit_points, _rahn_boss.max_hit_points)
+	_set_boss_hp_visible(true)
 
 
 func _on_player_crossbar_drive_impact(
@@ -384,6 +422,7 @@ func _unlock_exit() -> void:
 	_update_emitters(false)
 	_update_blue_beacon(false)
 	wave_manager.clear_all_waves()
+	_set_boss_hp_visible(false)
 	_set_exit_gate_open(true)
 	_status_label.text = _t("exit_open")
 	_set_controls_text()
@@ -406,6 +445,8 @@ func _update_emitters(running: bool) -> void:
 	for emitter in _emitters:
 		emitter.combat_time = _elapsed
 		emitter.combat_running = running
+	if is_instance_valid(_rahn_boss):
+		_rahn_boss.combat_running = running
 
 
 func _update_blue_beacon(running: bool) -> void:
@@ -533,6 +574,7 @@ func _on_player_defeat_started() -> void:
 	_set_state("defeat_transition")
 	_clear_driven_crossbar()
 	_resonator_volley_active = false
+	_set_boss_hp_visible(false)
 	if is_instance_valid(wave_manager):
 		wave_manager.clear_all_waves()
 
@@ -554,6 +596,20 @@ func _on_emitter_defeated(_emitter) -> void:
 	_accelerate_next_scheduled_emitter()
 	_status_label.text = _t("target_down")
 	_update_ui()
+
+
+func _on_boss_hit_points_changed(current: int, maximum: int) -> void:
+	if not is_instance_valid(_boss_hp_bar) or not is_instance_valid(_boss_hp_label):
+		return
+	_boss_hp_bar.max_value = maximum
+	_boss_hp_bar.value = current
+	_boss_hp_label.text = "RAHN  %d/%d" % [current, maximum]
+
+
+func _on_rahn_defeated(boss) -> void:
+	if boss != _rahn_boss or _state != "combat":
+		return
+	_unlock_exit()
 
 
 func _accelerate_next_scheduled_emitter() -> void:
@@ -618,6 +674,33 @@ func _create_ui() -> void:
 	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_status_label.add_theme_font_size_override("font_size", 26)
 	ui.add_child(_status_label)
+
+	_boss_hp_bar = ProgressBar.new()
+	_boss_hp_bar.position = Vector2(430, 52)
+	_boss_hp_bar.size = Vector2(420, 20)
+	_boss_hp_bar.show_percentage = false
+	_boss_hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var boss_bar_background := StyleBoxFlat.new()
+	boss_bar_background.bg_color = Color(0.025, 0.015, 0.018, 0.92)
+	boss_bar_background.border_color = Color(0.55, 0.44, 0.40, 0.92)
+	boss_bar_background.set_border_width_all(2)
+	_boss_hp_bar.add_theme_stylebox_override("background", boss_bar_background)
+	var boss_bar_fill := StyleBoxFlat.new()
+	boss_bar_fill.bg_color = Color(0.72, 0.06, 0.10, 0.96)
+	boss_bar_fill.border_color = Color(1.0, 0.30, 0.24, 0.95)
+	boss_bar_fill.set_border_width_all(1)
+	_boss_hp_bar.add_theme_stylebox_override("fill", boss_bar_fill)
+	ui.add_child(_boss_hp_bar)
+
+	_boss_hp_label = Label.new()
+	_boss_hp_label.position = _boss_hp_bar.position
+	_boss_hp_label.size = _boss_hp_bar.size
+	_boss_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_boss_hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_boss_hp_label.add_theme_font_size_override("font_size", 14)
+	_boss_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui.add_child(_boss_hp_label)
+	_set_boss_hp_visible(false)
 
 	_hint_label = Label.new()
 	_hint_label.position = HUD_CONTROLS_RECT.position
@@ -725,6 +808,13 @@ func _set_controls_text() -> void:
 		_hint_label.text = _t("controls")
 
 
+func _set_boss_hp_visible(is_visible: bool) -> void:
+	if is_instance_valid(_boss_hp_bar):
+		_boss_hp_bar.visible = is_visible
+	if is_instance_valid(_boss_hp_label):
+		_boss_hp_label.visible = is_visible
+
+
 func _localize(value) -> String:
 	if typeof(value) == TYPE_DICTIONARY:
 		var localized: Dictionary = value
@@ -742,6 +832,12 @@ func _update_ui() -> void:
 	var time_left := maxf(0.0, _battle_length - _elapsed)
 	if _objective == "reach_exit":
 		_timer_label.text = _t("room_route_timer") % [
+			_encounter_index + 1,
+			_dungeon_sequence.size(),
+			time_left,
+		]
+	elif _objective == "defeat_boss":
+		_timer_label.text = _t("room_boss_timer") % [
 			_encounter_index + 1,
 			_dungeon_sequence.size(),
 			time_left,
