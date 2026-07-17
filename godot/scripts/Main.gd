@@ -24,7 +24,7 @@ const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
 const UI_TEXT := {
 	"blue_source": {"en": "BLUE SOURCE", "ru": "СИНИЙ ИСТОЧНИК"},
-	"controls": {"en": "WASD move | Space dash | LMB wave | RMB resonator | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ волна | ПКМ резонатор | N/P комнаты | F2 язык | R повтор"},
+	"controls": {"en": "WASD move | Space dash | LMB crossbar | RMB resonator | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | ПКМ резонатор | N/P комнаты | F2 язык | R повтор"},
 	"counter_ready": {"en": "COUNTER READY", "ru": "КОНТРВОЛНА ГОТОВА"},
 	"counter_wave": {"en": "COUNTER WAVE", "ru": "КОНТРВОЛНА"},
 	"danger_node": {"en": "DANGER NODE", "ru": "ОПАСНЫЙ УЗЕЛ"},

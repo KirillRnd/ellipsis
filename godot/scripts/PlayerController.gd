@@ -2,8 +2,19 @@ class_name PlayerController
 extends CharacterBody2D
 
 signal fired_counter_wave(origin: Vector2)
+signal crossbar_short_committed(origin: Vector2)
+signal crossbar_long_committed(origin: Vector2, direction: Vector2)
+signal crossbar_aim_cancelled
 signal hit_points_changed(hit_points: int)
 signal died
+
+enum CrossbarInputState {
+	READY,
+	PRESSING,
+	AIMING,
+	RECOVERING,
+	CANCELLED,
+}
 
 const ARENA_RECT := Rect2(Vector2(110, 90), Vector2(1060, 560))
 const SPEED := 318.5
@@ -12,30 +23,36 @@ const DASH_TIME := 0.13
 const DASH_COOLDOWN := 0.55
 const INVULNERABLE_TIME := 1.05
 const FIRE_COOLDOWN := 0.11
-const HELD_FIRE_INTERVAL := 0.22
 const COUNTER_WAVE_REACH_RADIUS := Wave.PLAYER_MAX_RADIUS
 const DASH_VISUAL_OFFSET := Vector2(0.0, -128.0)
+const CROSSBAR_HOLD_THRESHOLD := 0.16
+const CROSSBAR_AIM_SPEED_FACTOR := 0.55
+const CROSSBAR_HOLD_FRAME := 2
 
 @onready var _visual_root: Node2D = $VisualRoot
 @onready var _body: AnimatedSprite2D = $VisualRoot/Body
 
 var hit_points := 30
 var counter_wave_enabled := false
+var crossbar_enabled := true
 var dash_enabled := true
 var _fire_cooldown := 0.0
-var _held_fire_timer := 0.0
 var _dash_time_left := 0.0
 var _dash_cooldown := 0.0
 var _invulnerable_left := 0.0
 var _last_move_dir := Vector2.UP
-var _fire_was_down := false
 var _dash_was_down := false
 var _base_animation := &"idle"
 var _action_animation := &""
+var _crossbar_state := CrossbarInputState.READY
+var _crossbar_hold_time := 0.0
+var _crossbar_was_down := false
+var _crossbar_aim_direction := Vector2.UP
 
 
 func _ready() -> void:
 	_body.animation_finished.connect(_on_body_animation_finished)
+	_body.frame_changed.connect(_on_body_frame_changed)
 	_body.play(&"idle")
 	hit_points_changed.emit(hit_points)
 
@@ -44,14 +61,16 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 	global_position = start_position
 	velocity = Vector2.ZERO
 	_fire_cooldown = 0.0
-	_held_fire_timer = 0.0
 	_dash_time_left = 0.0
 	_dash_cooldown = 0.0
 	_invulnerable_left = 0.0
-	_fire_was_down = false
 	_dash_was_down = false
 	_action_animation = &""
 	_base_animation = &"idle"
+	_crossbar_state = CrossbarInputState.READY
+	_crossbar_hold_time = 0.0
+	_crossbar_was_down = false
+	_crossbar_aim_direction = Vector2.UP
 	if is_instance_valid(_body):
 		_body.offset = Vector2.ZERO
 		_body.play(&"idle")
@@ -70,20 +89,32 @@ func _physics_process(delta: float) -> void:
 	if input_dir.length_squared() > 0.0:
 		_last_move_dir = input_dir
 
+	_update_crossbar_input(delta)
+
 	var dash_down := Input.is_key_pressed(KEY_SPACE)
-	if dash_enabled and dash_down and not _dash_was_down and _dash_cooldown <= 0.0:
+	var dash_started := (
+		dash_enabled
+		and dash_down
+		and not _dash_was_down
+		and _dash_cooldown <= 0.0
+		and _crossbar_state != CrossbarInputState.RECOVERING
+	)
+	if dash_started:
+		if _is_crossbar_aim_active():
+			_cancel_crossbar_aim()
 		_dash_time_left = DASH_TIME
 		_dash_cooldown = DASH_COOLDOWN
 		play_action(&"dash")
 	_dash_was_down = dash_down
 
 	var move_speed := DASH_SPEED if _dash_time_left > 0.0 else SPEED
+	if _crossbar_state == CrossbarInputState.AIMING:
+		move_speed *= CROSSBAR_AIM_SPEED_FACTOR
 	velocity = _last_move_dir * move_speed if _dash_time_left > 0.0 else input_dir * move_speed
 	move_and_slide()
 	global_position = global_position.clamp(ARENA_RECT.position, ARENA_RECT.end)
 
 	_update_visual_state(input_dir)
-	_update_counter_wave_input(delta)
 	queue_redraw()
 
 
@@ -100,19 +131,109 @@ func _read_move_input() -> Vector2:
 	return dir.normalized()
 
 
-func _update_counter_wave_input(delta: float) -> void:
-	var fire_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	if fire_down and not _fire_was_down:
-		_try_fire_counter_wave()
-		_held_fire_timer = HELD_FIRE_INTERVAL
-	elif fire_down:
-		_held_fire_timer -= delta
-		while _held_fire_timer <= 0.0:
-			_try_fire_counter_wave()
-			_held_fire_timer += HELD_FIRE_INTERVAL
-	else:
-		_held_fire_timer = 0.0
-	_fire_was_down = fire_down
+func _update_crossbar_input(delta: float) -> void:
+	var crossbar_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	_advance_crossbar_input(crossbar_down, delta)
+
+
+func _advance_crossbar_input(crossbar_down: bool, delta: float) -> void:
+	if not crossbar_enabled:
+		if _is_crossbar_aim_active():
+			_cancel_crossbar_aim()
+		if _crossbar_state == CrossbarInputState.CANCELLED and not crossbar_down:
+			_crossbar_state = CrossbarInputState.READY
+		_crossbar_was_down = crossbar_down
+		return
+
+	if _crossbar_state == CrossbarInputState.PRESSING and _crossbar_was_down:
+		_crossbar_hold_time += delta
+		if _crossbar_hold_time >= CROSSBAR_HOLD_THRESHOLD:
+			_crossbar_state = CrossbarInputState.AIMING
+
+	if crossbar_down and not _crossbar_was_down:
+		_start_crossbar_aim()
+	elif crossbar_down:
+		if _is_crossbar_aim_active():
+			_update_crossbar_aim_direction()
+			_hold_crossbar_at_aim_frame()
+	elif _crossbar_was_down:
+		_release_crossbar()
+
+	_crossbar_was_down = crossbar_down
+
+
+func _start_crossbar_aim() -> void:
+	if _crossbar_state != CrossbarInputState.READY:
+		return
+	if _dash_time_left > 0.0 or _action_animation != &"":
+		return
+	_crossbar_state = CrossbarInputState.PRESSING
+	_crossbar_hold_time = 0.0
+	_update_crossbar_aim_direction()
+	play_action(&"crossbar_aim", _crossbar_aim_direction)
+
+
+func _release_crossbar() -> void:
+	if _crossbar_state == CrossbarInputState.PRESSING:
+		_crossbar_state = CrossbarInputState.RECOVERING
+		_switch_crossbar_animation(&"crossbar_drive")
+		crossbar_short_committed.emit(global_position)
+	elif _crossbar_state == CrossbarInputState.AIMING:
+		_update_crossbar_aim_direction()
+		_crossbar_state = CrossbarInputState.RECOVERING
+		_resume_body_animation()
+		crossbar_long_committed.emit(global_position, _crossbar_aim_direction)
+	elif _crossbar_state == CrossbarInputState.CANCELLED:
+		_crossbar_state = CrossbarInputState.READY
+
+
+func _update_crossbar_aim_direction() -> void:
+	var direction := get_global_mouse_position() - global_position
+	if direction.length_squared() > 0.0:
+		_crossbar_aim_direction = direction.normalized()
+		_last_move_dir = _crossbar_aim_direction
+
+
+func _hold_crossbar_at_aim_frame() -> void:
+	if not is_instance_valid(_body):
+		return
+	if _body.animation == &"crossbar_aim" and _body.frame >= CROSSBAR_HOLD_FRAME:
+		_body.set_frame_and_progress(CROSSBAR_HOLD_FRAME, 0.0)
+		_body.pause()
+
+
+func _resume_body_animation() -> void:
+	if not is_instance_valid(_body):
+		return
+	var current_frame := _body.frame
+	var current_progress := _body.frame_progress
+	_body.play(_body.animation)
+	_body.set_frame_and_progress(current_frame, current_progress)
+
+
+func _switch_crossbar_animation(animation_name: StringName) -> void:
+	if not is_instance_valid(_body):
+		return
+	var current_frame := _body.frame
+	var current_progress := _body.frame_progress
+	_action_animation = animation_name
+	_body.play(animation_name)
+	_body.set_frame_and_progress(current_frame, current_progress)
+
+
+func _is_crossbar_aim_active() -> bool:
+	return (
+		_crossbar_state == CrossbarInputState.PRESSING
+		or _crossbar_state == CrossbarInputState.AIMING
+	)
+
+
+func _cancel_crossbar_aim() -> void:
+	if not _is_crossbar_aim_active():
+		return
+	_crossbar_state = CrossbarInputState.CANCELLED
+	_crossbar_hold_time = 0.0
+	crossbar_aim_cancelled.emit()
 
 
 func _try_fire_counter_wave() -> void:
@@ -127,6 +248,8 @@ func _try_fire_counter_wave() -> void:
 func take_hit(amount: int = 1) -> void:
 	if is_invulnerable():
 		return
+	if _is_crossbar_aim_active():
+		_cancel_crossbar_aim()
 	hit_points -= amount
 	_invulnerable_left = INVULNERABLE_TIME
 	play_action(&"hit")
@@ -149,6 +272,11 @@ func play_action(animation_name: StringName, facing_direction: Vector2 = Vector2
 	if not is_instance_valid(_body):
 		return
 	if not _body.sprite_frames.has_animation(animation_name):
+		return
+	if (
+		_crossbar_state != CrossbarInputState.READY
+		and not animation_name in [&"crossbar_aim", &"crossbar_drive", &"dash", &"hit"]
+	):
 		return
 	if facing_direction.length_squared() > 0.0:
 		_last_move_dir = facing_direction.normalized()
@@ -176,9 +304,17 @@ func _update_visual_rotation() -> void:
 func _on_body_animation_finished() -> void:
 	if _action_animation == &"":
 		return
+	if _action_animation in [&"crossbar_aim", &"crossbar_drive"]:
+		_crossbar_state = CrossbarInputState.READY
+		_crossbar_hold_time = 0.0
 	_action_animation = &""
 	_body.offset = Vector2.ZERO
 	_body.play(_base_animation)
+
+
+func _on_body_frame_changed() -> void:
+	if _crossbar_state == CrossbarInputState.AIMING:
+		_hold_crossbar_at_aim_frame()
 
 
 func _draw() -> void:

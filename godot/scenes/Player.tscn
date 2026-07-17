@@ -91,7 +91,7 @@ animations = [{
 }],
 "loop": false,
 "name": &"crossbar_aim",
-"speed": 5.0
+"speed": 12.5
 }, {
 "frames": [{
 "duration": 1.0,
@@ -111,7 +111,7 @@ animations = [{
 }],
 "loop": false,
 "name": &"crossbar_drive",
-"speed": 5.0
+"speed": 12.5
 }, {
 "frames": [{
 "duration": 1.0,
