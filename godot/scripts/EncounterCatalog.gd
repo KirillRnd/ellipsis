@@ -346,8 +346,8 @@ static func _old_sluice_room_07_resonator() -> Dictionary:
 	room["popup_hint"] = {
 		"title": room["title"],
 		"body": {
-			"en": "Pick up the resonator and place it with E. RMB fires; hold RMB for repeated volleys.",
-			"ru": "Подбери резонатор и поставь его клавишей E. ПКМ даёт залп, удержание ПКМ — серию залпов.",
+			"en": "Place two resonators with E; a third replaces the oldest. RMB fires from both.",
+			"ru": "Поставь два резонатора клавишей E; третий заменяет старейший. ПКМ стреляет из обоих.",
 		},
 		"duration": 7.0,
 	}

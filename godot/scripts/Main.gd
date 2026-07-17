@@ -22,6 +22,7 @@ const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
 const RESONATOR_VOLLEY_INTERVAL := 2.35 * 0.25
+const MAX_ACTIVE_RESONATORS := 2
 const PICKUP_VISUAL_HEIGHT := 64.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
@@ -82,7 +83,8 @@ var _player_wave_available := true
 var _dash_available := true
 var _resonator_available := true
 var _emitters: Array = []
-var _resonator
+var _resonators: Array[Resonator] = []
+var _next_resonator_number := 1
 var _driven_crossbar: SteelCrossbarDriven
 var _exit_unlocked := false
 var _exit_trigger_rect := Rect2()
@@ -158,9 +160,11 @@ func _clear_current_encounter() -> void:
 	_blue_beacon = null
 	_blue_beacon_wave_config = {}
 
-	if is_instance_valid(_resonator):
-		_resonator.queue_free()
-	_resonator = null
+	for resonator in _resonators:
+		if is_instance_valid(resonator):
+			resonator.queue_free()
+	_resonators.clear()
+	_next_resonator_number = 1
 
 	_clear_driven_crossbar()
 
@@ -434,8 +438,8 @@ func _advance_resonator_place_input(resonator_place_down: bool) -> void:
 		and _resonator_available
 		and _resonator_place_cooldown <= 0.0
 	):
-		_place_resonator(_get_resonator_target_position())
-		_resonator_place_cooldown = RESONATOR_PLACE_COOLDOWN
+		if _place_resonator(_get_resonator_target_position()):
+			_resonator_place_cooldown = RESONATOR_PLACE_COOLDOWN
 	_resonator_place_was_down = resonator_place_down
 
 
@@ -462,10 +466,12 @@ func _advance_resonator_volley_input(resonator_volley_down: bool) -> void:
 
 
 func _fire_resonator_volley() -> bool:
-	if not is_instance_valid(_resonator):
+	_remove_invalid_resonators()
+	if _resonators.is_empty():
 		return false
-	wave_manager.spawn_wave("player", "resonator", _resonator.global_position)
-	_resonator.trigger()
+	for resonator in _resonators:
+		wave_manager.spawn_wave("player", "resonator", resonator.global_position)
+		resonator.trigger()
 	_status_label.text = _t("resonator_volley")
 	return true
 
@@ -478,21 +484,34 @@ func _get_resonator_target_position() -> Vector2:
 	return target.clamp(PlayerController.ARENA_RECT.position, PlayerController.ARENA_RECT.end)
 
 
-func _place_resonator(target: Vector2) -> void:
-	if is_instance_valid(_resonator):
-		_resonator.queue_free()
-	_resonator = RESONATOR_SCRIPT.new()
-	_resonator.name = "Resonator"
-	_resonator.global_position = target
-	_resonator.expired.connect(_on_resonator_expired)
-	add_child(_resonator)
+func _place_resonator(target: Vector2) -> bool:
+	_remove_invalid_resonators()
+	if _resonators.size() >= MAX_ACTIVE_RESONATORS:
+		var oldest_resonator: Resonator = _resonators.pop_front()
+		if is_instance_valid(oldest_resonator):
+			oldest_resonator.visible = false
+			oldest_resonator.queue_free()
+
+	var resonator: Resonator = RESONATOR_SCRIPT.new()
+	resonator.name = "Resonator%d" % _next_resonator_number
+	_next_resonator_number += 1
+	resonator.global_position = target
+	resonator.expired.connect(_on_resonator_expired)
+	add_child(resonator)
+	_resonators.append(resonator)
 	player.play_action(&"place_resonator", target - player.global_position)
 	_status_label.text = _t("resonator_set")
+	return true
 
 
 func _on_resonator_expired(resonator) -> void:
-	if resonator == _resonator:
-		_resonator = null
+	_resonators.erase(resonator)
+
+
+func _remove_invalid_resonators() -> void:
+	for index in range(_resonators.size() - 1, -1, -1):
+		if not is_instance_valid(_resonators[index]):
+			_resonators.remove_at(index)
 
 
 func _on_player_hit_points_changed(hit_points: int) -> void:
