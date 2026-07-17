@@ -36,7 +36,7 @@
 colorless_move_sheet.png
 colorless_idle_sheet.png
 rahn_move_sheet.png
-rahn_cast_sheet.png
+rahn_action_sheet.png
 ```
 
 Внутри одного runtime-sheet одновременно находятся:
@@ -93,7 +93,7 @@ rahn_cast_sheet.png
 
 ```text
 colorless_move_sheet.png
-rahn_cast_sheet.png
+rahn_action_sheet.png
 ```
 
 Runtime-sheet одновременно является:
@@ -463,33 +463,18 @@ rahn_interlude_neutral.png
 
 | Действие | Ориентир уникальных кадров | Режим |
 |---|---:|---|
-| `idle` | 3–6 | loop |
+| `anchor` | 1 | static |
 | `move` | 4–8 | loop |
-| `place_resonator` | 3–6 | one-shot |
-| `cast` | 3–5 | one-shot |
-| `hit` | 2–3 | one-shot |
-| `defeat` | 4–8 | one-shot |
+| `action` | 3–5 | one-shot |
+| `defeat` | 1 | static |
 
-`cast` означает ручную команду синхронного залпа.
+`action` используется и для постановки резонатора, и для ручной команды синхронного залпа. Отдельные `idle` и `hit` для текущего runtime Рахна не производятся: покой показывает `anchor`, получение урона читается кратким программным flash.
 
 Резонаторы не стреляют автоматически. Таймеры принадлежат самому Рахну.
 
-### 10.5. Яркая точка Рахна
+### 10.5. Дополнительные слои Рахна
 
-Используется одна отдельная яркая точка:
-
-```text
-rahn_glow_point.png
-```
-
-Требования:
-
-- прозрачный фон;
-- одна точка, не две;
-- не встроена в тело;
-- может размещаться в нужном месте поверх спрайта;
-- интенсивность и масштаб меняются кодом;
-- не должна усложнять сам рисунок Рахна.
+Отдельная яркая точка Рахна не используется. Получение урона и другие краткие сигналы создаются кодом и не требуют дополнительного PNG-слоя.
 
 ---
 
@@ -560,7 +545,6 @@ CharacterBody2D
     ├── BodyAnimatedSprite2D
     ├── CrossbarPivot
     │   └── CrossbarSprite
-    ├── GlowPoint
     └── AnimationPlayer
 ```
 
@@ -673,7 +657,6 @@ runtime-sheet + manifest последовательности
 
 ```text
 Стальная Поперечина
-яркая точка Рахна
 тень
 прочие световые и предметные слои
 ```
