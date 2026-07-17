@@ -21,14 +21,15 @@ const STEEL_CROSSBAR_DRIVEN_SCENE := preload("res://scenes/SteelCrossbarDriven.t
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
+const RESONATOR_VOLLEY_INTERVAL := 2.35 * 0.25
 const PICKUP_VISUAL_HEIGHT := 64.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
 const UI_TEXT := {
 	"blue_source": {"en": "BLUE SOURCE", "ru": "СИНИЙ ИСТОЧНИК"},
-	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | N/P комнаты | F2 язык | R повтор"},
+	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | RMB volley | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | ПКМ залп | N/P комнаты | F2 язык | R повтор"},
 	"counter_ready": {"en": "COUNTER READY", "ru": "КОНТРВОЛНА ГОТОВА"},
-	"counter_wave": {"en": "COUNTER WAVE", "ru": "КОНТРВОЛНА"},
+	"resonator_volley": {"en": "RESONATOR VOLLEY", "ru": "ЗАЛП РЕЗОНАТОРА"},
 	"danger_node": {"en": "DANGER NODE", "ru": "ОПАСНЫЙ УЗЕЛ"},
 	"defeat": {"en": "DEFEAT", "ru": "ПОРАЖЕНИЕ"},
 	"demo_clear": {"en": "DEMO CLEAR", "ru": "ДЕМО ПРОЙДЕНО"},
@@ -64,6 +65,9 @@ var _language_was_down := false
 var _language := DEFAULT_LANGUAGE
 var _resonator_place_was_down := false
 var _resonator_place_cooldown := 0.0
+var _resonator_volley_was_down := false
+var _resonator_volley_active := false
+var _resonator_volley_cooldown := 0.0
 var _dungeon_sequence: Array[String] = []
 var _current_encounter := {}
 var _scheduled_active_times: Array = []
@@ -98,7 +102,6 @@ var _hint_label: Label
 
 func _ready() -> void:
 	wave_manager.player = player
-	player.fired_counter_wave.connect(_on_player_fired_counter_wave)
 	player.crossbar_action_started.connect(_on_player_crossbar_action_started)
 	player.crossbar_drive_impact.connect(_on_player_crossbar_drive_impact)
 	player.hit_points_changed.connect(_on_player_hit_points_changed)
@@ -179,6 +182,9 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 	_resonator_place_range = encounter.get("resonator_place_range", DEFAULT_RESONATOR_PLACE_RANGE)
 	_resonator_place_was_down = Input.is_key_pressed(KEY_E)
 	_resonator_place_cooldown = 0.0
+	_resonator_volley_was_down = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	_resonator_volley_active = false
+	_resonator_volley_cooldown = 0.0
 	_objective = encounter.get("objective", "defeat_emitters")
 	_player_wave_available = encounter.get("player_wave_enabled", true)
 	_dash_available = encounter.get("dash_enabled", true)
@@ -293,6 +299,7 @@ func _process(delta: float) -> void:
 
 	_elapsed += delta
 	_resonator_place_cooldown = maxf(0.0, _resonator_place_cooldown - delta)
+	_resonator_volley_cooldown = maxf(0.0, _resonator_volley_cooldown - delta)
 	player.counter_wave_enabled = _player_wave_available
 	player.dash_enabled = _dash_available
 	_update_emitters(true)
@@ -408,14 +415,6 @@ func _create_blue_beacon(config: Dictionary) -> void:
 	add_child(_blue_beacon)
 
 
-func _on_player_fired_counter_wave(origin: Vector2) -> void:
-	wave_manager.spawn_wave("player", "violet", origin)
-	if is_instance_valid(_resonator):
-		wave_manager.spawn_wave("player", "resonator", _resonator.global_position)
-		_resonator.trigger()
-	_status_label.text = _t("counter_wave")
-
-
 func _on_blue_beacon_fired(origin: Vector2) -> void:
 	wave_manager.spawn_wave("player", "blue", origin, _blue_beacon_wave_config)
 	_status_label.text = _t("blue_source")
@@ -423,6 +422,9 @@ func _on_blue_beacon_fired(origin: Vector2) -> void:
 
 func _handle_resonator_input() -> void:
 	_advance_resonator_place_input(Input.is_key_pressed(KEY_E))
+	_advance_resonator_volley_input(
+		Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	)
 
 
 func _advance_resonator_place_input(resonator_place_down: bool) -> void:
@@ -435,6 +437,37 @@ func _advance_resonator_place_input(resonator_place_down: bool) -> void:
 		_place_resonator(_get_resonator_target_position())
 		_resonator_place_cooldown = RESONATOR_PLACE_COOLDOWN
 	_resonator_place_was_down = resonator_place_down
+
+
+func _advance_resonator_volley_input(resonator_volley_down: bool) -> void:
+	if not resonator_volley_down:
+		_resonator_volley_active = false
+		_resonator_volley_was_down = false
+		return
+
+	if not _resonator_volley_was_down:
+		_resonator_volley_active = (
+			_resonator_volley_cooldown <= 0.0
+			and _fire_resonator_volley()
+		)
+		if _resonator_volley_active:
+			_resonator_volley_cooldown = RESONATOR_VOLLEY_INTERVAL
+	elif _resonator_volley_active and _resonator_volley_cooldown <= 0.0:
+		if _fire_resonator_volley():
+			_resonator_volley_cooldown += RESONATOR_VOLLEY_INTERVAL
+		else:
+			_resonator_volley_active = false
+
+	_resonator_volley_was_down = true
+
+
+func _fire_resonator_volley() -> bool:
+	if not is_instance_valid(_resonator):
+		return false
+	wave_manager.spawn_wave("player", "resonator", _resonator.global_position)
+	_resonator.trigger()
+	_status_label.text = _t("resonator_volley")
+	return true
 
 
 func _get_resonator_target_position() -> Vector2:
@@ -691,7 +724,7 @@ func _update_ui() -> void:
 			_status_label.text = _t("reach_exit")
 		elif not _player_wave_available:
 			_status_label.text = _t("survive")
-		elif player.get_cooldown_ratio() > 0.0:
+		elif _resonator_volley_cooldown > 0.0:
 			_status_label.text = _t("recharging")
 		else:
 			_status_label.text = _localize(_current_encounter.get("title", _t("counter_ready"))).to_upper()
