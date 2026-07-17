@@ -14,6 +14,8 @@ OUTPUT_DIR = ROOT / "godot" / "assets" / "actors" / "colorless"
 CELL_SIZE = 256
 PLACE_RESONATOR_SCALE = 1.05
 PLACE_RESONATOR_OFFSET = (0, 12)
+CROSSBAR_EMPTY_HANDS_SCALE = 0.80
+CROSSBAR_EMPTY_HANDS_OFFSET = (0, -25)
 
 
 def load_rgba(name: str, expected_size: tuple[int, int]) -> Image.Image:
@@ -96,6 +98,27 @@ def build_place_resonator() -> None:
     save_rgba(runtime, "colorless_place_resonator_two_state_sheet.png")
 
 
+def build_crossbar_empty_hands() -> None:
+    frame_names = (
+        "colorless_crossbar_empty_hands_intermediate_01_alpha.png",
+        "colorless_crossbar_empty_hands_06_alpha.png",
+    )
+    runtime = Image.new(
+        "RGBA",
+        (CELL_SIZE * len(frame_names), CELL_SIZE),
+        (0, 0, 0, 0),
+    )
+    for frame_index, frame_name in enumerate(frame_names):
+        frame = load_rgba(frame_name, (CELL_SIZE, CELL_SIZE))
+        normalized = scale_frame_around_pivot(
+            frame,
+            CROSSBAR_EMPTY_HANDS_SCALE,
+            CROSSBAR_EMPTY_HANDS_OFFSET,
+        )
+        runtime.alpha_composite(normalized, (frame_index * CELL_SIZE, 0))
+    save_rgba(runtime, "colorless_crossbar_empty_hands_two_state_sheet.png")
+
+
 def main() -> None:
     build_idle()
     copy_compatible_sheet(
@@ -115,6 +138,7 @@ def main() -> None:
         frame_height=512,
     )
     build_place_resonator()
+    build_crossbar_empty_hands()
 
 
 if __name__ == "__main__":

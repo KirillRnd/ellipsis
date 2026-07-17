@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/items/steel_crossbar_topdown.png" id="1_crossbar"]
+
+[node name="SteelCrossbarTopdown" type="Node2D"]
+scale = Vector2(0.0522, 0.0522)
+
+[node name="Visual" type="Sprite2D" parent="."]
+position = Vector2(-830, -93)
+texture = ExtResource("1_crossbar")
+centered = false

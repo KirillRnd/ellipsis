@@ -1,4 +1,4 @@
-[gd_scene load_steps=22 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://scripts/PlayerController.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_idle_sheet.png" id="2_idle"]
@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_hit_sheet.png" id="4_hit"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_dash_sheet.png" id="5_dash"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_place_resonator_two_state_sheet.png" id="6_place"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_crossbar_empty_hands_two_state_sheet.png" id="7_crossbar"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_dash_0"]
 atlas = ExtResource("5_dash")
@@ -59,11 +60,59 @@ region = Rect2(0, 0, 256, 256)
 atlas = ExtResource("6_place")
 region = Rect2(256, 0, 256, 256)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_crossbar_0"]
+atlas = ExtResource("7_crossbar")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_crossbar_1"]
+atlas = ExtResource("7_crossbar")
+region = Rect2(256, 0, 256, 256)
+
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
 radius = 8.0
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_colorless"]
 animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_crossbar_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_crossbar_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_crossbar_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_0")
+}],
+"loop": false,
+"name": &"crossbar_aim",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_crossbar_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_crossbar_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_crossbar_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_idle_0")
+}],
+"loop": false,
+"name": &"crossbar_drive",
+"speed": 5.0
+}, {
 "frames": [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_dash_0")

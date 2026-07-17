@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 from PIL import Image
@@ -27,6 +28,13 @@ GATE_STATE_BOUNDS = (
 )
 PICKUP_SOURCE_SIZE = (863, 878)
 PICKUP_CROP_PADDING = 12
+CROSSBAR_CROP_PADDING = 12
+CROSSBAR_TOPDOWN_SOURCE_SIZE = (1533, 166)
+CROSSBAR_TOPDOWN_CONTENT_BOUNDS = (0, 0, 1533, 166)
+CROSSBAR_INTERLUDE_SOURCE_SIZE = (955, 1166)
+CROSSBAR_INTERLUDE_CONTENT_BOUNDS = (5, 6, 950, 1161)
+CROSSBAR_DRIVEN_SOURCE_SIZE = (454, 659)
+CROSSBAR_DRIVEN_CONTENT_BOUNDS = (5, 6, 449, 654)
 
 
 def load_rgba(name: str, expected_size: tuple[int, int]) -> Image.Image:
@@ -126,10 +134,79 @@ def build_pickup() -> None:
     cleaned.crop(crop_bounds).save(ITEM_OUTPUT_DIR / "pickup_white_glow.png")
 
 
+def crop_component_with_padding(
+    image: Image.Image,
+    expected_bounds: tuple[int, int, int, int],
+    padding: int,
+) -> Image.Image:
+    bounds = image.getchannel("A").getbbox()
+    if bounds != expected_bounds:
+        raise SystemExit(f"Visible bounds {bounds}, expected {expected_bounds}")
+    content = image.crop(bounds)
+    runtime = Image.new(
+        "RGBA",
+        (content.width + padding * 2, content.height + padding * 2),
+        (0, 0, 0, 0),
+    )
+    runtime.alpha_composite(content, (padding, padding))
+    return runtime
+
+
+def build_crossbar() -> None:
+    topdown_source = load_rgba(
+        "steel_crossbar_topdown_alpha_cropped.png",
+        CROSSBAR_TOPDOWN_SOURCE_SIZE,
+    )
+    topdown = crop_component_with_padding(
+        keep_largest_alpha_component(topdown_source),
+        CROSSBAR_TOPDOWN_CONTENT_BOUNDS,
+        CROSSBAR_CROP_PADDING,
+    )
+
+    interlude_source = load_rgba(
+        "steel_crossbar_interlude_alpha_cropped.png",
+        CROSSBAR_INTERLUDE_SOURCE_SIZE,
+    )
+    interlude = crop_component_with_padding(
+        keep_largest_alpha_component(interlude_source),
+        CROSSBAR_INTERLUDE_CONTENT_BOUNDS,
+        CROSSBAR_CROP_PADDING,
+    )
+
+    driven_source = load_rgba(
+        "kovyryalka_driven_alpha_cropped.png",
+        CROSSBAR_DRIVEN_SOURCE_SIZE,
+    )
+    driven = crop_component_with_padding(
+        keep_largest_alpha_component(driven_source),
+        CROSSBAR_DRIVEN_CONTENT_BOUNDS,
+        CROSSBAR_CROP_PADDING,
+    )
+
+    ITEM_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    topdown.save(ITEM_OUTPUT_DIR / "steel_crossbar_topdown.png")
+    interlude.save(ITEM_OUTPUT_DIR / "steel_crossbar_interlude.png")
+    driven.save(ITEM_OUTPUT_DIR / "kovyryalka_driven.png")
+
+
 def main() -> None:
-    build_backgrounds()
-    build_gate()
-    build_pickup()
+    builders = {
+        "backgrounds": build_backgrounds,
+        "gate": build_gate,
+        "pickup": build_pickup,
+        "crossbar": build_crossbar,
+    }
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "targets",
+        nargs="*",
+        choices=builders,
+        help="asset groups to build; omit to build all groups",
+    )
+    args = parser.parse_args()
+    targets = args.targets or list(builders)
+    for target in targets:
+        builders[target]()
 
 
 if __name__ == "__main__":

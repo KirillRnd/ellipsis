@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/items/kovyryalka_driven.png" id="1_crossbar"]
+
+[node name="SteelCrossbarDriven" type="Node2D"]
+scale = Vector2(0.1235, 0.1235)
+
+[node name="Visual" type="Sprite2D" parent="."]
+position = Vector2(-130, -658)
+texture = ExtResource("1_crossbar")
+centered = false
