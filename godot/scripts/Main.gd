@@ -17,7 +17,9 @@ const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
 const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
 const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
 const EXIT_GATE_SCENE := preload("res://scenes/ExitGate.tscn")
+const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
+const PICKUP_VISUAL_HEIGHT := 64.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
 const UI_TEXT := {
@@ -200,11 +202,13 @@ func _create_pickups(pickup_configs: Array) -> void:
 	for pickup_config in pickup_configs:
 		var position: Vector2 = pickup_config.get("position", Vector2.ZERO)
 		var size := Vector2(36, 36)
-		var visual := ColorRect.new()
+		var visual := Sprite2D.new()
 		visual.name = pickup_config.get("name", "Pickup")
-		visual.position = position - size * 0.5
-		visual.size = size
-		visual.color = pickup_config.get("color", Color(0.62, 0.40, 1.0, 0.82))
+		visual.texture = PICKUP_TEXTURE
+		visual.global_position = position
+		var visual_scale := PICKUP_VISUAL_HEIGHT / float(PICKUP_TEXTURE.get_height())
+		visual.scale = Vector2.ONE * visual_scale
+		visual.z_index = 5
 		add_child(visual)
 		_pickup_items.append({
 			"kind": pickup_config.get("kind", ""),

@@ -199,7 +199,6 @@ static func _old_sluice_room_03_make_gap() -> Dictionary:
 			"name": "VioletEmitterPickup",
 			"kind": "violet_emitter",
 			"position": Vector2(640, 500),
-			"color": Color(0.62, 0.32, 1.0, 0.82),
 		},
 	]
 	room["emitters"] = [
@@ -357,7 +356,6 @@ static func _old_sluice_room_07_resonator() -> Dictionary:
 			"name": "ResonatorPickup",
 			"kind": "resonator",
 			"position": Vector2(640, 500),
-			"color": Color(0.62, 0.40, 1.0, 0.82),
 		},
 	]
 	room["emitters"] = [
