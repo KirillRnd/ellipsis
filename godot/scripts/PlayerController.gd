@@ -38,6 +38,7 @@ const DEFEAT_TIME := 0.45
 var hit_points := 30
 var crossbar_enabled := true
 var dash_enabled := true
+var controls_enabled := true
 var _dash_time_left := 0.0
 var _dash_cooldown := 0.0
 var _invulnerable_left := 0.0
@@ -67,6 +68,7 @@ func _ready() -> void:
 
 
 func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = true) -> void:
+	controls_enabled = true
 	global_position = start_position
 	velocity = Vector2.ZERO
 	_dash_time_left = 0.0
@@ -96,6 +98,10 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 func _physics_process(delta: float) -> void:
 	if _defeated:
 		_update_defeat(delta)
+		return
+	if not controls_enabled:
+		velocity = Vector2.ZERO
+		_update_visual_state(Vector2.ZERO)
 		return
 
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)

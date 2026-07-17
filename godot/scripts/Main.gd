@@ -19,6 +19,8 @@ const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
 const EXIT_GATE_SCENE := preload("res://scenes/ExitGate.tscn")
 const STEEL_CROSSBAR_DRIVEN_SCENE := preload("res://scenes/SteelCrossbarDriven.tscn")
 const RAHN_BOSS_SCENE := preload("res://scenes/RahnBoss.tscn")
+const INTERLUDE_OVERLAY_SCENE := preload("res://scenes/InterludeOverlay.tscn")
+const INTERLUDE_CATALOG := preload("res://scripts/InterludeCatalog.gd")
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
@@ -107,6 +109,9 @@ var _status_label: Label
 var _hint_label: Label
 var _boss_hp_bar: ProgressBar
 var _boss_hp_label: Label
+var _interlude_overlay: InterludeOverlay
+var _shown_interludes := {}
+var _pending_encounter_index := -1
 
 
 func _ready() -> void:
@@ -120,12 +125,15 @@ func _ready() -> void:
 
 	_create_exit_door_visual()
 	_create_ui()
+	_create_interlude_overlay()
 
 	_dungeon_sequence = ENCOUNTER_CATALOG.get_dungeon_sequence(DUNGEON_ID)
 	_load_encounter(0)
 
 
-func _load_encounter(index: int) -> void:
+func _load_encounter(index: int, skip_interlude: bool = false) -> void:
+	if not skip_interlude and _try_start_interlude(index):
+		return
 	_clear_current_encounter()
 	_encounter_index = clampi(index, 0, max(0, _dungeon_sequence.size() - 1))
 	var encounter_id := _dungeon_sequence[_encounter_index]
@@ -155,6 +163,39 @@ func _load_encounter(index: int) -> void:
 	_create_pickups(_current_encounter.get("pickups", []))
 	_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
 	_update_ui()
+
+
+func _try_start_interlude(index: int) -> bool:
+	var config: Dictionary = INTERLUDE_CATALOG.get_for_room(index)
+	if config.is_empty():
+		return false
+	var interlude_id: String = config.get("id", "")
+	if interlude_id.is_empty() or _shown_interludes.has(interlude_id):
+		return false
+	_shown_interludes[interlude_id] = true
+	_pending_encounter_index = index
+	_clear_current_encounter()
+	_state = "interlude"
+	_exit_unlocked = false
+	player.controls_enabled = false
+	player.velocity = Vector2.ZERO
+	_set_exit_gate_open(false)
+	_interlude_overlay.show_interlude(config, _language)
+	return true
+
+
+func _create_interlude_overlay() -> void:
+	_interlude_overlay = INTERLUDE_OVERLAY_SCENE.instantiate()
+	_interlude_overlay.finished.connect(_on_interlude_finished)
+	add_child(_interlude_overlay)
+
+
+func _on_interlude_finished() -> void:
+	var next_index := _pending_encounter_index
+	_pending_encounter_index = -1
+	if next_index < 0:
+		return
+	_load_encounter(next_index, true)
 
 
 func _clear_current_encounter() -> void:
