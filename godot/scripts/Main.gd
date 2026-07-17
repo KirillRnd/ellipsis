@@ -17,6 +17,7 @@ const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
 const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
 const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
 const EXIT_GATE_SCENE := preload("res://scenes/ExitGate.tscn")
+const STEEL_CROSSBAR_DRIVEN_SCENE := preload("res://scenes/SteelCrossbarDriven.tscn")
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const PICKUP_VISUAL_HEIGHT := 64.0
@@ -76,6 +77,7 @@ var _dash_available := true
 var _resonator_available := true
 var _emitters: Array = []
 var _resonator
+var _driven_crossbar: SteelCrossbarDriven
 var _exit_unlocked := false
 var _exit_trigger_rect := Rect2()
 var _exit_door_rect := Rect2()
@@ -95,6 +97,8 @@ var _hint_label: Label
 func _ready() -> void:
 	wave_manager.player = player
 	player.fired_counter_wave.connect(_on_player_fired_counter_wave)
+	player.crossbar_action_started.connect(_on_player_crossbar_action_started)
+	player.crossbar_drive_impact.connect(_on_player_crossbar_drive_impact)
 	player.hit_points_changed.connect(_on_player_hit_points_changed)
 	player.died.connect(_on_player_died)
 	wave_manager.danger_changed.connect(_on_danger_changed)
@@ -153,6 +157,8 @@ func _clear_current_encounter() -> void:
 		_resonator.queue_free()
 	_resonator = null
 
+	_clear_driven_crossbar()
+
 	if is_instance_valid(wave_manager):
 		wave_manager.clear_all_waves()
 
@@ -196,6 +202,28 @@ func _create_emitters(emitter_configs: Array) -> void:
 		emitter.damage_mode = emitter_config.get("damage_mode", emitter.damage_mode)
 		add_child(emitter)
 		_emitters.append(emitter)
+
+
+func _on_player_crossbar_drive_impact(
+	origin: Vector2,
+	direction: Vector2,
+	is_oriented: bool,
+) -> void:
+	_clear_driven_crossbar()
+	_driven_crossbar = STEEL_CROSSBAR_DRIVEN_SCENE.instantiate()
+	add_child(_driven_crossbar)
+	_driven_crossbar.setup(origin, direction, is_oriented)
+
+
+func _on_player_crossbar_action_started(_animation_name: StringName) -> void:
+	_clear_driven_crossbar()
+
+
+func _clear_driven_crossbar() -> void:
+	if is_instance_valid(_driven_crossbar):
+		_driven_crossbar.visible = false
+		_driven_crossbar.queue_free()
+	_driven_crossbar = null
 
 
 func _create_pickups(pickup_configs: Array) -> void:

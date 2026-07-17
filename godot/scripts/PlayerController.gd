@@ -4,6 +4,8 @@ extends CharacterBody2D
 signal fired_counter_wave(origin: Vector2)
 signal crossbar_short_committed(origin: Vector2)
 signal crossbar_long_committed(origin: Vector2, direction: Vector2)
+signal crossbar_action_started(animation_name: StringName)
+signal crossbar_drive_impact(origin: Vector2, direction: Vector2, is_oriented: bool)
 signal crossbar_aim_cancelled
 signal hit_points_changed(hit_points: int)
 signal died
@@ -28,6 +30,7 @@ const DASH_VISUAL_OFFSET := Vector2(0.0, -128.0)
 const CROSSBAR_HOLD_THRESHOLD := 0.16
 const CROSSBAR_AIM_SPEED_FACTOR := 0.55
 const CROSSBAR_HOLD_FRAME := 2
+const CROSSBAR_IMPACT_FRAME := 3
 
 @onready var _visual_root: Node2D = $VisualRoot
 @onready var _crossbar_pivot: Node2D = $VisualRoot/CrossbarPivot
@@ -49,6 +52,10 @@ var _crossbar_state := CrossbarInputState.READY
 var _crossbar_hold_time := 0.0
 var _crossbar_was_down := false
 var _crossbar_aim_direction := Vector2.UP
+var _crossbar_impact_pending := false
+var _crossbar_impact_origin := Vector2.ZERO
+var _crossbar_impact_direction := Vector2.UP
+var _crossbar_impact_is_oriented := false
 
 
 func _ready() -> void:
@@ -73,6 +80,7 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 	_crossbar_hold_time = 0.0
 	_crossbar_was_down = false
 	_crossbar_aim_direction = Vector2.UP
+	_clear_pending_crossbar_impact()
 	if is_instance_valid(_body):
 		_body.offset = Vector2.ZERO
 		_body.play(&"idle")
@@ -173,7 +181,9 @@ func _start_crossbar_aim() -> void:
 		return
 	_crossbar_state = CrossbarInputState.PRESSING
 	_crossbar_hold_time = 0.0
+	_clear_pending_crossbar_impact()
 	_update_crossbar_aim_direction()
+	crossbar_action_started.emit(&"crossbar_aim")
 	_crossbar_pivot.visible = true
 	play_action(&"crossbar_aim", _crossbar_aim_direction)
 
@@ -181,11 +191,13 @@ func _start_crossbar_aim() -> void:
 func _release_crossbar() -> void:
 	if _crossbar_state == CrossbarInputState.PRESSING:
 		_crossbar_state = CrossbarInputState.RECOVERING
+		_queue_crossbar_impact(false)
 		_switch_crossbar_animation(&"crossbar_drive")
 		crossbar_short_committed.emit(global_position)
 	elif _crossbar_state == CrossbarInputState.AIMING:
 		_update_crossbar_aim_direction()
 		_crossbar_state = CrossbarInputState.RECOVERING
+		_queue_crossbar_impact(true)
 		_resume_body_animation()
 		crossbar_long_committed.emit(global_position, _crossbar_aim_direction)
 	elif _crossbar_state == CrossbarInputState.CANCELLED:
@@ -219,11 +231,38 @@ func _resume_body_animation() -> void:
 func _switch_crossbar_animation(animation_name: StringName) -> void:
 	if not is_instance_valid(_body):
 		return
+	crossbar_action_started.emit(animation_name)
 	var current_frame := _body.frame
 	var current_progress := _body.frame_progress
 	_action_animation = animation_name
 	_body.play(animation_name)
 	_body.set_frame_and_progress(current_frame, current_progress)
+
+
+func _queue_crossbar_impact(is_oriented: bool) -> void:
+	_crossbar_impact_pending = true
+	_crossbar_impact_origin = global_position
+	_crossbar_impact_direction = _crossbar_aim_direction
+	_crossbar_impact_is_oriented = is_oriented
+
+
+func _emit_pending_crossbar_impact() -> void:
+	if not _crossbar_impact_pending:
+		return
+	_crossbar_impact_pending = false
+	_crossbar_pivot.visible = false
+	crossbar_drive_impact.emit(
+		_crossbar_impact_origin,
+		_crossbar_impact_direction,
+		_crossbar_impact_is_oriented,
+	)
+
+
+func _clear_pending_crossbar_impact() -> void:
+	_crossbar_impact_pending = false
+	_crossbar_impact_origin = Vector2.ZERO
+	_crossbar_impact_direction = Vector2.UP
+	_crossbar_impact_is_oriented = false
 
 
 func _is_crossbar_aim_active() -> bool:
@@ -259,6 +298,7 @@ func take_hit(amount: int = 1) -> void:
 	elif _crossbar_state == CrossbarInputState.RECOVERING:
 		_crossbar_state = CrossbarInputState.READY
 		_crossbar_hold_time = 0.0
+		_clear_pending_crossbar_impact()
 		_crossbar_pivot.visible = false
 	hit_points -= amount
 	_invulnerable_left = INVULNERABLE_TIME
@@ -315,6 +355,7 @@ func _on_body_animation_finished() -> void:
 	if _action_animation == &"":
 		return
 	if _action_animation in [&"crossbar_aim", &"crossbar_drive"]:
+		_emit_pending_crossbar_impact()
 		_crossbar_state = CrossbarInputState.READY
 		_crossbar_hold_time = 0.0
 		_crossbar_pivot.visible = false
@@ -326,6 +367,12 @@ func _on_body_animation_finished() -> void:
 func _on_body_frame_changed() -> void:
 	if _crossbar_state == CrossbarInputState.AIMING:
 		_hold_crossbar_at_aim_frame()
+	elif (
+		_crossbar_state == CrossbarInputState.RECOVERING
+		and _body.animation in [&"crossbar_aim", &"crossbar_drive"]
+		and _body.frame >= CROSSBAR_IMPACT_FRAME
+	):
+		_emit_pending_crossbar_impact()
 
 
 func _draw() -> void:

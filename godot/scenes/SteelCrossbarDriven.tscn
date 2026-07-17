@@ -1,9 +1,12 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Texture2D" path="res://assets/items/kovyryalka_driven.png" id="1_crossbar"]
+[ext_resource type="Script" path="res://scripts/SteelCrossbarDriven.gd" id="2_script"]
 
 [node name="SteelCrossbarDriven" type="Node2D"]
-scale = Vector2(0.1235, 0.1235)
+scale = Vector2(0.08025, 0.08025)
+z_index = -1
+script = ExtResource("2_script")
 
 [node name="Visual" type="Sprite2D" parent="."]
 position = Vector2(-130, -658)
