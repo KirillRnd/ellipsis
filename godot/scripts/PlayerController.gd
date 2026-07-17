@@ -8,6 +8,7 @@ signal crossbar_action_started(animation_name: StringName)
 signal crossbar_drive_impact(origin: Vector2, direction: Vector2, is_oriented: bool)
 signal crossbar_aim_cancelled
 signal hit_points_changed(hit_points: int)
+signal defeat_started
 signal died
 
 enum CrossbarInputState {
@@ -31,6 +32,7 @@ const CROSSBAR_HOLD_THRESHOLD := 0.16
 const CROSSBAR_AIM_SPEED_FACTOR := 0.55
 const CROSSBAR_HOLD_FRAME := 2
 const CROSSBAR_IMPACT_FRAME := 3
+const DEFEAT_TIME := 0.45
 
 @onready var _visual_root: Node2D = $VisualRoot
 @onready var _crossbar_pivot: Node2D = $VisualRoot/CrossbarPivot
@@ -56,6 +58,9 @@ var _crossbar_impact_pending := false
 var _crossbar_impact_origin := Vector2.ZERO
 var _crossbar_impact_direction := Vector2.UP
 var _crossbar_impact_is_oriented := false
+var _defeated := false
+var _defeat_time_left := 0.0
+var _death_emitted := false
 
 
 func _ready() -> void:
@@ -80,6 +85,9 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 	_crossbar_hold_time = 0.0
 	_crossbar_was_down = false
 	_crossbar_aim_direction = Vector2.UP
+	_defeated = false
+	_defeat_time_left = 0.0
+	_death_emitted = false
 	_clear_pending_crossbar_impact()
 	if is_instance_valid(_body):
 		_body.offset = Vector2.ZERO
@@ -92,6 +100,10 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 
 
 func _physics_process(delta: float) -> void:
+	if _defeated:
+		_update_defeat(delta)
+		return
+
 	_fire_cooldown = maxf(0.0, _fire_cooldown - delta)
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)
 	_invulnerable_left = maxf(0.0, _invulnerable_left - delta)
@@ -291,7 +303,7 @@ func _try_fire_counter_wave() -> void:
 
 
 func take_hit(amount: int = 1) -> void:
-	if is_invulnerable():
+	if _defeated or is_invulnerable():
 		return
 	if _is_crossbar_aim_active():
 		_cancel_crossbar_aim()
@@ -300,16 +312,48 @@ func take_hit(amount: int = 1) -> void:
 		_crossbar_hold_time = 0.0
 		_clear_pending_crossbar_impact()
 		_crossbar_pivot.visible = false
-	hit_points -= amount
+	hit_points = max(0, hit_points - amount)
 	_invulnerable_left = INVULNERABLE_TIME
-	play_action(&"hit")
 	hit_points_changed.emit(hit_points)
 	if hit_points <= 0:
+		_start_defeat()
+	else:
+		play_action(&"hit")
+
+
+func _start_defeat() -> void:
+	_defeated = true
+	_defeat_time_left = DEFEAT_TIME
+	_death_emitted = false
+	velocity = Vector2.ZERO
+	_dash_time_left = 0.0
+	_crossbar_state = CrossbarInputState.READY
+	_crossbar_hold_time = 0.0
+	_crossbar_was_down = false
+	_clear_pending_crossbar_impact()
+	_crossbar_pivot.visible = false
+	_action_animation = &"defeat"
+	_body.offset = Vector2.ZERO
+	_body.modulate = Color.WHITE
+	_body.play(&"defeat")
+	defeat_started.emit()
+
+
+func _update_defeat(delta: float) -> void:
+	velocity = Vector2.ZERO
+	_defeat_time_left = maxf(0.0, _defeat_time_left - delta)
+	if _defeat_time_left <= 0.0 and not _death_emitted:
+		_death_emitted = true
 		died.emit()
+	queue_redraw()
 
 
 func is_invulnerable() -> bool:
-	return _invulnerable_left > 0.0
+	return _defeated or _invulnerable_left > 0.0
+
+
+func is_defeated() -> bool:
+	return _defeated
 
 
 func get_cooldown_ratio() -> float:
@@ -325,7 +369,7 @@ func play_action(animation_name: StringName, facing_direction: Vector2 = Vector2
 		return
 	if (
 		_crossbar_state != CrossbarInputState.READY
-		and not animation_name in [&"crossbar_aim", &"crossbar_drive", &"dash", &"hit"]
+		and not animation_name in [&"crossbar_aim", &"crossbar_drive", &"dash", &"hit", &"defeat"]
 	):
 		return
 	if facing_direction.length_squared() > 0.0:
@@ -352,6 +396,8 @@ func _update_visual_rotation() -> void:
 
 
 func _on_body_animation_finished() -> void:
+	if _defeated:
+		return
 	if _action_animation == &"":
 		return
 	if _action_animation in [&"crossbar_aim", &"crossbar_drive"]:

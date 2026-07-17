@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene load_steps=28 format=3]
 
 [ext_resource type="Script" path="res://scripts/PlayerController.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_idle_sheet.png" id="2_idle"]
@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_place_resonator_two_state_sheet.png" id="6_place"]
 [ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_crossbar_empty_hands_two_state_sheet.png" id="7_crossbar"]
 [ext_resource type="PackedScene" path="res://scenes/SteelCrossbarTopdown.tscn" id="8_crossbar_scene"]
+[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_defeat_sheet.png" id="9_defeat"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_dash_0"]
 atlas = ExtResource("5_dash")
@@ -69,6 +70,10 @@ region = Rect2(0, 0, 256, 256)
 atlas = ExtResource("7_crossbar")
 region = Rect2(256, 0, 256, 256)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_defeat_0"]
+atlas = ExtResource("9_defeat")
+region = Rect2(0, 0, 256, 256)
+
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
 radius = 8.0
 
@@ -113,6 +118,14 @@ animations = [{
 "loop": false,
 "name": &"crossbar_drive",
 "speed": 12.5
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_defeat_0")
+}],
+"loop": false,
+"name": &"defeat",
+"speed": 1.0
 }, {
 "frames": [{
 "duration": 1.0,

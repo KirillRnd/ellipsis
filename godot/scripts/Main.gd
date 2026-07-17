@@ -107,6 +107,7 @@ func _ready() -> void:
 	player.crossbar_action_started.connect(_on_player_crossbar_action_started)
 	player.crossbar_drive_impact.connect(_on_player_crossbar_drive_impact)
 	player.hit_points_changed.connect(_on_player_hit_points_changed)
+	player.defeat_started.connect(_on_player_defeat_started)
 	player.died.connect(_on_player_died)
 	wave_manager.danger_changed.connect(_on_danger_changed)
 
@@ -517,6 +518,14 @@ func _remove_invalid_resonators() -> void:
 func _on_player_hit_points_changed(hit_points: int) -> void:
 	if is_instance_valid(_hp_label):
 		_hp_label.text = _t("hp") % max(hit_points, 0)
+
+
+func _on_player_defeat_started() -> void:
+	_set_state("defeat_transition")
+	_clear_driven_crossbar()
+	_resonator_volley_active = false
+	if is_instance_valid(wave_manager):
+		wave_manager.clear_all_waves()
 
 
 func _on_player_died() -> void:
