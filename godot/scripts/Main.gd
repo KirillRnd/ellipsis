@@ -213,6 +213,7 @@ func _on_player_crossbar_drive_impact(
 	_driven_crossbar = STEEL_CROSSBAR_DRIVEN_SCENE.instantiate()
 	add_child(_driven_crossbar)
 	_driven_crossbar.setup(origin, direction, is_oriented)
+	wave_manager.set_driven_crossbar(_driven_crossbar)
 
 
 func _on_player_crossbar_action_started(_animation_name: StringName) -> void:
@@ -220,6 +221,8 @@ func _on_player_crossbar_action_started(_animation_name: StringName) -> void:
 
 
 func _clear_driven_crossbar() -> void:
+	if is_instance_valid(wave_manager):
+		wave_manager.set_driven_crossbar(null)
 	if is_instance_valid(_driven_crossbar):
 		_driven_crossbar.visible = false
 		_driven_crossbar.queue_free()
