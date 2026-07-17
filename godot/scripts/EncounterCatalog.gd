@@ -49,6 +49,7 @@ static func _base_room(id: String, title) -> Dictionary:
 		"objective": "defeat_emitters",
 		"battle_length": 70.0,
 		"game_speed": 0.333333,
+		"arena_background": "red_fault",
 		"kills_to_win": 1,
 		"next_emitter_delay": 2.0,
 		"player_position": Vector2(640, 570),
@@ -63,9 +64,8 @@ static func _base_room(id: String, title) -> Dictionary:
 		},
 		"exit": {
 			"side": "top",
-			"door_rect": Rect2(Vector2(560, 60), Vector2(160, 26)),
-			"trigger_rect": Rect2(Vector2(560, 90), Vector2(160, 38)),
-			"color": Color(0.22, 0.86, 1.0, 0.78),
+			"door_rect": Rect2(Vector2(600, 60), Vector2(80, 26)),
+			"trigger_rect": Rect2(Vector2(600, 90), Vector2(80, 38)),
 		},
 		"blue_beacon": {},
 		"emitters": [],
@@ -136,6 +136,7 @@ static func _old_sluice_room_02_blue_safe_route() -> Dictionary:
 		"ru": "Комната 2 - синий маршрут",
 	})
 	room["objective"] = "reach_exit"
+	room["arena_background"] = "blue_guides"
 	room["battle_length"] = 75.0
 	room["player_wave_enabled"] = false
 	room["popup_hint"] = {
@@ -292,6 +293,7 @@ static func _old_sluice_room_06_blue_resonance() -> Dictionary:
 		"ru": "Комната 6 - синий резонанс",
 	})
 	room["battle_length"] = 85.0
+	room["arena_background"] = "blue_guides"
 	room["kills_to_win"] = 1
 	room["popup_hint"] = {
 		"title": room["title"],
@@ -389,6 +391,7 @@ static func _mvp_combat_test() -> Dictionary:
 		"ru": "MVP боевой тест",
 	})
 	room["battle_length"] = 90.0
+	room["arena_background"] = "gold_boss"
 	room["kills_to_win"] = 3
 	room["resonator_enabled"] = true
 	room["blue_beacon"] = {

@@ -1,0 +1,28 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Texture2D" path="res://assets/arena/gate_two_state_sheet.png" id="1_gate"]
+[ext_resource type="Script" path="res://scripts/ExitGate.gd" id="2_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_left"]
+size = Vector2(400, 424)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_right"]
+size = Vector2(400, 424)
+
+[node name="ExitGate" type="Sprite2D"]
+z_index = -90
+texture = ExtResource("1_gate")
+hframes = 2
+script = ExtResource("2_script")
+
+[node name="LeftWall" type="StaticBody2D" parent="."]
+position = Vector2(-380, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftWall"]
+shape = SubResource("RectangleShape2D_left")
+
+[node name="RightWall" type="StaticBody2D" parent="."]
+position = Vector2(380, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RightWall"]
+shape = SubResource("RectangleShape2D_right")

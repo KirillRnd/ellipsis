@@ -3,12 +3,24 @@ extends Node2D
 
 const ARENA_RECT := Rect2(Vector2(80, 60), Vector2(1120, 600))
 const VIEW_RECT := Rect2(Vector2.ZERO, Vector2(1280, 720))
-const BLUE_GUIDES_BG := preload("res://assets/arena/arena_blue_guides_bg.png")
+const BACKGROUNDS := {
+	"blue_guides": preload("res://assets/arena/arena_blue_guides_bg.png"),
+	"red_fault": preload("res://assets/arena/arena_red_fault_bg.png"),
+	"gold_boss": preload("res://assets/arena/arena_gold_boss_bg.png"),
+}
+
+var _background: Texture2D = BACKGROUNDS["blue_guides"]
+
+
+func set_background(background_id: String) -> void:
+	if not BACKGROUNDS.has(background_id):
+		push_warning("Unknown arena background: %s" % background_id)
+		background_id = "blue_guides"
+	_background = BACKGROUNDS[background_id]
+	queue_redraw()
 
 func _draw() -> void:
-	draw_texture_rect(BLUE_GUIDES_BG, VIEW_RECT, false, Color(1.0, 1.0, 1.0, 0.82))
-	draw_rect(VIEW_RECT, Color(0.008, 0.008, 0.014, 0.26))
-	draw_rect(ARENA_RECT, Color(0.055, 0.052, 0.070, 0.34))
+	draw_texture_rect(_background, VIEW_RECT, false)
 	_draw_floor_grid()
 	_draw_border()
 
@@ -33,4 +45,3 @@ func _draw_floor_grid() -> void:
 
 func _draw_border() -> void:
 	draw_rect(ARENA_RECT, Color(0.0, 0.0, 0.0, 0.96), false, 5.0)
-	draw_rect(ARENA_RECT.grow(-5.0), Color(0.08, 0.08, 0.11, 0.55), false, 1.0)

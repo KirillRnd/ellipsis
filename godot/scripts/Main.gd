@@ -16,6 +16,7 @@ const ENCOUNTER_CATALOG := preload("res://scripts/EncounterCatalog.gd")
 const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
 const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
 const WAVE_EMITTER_SCENE := preload("res://scenes/WaveEmitter.tscn")
+const EXIT_GATE_SCENE := preload("res://scenes/ExitGate.tscn")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
@@ -45,6 +46,7 @@ const UI_TEXT := {
 
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
+@onready var arena: Arena = $Arena
 
 var _state := "combat"
 var _elapsed := 0.0
@@ -75,8 +77,7 @@ var _resonator
 var _exit_unlocked := false
 var _exit_trigger_rect := Rect2()
 var _exit_door_rect := Rect2()
-var _exit_door_color := Color(0.22, 0.86, 1.0, 0.78)
-var _door_visual: ColorRect
+var _exit_gate: ExitGate
 var _hint_popup: Panel
 var _hint_popup_title: Label
 var _hint_popup_body: Label
@@ -117,7 +118,8 @@ func _load_encounter(index: int) -> void:
 	_exit_unlocked = _objective == "reach_exit"
 	player.counter_wave_enabled = _player_wave_available
 	player.dash_enabled = _dash_available
-	_show_exit_door(_exit_unlocked)
+	arena.set_background(_current_encounter.get("arena_background", "red_fault"))
+	_set_exit_gate_open(_exit_unlocked)
 
 	_create_emitters(_current_encounter.get("emitters", []))
 	wave_manager.emitters = _emitters
@@ -176,7 +178,6 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 	var exit_config: Dictionary = encounter.get("exit", {})
 	_exit_door_rect = exit_config.get("door_rect", Rect2())
 	_exit_trigger_rect = exit_config.get("trigger_rect", Rect2())
-	_exit_door_color = exit_config.get("color", Color(0.22, 0.86, 1.0, 0.78))
 
 
 func _create_emitters(emitter_configs: Array) -> void:
@@ -323,26 +324,22 @@ func _unlock_exit() -> void:
 	_update_emitters(false)
 	_update_blue_beacon(false)
 	wave_manager.clear_all_waves()
-	_show_exit_door(true)
+	_set_exit_gate_open(true)
 	_status_label.text = _t("exit_open")
 	_set_controls_text()
 
 
 func _create_exit_door_visual() -> void:
-	_door_visual = ColorRect.new()
-	_door_visual.name = "ExitDoorPlaceholder"
-	_door_visual.visible = false
-	_door_visual.z_index = 80
-	add_child(_door_visual)
+	_exit_gate = EXIT_GATE_SCENE.instantiate()
+	add_child(_exit_gate)
 
 
-func _show_exit_door(visible: bool) -> void:
-	if not is_instance_valid(_door_visual):
+func _set_exit_gate_open(is_open: bool) -> void:
+	if not is_instance_valid(_exit_gate):
 		return
-	_door_visual.visible = visible and _exit_door_rect.size.length_squared() > 0.0
-	_door_visual.position = _exit_door_rect.position
-	_door_visual.size = _exit_door_rect.size
-	_door_visual.color = _exit_door_color
+	_exit_gate.visible = _exit_door_rect.size.length_squared() > 0.0
+	_exit_gate.configure(_exit_door_rect)
+	_exit_gate.set_open(is_open)
 
 
 func _update_emitters(running: bool) -> void:
@@ -469,7 +466,7 @@ func _set_state(new_state: String) -> void:
 		return
 	_state = new_state
 	player.counter_wave_enabled = false
-	_show_exit_door(false)
+	_set_exit_gate_open(false)
 	if _state == "victory":
 		_status_label.text = _t("demo_clear")
 		_set_controls_text()
