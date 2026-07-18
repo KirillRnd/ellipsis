@@ -5,7 +5,6 @@ extends RefCounted
 const COLORLESS := "res://assets/interlude/characters/colorless.png"
 const CRON := "res://assets/interlude/characters/cron.png"
 const RAHN := "res://assets/interlude/characters/rahn.png"
-const CROSSBAR := "res://assets/items/steel_crossbar_interlude.png"
 
 
 static func get_for_room(room_index: int) -> Dictionary:
@@ -20,15 +19,22 @@ static func get_for_room(room_index: int) -> Dictionary:
 					{
 						"speaker": {"en": "CRON", "ru": "КРОН"},
 						"text": {
-							"en": "The Old Sluice is still open, but red fronts have occupied its route.",
-							"ru": "Старый Шлюз ещё открыт, но его маршрут заняли красные фронты.",
+							"en": "Colorless, the Old Sluice has been seized by the Reds. The Blue Guides retreated behind the inner gates.",
+							"ru": "Бесцветный, Старый Шлюз захвачен Красными. Синие Проводники отступили за внутренние ворота.",
 						},
 					},
 					{
 						"speaker": {"en": "COLORLESS", "ru": "БЕСЦВЕТНЫЙ"},
 						"text": {
-							"en": "Then I cross it by reading the field, not by forcing it.",
-							"ru": "Тогда я пройду, читая поле, а не продавливая его.",
+							"en": "Cron, if the passage still holds, I will find a way through.",
+							"ru": "Крон, если проход ещё держится, я найду дорогу.",
+						},
+					},
+					{
+						"speaker": {"en": "CRON", "ru": "КРОН"},
+						"text": {
+							"en": "Then do not linger. The red light has already reached the old beacons.",
+							"ru": "Тогда не задерживайся. Красный свет уже добрался до старых маяков.",
 						},
 					},
 				],
@@ -43,22 +49,22 @@ static func get_for_room(room_index: int) -> Dictionary:
 					{
 						"speaker": {"en": "CRON", "ru": "КРОН"},
 						"text": {
-							"en": "A resonator is not a turret. You choose its support point and the moment it answers.",
-							"ru": "Резонатор — не турель. Ты выбираешь точку опоры и момент ответа.",
-						},
-					},
-					{
-						"speaker": {"en": "CRON", "ru": "КРОН"},
-						"text": {
-							"en": "Place it with E. Command its wave with the right mouse button.",
-							"ru": "Ставь его на E. Командуй волной правой кнопкой мыши.",
+							"en": "These Resonators belonged to the Blues long before the fall of the Old Sluice.",
+							"ru": "Эти Резонаторы принадлежали Синим задолго до падения Старого Шлюза.",
 						},
 					},
 					{
 						"speaker": {"en": "COLORLESS", "ru": "БЕСЦВЕТНЫЙ"},
 						"text": {
-							"en": "One point first. A pair when I can preserve the useful support.",
-							"ru": "Сначала одна точка. Потом пара, если я сохраню полезную опору.",
+							"en": "And yet one of them answers to the Colorless.",
+							"ru": "И всё же один из них откликается на Бесцветного.",
+						},
+					},
+					{
+						"speaker": {"en": "CRON", "ru": "КРОН"},
+						"text": {
+							"en": "Take it. The Reds left us no time to unravel miracles.",
+							"ru": "Возьми его. Красные не оставили нам времени разбираться в чудесах.",
 						},
 					},
 				],
@@ -68,21 +74,27 @@ static func get_for_room(room_index: int) -> Dictionary:
 				"id": "steel_crossbar",
 				"background": "res://assets/interlude/backgrounds/steel_crossbar.png",
 				"left": COLORLESS,
-				"right": CROSSBAR,
-				"right_is_item": true,
+				"right": CRON,
 				"messages": [
 					{
-						"speaker": {"en": "COLORLESS", "ru": "БЕСЦВЕТНЫЙ"},
+						"speaker": {"en": "CRON", "ru": "КРОН"},
 						"text": {
-							"en": "Dead steel. It does not command magic; it makes the front go around.",
-							"ru": "Мёртвый металл. Он не командует магией — он заставляет фронт обойти себя.",
+							"en": "The Blues pulled this steel crossbar from the Old Sluice gates after the Fall.",
+							"ru": "Эту стальную поперечину Синие вынули из ворот Старого Шлюза после Падения.",
 						},
 					},
 					{
 						"speaker": {"en": "COLORLESS", "ru": "БЕСЦВЕТНЫЙ"},
 						"text": {
-							"en": "A short drive for an emergency cut. Hold, aim and release for a wider gap.",
-							"ru": "Короткий удар — для срочного разрыва. Удержать, навести и отпустить — для широкого прохода.",
+							"en": "A grand past for a piece of iron. I will call it the Prying Stick.",
+							"ru": "Слишком громкое прошлое для куска железа. Будет Ковырялкой.",
+						},
+					},
+					{
+						"speaker": {"en": "CRON", "ru": "КРОН"},
+						"text": {
+							"en": "Call it what you like. Just do not lose it before you meet Rahn.",
+							"ru": "Назови как хочешь. Только не потеряй её до встречи с Рахном.",
 						},
 					},
 				],
@@ -97,22 +109,22 @@ static func get_for_room(room_index: int) -> Dictionary:
 					{
 						"speaker": {"en": "RAHN", "ru": "РАХН"},
 						"text": {
-							"en": "You learned to hold two points. Now show me which one you can afford to lose.",
-							"ru": "Ты научился держать две точки. Теперь покажи, какую можешь позволить себе потерять.",
+							"en": "Colorless. Cron did bring you to the heart of the Old Sluice after all.",
+							"ru": "Бесцветный. Крон всё-таки довёл тебя до сердца Старого Шлюза.",
 						},
 					},
 					{
 						"speaker": {"en": "COLORLESS", "ru": "БЕСЦВЕТНЫЙ"},
 						"text": {
-							"en": "The oldest leaves. The useful support remains.",
-							"ru": "Старейшая уходит. Полезная опора остаётся.",
+							"en": "Stand aside, Rahn. I want no war with the Reds.",
+							"ru": "Отойди, Рахн. Мне не нужна война с Красными.",
 						},
 					},
 					{
 						"speaker": {"en": "RAHN", "ru": "РАХН"},
 						"text": {
-							"en": "Then move.",
-							"ru": "Тогда двигайся.",
+							"en": "The Reds do not need your consent. Set your Resonators; let us see what the Blues taught you.",
+							"ru": "А Красным не нужно твоё согласие. Ставь Резонаторы — посмотрим, чему научили тебя Синие.",
 						},
 					},
 				],
