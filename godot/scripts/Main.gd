@@ -22,6 +22,7 @@ const INTERLUDE_OVERLAY_SCENE := preload("res://scenes/InterludeOverlay.tscn")
 const INTERLUDE_CATALOG := preload("res://scripts/InterludeCatalog.gd")
 const TUTORIAL_OVERLAY_SCENE := preload("res://scenes/TutorialOverlay.tscn")
 const TUTORIAL_CATALOG := preload("res://scripts/TutorialCatalog.gd")
+const ABILITY_HUD_SCRIPT := preload("res://scripts/AbilityHud.gd")
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
@@ -109,6 +110,7 @@ var _interlude_overlay: InterludeOverlay
 var _shown_interludes := {}
 var _tutorial_overlay: TutorialOverlay
 var _shown_tutorials := {}
+var _ability_hud: AbilityHud
 var _pending_encounter_index := -1
 
 
@@ -763,6 +765,9 @@ func _create_ui() -> void:
 	_hint_label.add_theme_font_size_override("font_size", 16)
 	ui.add_child(_hint_label)
 
+	_ability_hud = ABILITY_HUD_SCRIPT.new()
+	ui.add_child(_ability_hud)
+
 	_on_player_hit_points_changed(player.hit_points)
 
 
@@ -790,6 +795,7 @@ func _localize(value) -> String:
 
 
 func _update_ui() -> void:
+	_update_ability_hud()
 	if _state == "room_clear":
 		_timer_label.text = _t("room_clear_timer") % [_encounter_index + 1, _dungeon_sequence.size(), _kills, _kills_to_win]
 		_status_label.text = _t("exit_open")
@@ -826,3 +832,23 @@ func _update_ui() -> void:
 		else:
 			_status_label.text = _localize(_current_encounter.get("title", _t("counter_ready"))).to_upper()
 		_set_controls_text()
+
+
+func _update_ability_hud() -> void:
+	if not is_instance_valid(_ability_hud):
+		return
+	_remove_invalid_resonators()
+	var place_readiness := 1.0 - _resonator_place_cooldown / RESONATOR_PLACE_COOLDOWN
+	var volley_readiness := 1.0 - _resonator_volley_cooldown / RESONATOR_VOLLEY_INTERVAL
+	var in_gameplay := _state in ["combat", "room_clear"]
+	_ability_hud.set_language(_language)
+	_ability_hud.set_state(
+		player.get_crossbar_readiness(),
+		in_gameplay and _crossbar_available,
+		clampf(volley_readiness, 0.0, 1.0),
+		in_gameplay and _resonator_available and not _resonators.is_empty(),
+		clampf(place_readiness, 0.0, 1.0),
+		in_gameplay and _resonator_available,
+		_resonators.size(),
+		_resonator_limit
+	)

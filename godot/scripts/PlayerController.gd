@@ -361,6 +361,27 @@ func is_defeated() -> bool:
 	return _defeated
 
 
+func get_crossbar_readiness() -> float:
+	if not crossbar_enabled or _defeated:
+		return 0.0
+	if _crossbar_state in [
+		CrossbarInputState.READY,
+		CrossbarInputState.PRESSING,
+		CrossbarInputState.AIMING,
+	]:
+		return 1.0
+	if _crossbar_state != CrossbarInputState.RECOVERING or not is_instance_valid(_body):
+		return 0.0
+	var frame_count := _body.sprite_frames.get_frame_count(_body.animation)
+	if frame_count <= 1:
+		return 0.0
+	return clampf(
+		(float(_body.frame) + _body.frame_progress) / float(frame_count - 1),
+		0.0,
+		1.0
+	)
+
+
 func play_action(animation_name: StringName, facing_direction: Vector2 = Vector2.ZERO) -> void:
 	if not is_instance_valid(_body):
 		return
