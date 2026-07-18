@@ -34,6 +34,20 @@ func _process(delta: float) -> void:
 		queue_free()
 
 
+func _draw() -> void:
+	draw_circle(Vector2.ZERO, CONTACT_RADIUS, Color(0.55, 0.56, 0.58, 0.055))
+	draw_arc(
+		Vector2.ZERO,
+		CONTACT_RADIUS,
+		0.0,
+		TAU,
+		64,
+		Color(0.66, 0.67, 0.69, 0.46),
+		2.0,
+		true
+	)
+
+
 func can_affect_wave(wave) -> bool:
 	if not is_instance_valid(wave):
 		return false

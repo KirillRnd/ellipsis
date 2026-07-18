@@ -49,8 +49,8 @@ static func get_for_room(room_index: int) -> Dictionary:
 					{
 						"speaker": {"en": "CRON", "ru": "КРОН"},
 						"text": {
-							"en": "These Resonators belonged to the Blues long before the fall of the Old Sluice.",
-							"ru": "Эти Резонаторы принадлежали Синим задолго до падения Старого Шлюза.",
+							"en": "These Resonators belonged to the Violets long before the fall of the Old Sluice.",
+							"ru": "Эти Резонаторы принадлежали Фиолетовым задолго до падения Старого Шлюза.",
 						},
 					},
 					{

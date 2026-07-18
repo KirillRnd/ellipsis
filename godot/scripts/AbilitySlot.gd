@@ -49,7 +49,7 @@ func _draw() -> void:
 	if _kind == "wave":
 		_draw_wave_fragment()
 	elif is_instance_valid(_item):
-		var item_rect := Rect2(24.0, 23.0, 52.0, 52.0)
+		var item_rect := _contain_texture_rect(_item, Rect2(22.0, 18.0, 56.0, 62.0))
 		draw_texture_rect(_item, item_rect, false, Color(1.0, 1.0, 1.0, 0.95 if _enabled else 0.34))
 
 	if is_instance_valid(_prompt):
@@ -102,6 +102,15 @@ func _fill_color() -> Color:
 	if _kind == "resonator":
 		return Color(0.25, 0.12, 0.43, 0.86)
 	return Color(0.30, 0.32, 0.35, 0.92)
+
+
+func _contain_texture_rect(texture: Texture2D, bounds: Rect2) -> Rect2:
+	var texture_size := texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return bounds
+	var scale_factor := minf(bounds.size.x / texture_size.x, bounds.size.y / texture_size.y)
+	var draw_size := texture_size * scale_factor
+	return Rect2(bounds.get_center() - draw_size * 0.5, draw_size)
 
 
 func _draw_wave_fragment() -> void:

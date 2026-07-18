@@ -1,7 +1,7 @@
 class_name AbilityHud
 extends Control
 
-const CROSSBAR_TEXTURE := preload("res://assets/items/steel_crossbar_topdown.png")
+const CROSSBAR_TEXTURE := preload("res://assets/items/kovyryalka_driven.png")
 const RESONATOR_TEXTURE := preload("res://assets/actors/resonator_crystal_base.png")
 const LMB_TEXTURE := preload("res://assets/ui/input_prompts/mouse_left.png")
 const RMB_TEXTURE := preload("res://assets/ui/input_prompts/mouse_right.png")

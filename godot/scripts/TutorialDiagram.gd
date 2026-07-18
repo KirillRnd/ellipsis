@@ -3,7 +3,7 @@ extends Control
 
 const PLAYER_TEXTURE := preload("res://assets/actors/colorless/colorless_idle_sheet.png")
 const RESONATOR_TEXTURE := preload("res://assets/actors/resonator_crystal_base.png")
-const CROSSBAR_TEXTURE := preload("res://assets/items/steel_crossbar_topdown.png")
+const CROSSBAR_TEXTURE := preload("res://assets/items/kovyryalka_driven.png")
 const KEY_W := preload("res://assets/ui/input_prompts/keyboard_w.png")
 const KEY_A := preload("res://assets/ui/input_prompts/keyboard_a.png")
 const KEY_S := preload("res://assets/ui/input_prompts/keyboard_s.png")
@@ -95,7 +95,7 @@ func _draw_violet_pair() -> void:
 
 func _draw_crossbar() -> void:
 	_draw_prompt(MOUSE_LEFT, Rect2(45, 145, 66, 66))
-	draw_texture_rect(CROSSBAR_TEXTURE, Rect2(268, 147, 46, 116), false)
+	draw_texture_rect(CROSSBAR_TEXTURE, Rect2(270, 140, 72, 100), false)
 	draw_arc(Vector2(360, 205), 150.0, -0.62, 0.62, 48, RED, 18.0, true)
 	draw_arc(Vector2(360, 205), 150.0, -0.18, 0.18, 20, SAFE, 24.0, true)
 	_draw_player(Vector2(545, 205))
