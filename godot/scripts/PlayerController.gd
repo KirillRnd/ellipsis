@@ -20,11 +20,18 @@ enum CrossbarInputState {
 
 const ARENA_RECT := Rect2(Vector2(110, 90), Vector2(1060, 560))
 const SPEED := 318.5
-const DASH_SPEED := 650.0
-const DASH_TIME := 0.13
+const DASH_FRAME_COUNT := 3.0
+const DASH_ANIMATION_FPS := 24.0
+const DASH_TIME := DASH_FRAME_COUNT / DASH_ANIMATION_FPS
+const DASH_DISTANCE := 84.0
+const DASH_SPEED := DASH_DISTANCE / DASH_TIME
 const DASH_COOLDOWN := 0.55
 const INVULNERABLE_TIME := 1.05
-const DASH_VISUAL_OFFSET := Vector2(0.0, -128.0)
+const DASH_FRAME_OFFSETS := [
+	Vector2(4.0, -43.0),
+	Vector2(0.0, -18.0),
+	Vector2(0.0, -16.0),
+]
 const CROSSBAR_HOLD_THRESHOLD := 0.16
 const CROSSBAR_AIM_SPEED_FACTOR := 0.55
 const CROSSBAR_HOLD_FRAME := 2
@@ -40,6 +47,7 @@ var crossbar_enabled := true
 var dash_enabled := true
 var controls_enabled := true
 var _dash_time_left := 0.0
+var _dash_distance_left := 0.0
 var _dash_cooldown := 0.0
 var _invulnerable_left := 0.0
 var _last_move_dir := Vector2.UP
@@ -72,6 +80,7 @@ func reset_for_encounter(start_position: Vector2, restore_hit_points: bool = tru
 	global_position = start_position
 	velocity = Vector2.ZERO
 	_dash_time_left = 0.0
+	_dash_distance_left = 0.0
 	_dash_cooldown = 0.0
 	_invulnerable_left = 0.0
 	_dash_was_down = false
@@ -106,7 +115,6 @@ func _physics_process(delta: float) -> void:
 
 	_dash_cooldown = maxf(0.0, _dash_cooldown - delta)
 	_invulnerable_left = maxf(0.0, _invulnerable_left - delta)
-	_dash_time_left = maxf(0.0, _dash_time_left - delta)
 
 	var input_dir := _read_move_input()
 	if input_dir.length_squared() > 0.0:
@@ -126,19 +134,26 @@ func _physics_process(delta: float) -> void:
 		if _is_crossbar_aim_active():
 			_cancel_crossbar_aim()
 		_dash_time_left = DASH_TIME
+		_dash_distance_left = DASH_DISTANCE
 		_dash_cooldown = DASH_COOLDOWN
 		play_action(&"dash")
 	_dash_was_down = dash_down
 
-	var move_speed := DASH_SPEED if _dash_time_left > 0.0 else SPEED
-	if _crossbar_state == CrossbarInputState.AIMING:
-		move_speed *= CROSSBAR_AIM_SPEED_FACTOR
-	velocity = _last_move_dir * move_speed if _dash_time_left > 0.0 else input_dir * move_speed
+	var dash_active := _dash_time_left > 0.0 and _dash_distance_left > 0.0
+	if dash_active:
+		var dash_step := minf(DASH_SPEED * delta, _dash_distance_left)
+		velocity = _last_move_dir * (dash_step / delta) if delta > 0.0 else Vector2.ZERO
+		_dash_distance_left = maxf(0.0, _dash_distance_left - dash_step)
+		_dash_time_left = maxf(0.0, _dash_time_left - delta)
+	else:
+		var move_speed := SPEED
+		if _crossbar_state == CrossbarInputState.AIMING:
+			move_speed *= CROSSBAR_AIM_SPEED_FACTOR
+		velocity = input_dir * move_speed
 	move_and_slide()
 	global_position = global_position.clamp(ARENA_RECT.position, ARENA_RECT.end)
 
 	_update_visual_state(input_dir)
-	queue_redraw()
 
 
 func _read_move_input() -> Vector2:
@@ -317,6 +332,7 @@ func _start_defeat() -> void:
 	_death_emitted = false
 	velocity = Vector2.ZERO
 	_dash_time_left = 0.0
+	_dash_distance_left = 0.0
 	_crossbar_state = CrossbarInputState.READY
 	_crossbar_hold_time = 0.0
 	_crossbar_was_down = false
@@ -335,7 +351,6 @@ func _update_defeat(delta: float) -> void:
 	if _defeat_time_left <= 0.0 and not _death_emitted:
 		_death_emitted = true
 		died.emit()
-	queue_redraw()
 
 
 func is_invulnerable() -> bool:
@@ -360,8 +375,11 @@ func play_action(animation_name: StringName, facing_direction: Vector2 = Vector2
 		_last_move_dir = facing_direction.normalized()
 		_update_visual_rotation()
 	_action_animation = animation_name
-	_body.offset = DASH_VISUAL_OFFSET if animation_name == &"dash" else Vector2.ZERO
 	_body.play(animation_name)
+	if animation_name == &"dash":
+		_update_dash_frame_offset()
+	else:
+		_body.offset = Vector2.ZERO
 
 
 func _update_visual_state(input_dir: Vector2) -> void:
@@ -395,7 +413,9 @@ func _on_body_animation_finished() -> void:
 
 
 func _on_body_frame_changed() -> void:
-	if _crossbar_state == CrossbarInputState.AIMING:
+	if _body.animation == &"dash":
+		_update_dash_frame_offset()
+	elif _crossbar_state == CrossbarInputState.AIMING:
 		_hold_crossbar_at_aim_frame()
 	elif (
 		_crossbar_state == CrossbarInputState.RECOVERING
@@ -405,13 +425,9 @@ func _on_body_frame_changed() -> void:
 		_emit_pending_crossbar_impact()
 
 
-func _draw() -> void:
-	var blink := is_invulnerable() and int(Time.get_ticks_msec() / 80) % 2 == 0
-	var center_color := Color(0.45, 0.22, 1.0, 0.55 if blink else 0.85)
-	var hitbox_color := Color(0.30, 0.85, 1.0, 0.95)
-
-	draw_circle(Vector2.ZERO, 5.0, center_color)
-	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 48, hitbox_color, 2.0, true)
+func _update_dash_frame_offset() -> void:
+	var frame_index := clampi(_body.frame, 0, DASH_FRAME_OFFSETS.size() - 1)
+	_body.offset = DASH_FRAME_OFFSETS[frame_index]
 
 
 
