@@ -11,7 +11,6 @@ const HUD_BOTTOM_Y := 674.0
 const HUD_TIMER_RECT := Rect2(Vector2(24, HUD_TOP_Y), Vector2(330, 28))
 const HUD_CENTER_LABEL_RECT := Rect2(Vector2(360, HUD_TOP_Y), Vector2(560, 36))
 const HUD_CONTROLS_RECT := Rect2(Vector2(70, HUD_BOTTOM_Y), Vector2(1140, 40))
-const HINT_POPUP_SIZE := Vector2(760, 210)
 const ENCOUNTER_CATALOG := preload("res://scripts/EncounterCatalog.gd")
 const BLUE_BEACON_SCRIPT := preload("res://scripts/BlueBeacon.gd")
 const RESONATOR_SCRIPT := preload("res://scripts/Resonator.gd")
@@ -21,6 +20,8 @@ const STEEL_CROSSBAR_DRIVEN_SCENE := preload("res://scenes/SteelCrossbarDriven.t
 const RAHN_BOSS_SCENE := preload("res://scenes/RahnBoss.tscn")
 const INTERLUDE_OVERLAY_SCENE := preload("res://scenes/InterludeOverlay.tscn")
 const INTERLUDE_CATALOG := preload("res://scripts/InterludeCatalog.gd")
+const TUTORIAL_OVERLAY_SCENE := preload("res://scenes/TutorialOverlay.tscn")
+const TUTORIAL_CATALOG := preload("res://scripts/TutorialCatalog.gd")
 const PICKUP_TEXTURE := preload("res://assets/items/pickup_white_glow.png")
 const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
@@ -97,11 +98,6 @@ var _exit_unlocked := false
 var _exit_trigger_rect := Rect2()
 var _exit_door_rect := Rect2()
 var _exit_gate: ExitGate
-var _hint_popup: Panel
-var _hint_popup_title: Label
-var _hint_popup_body: Label
-var _hint_popup_footer: Label
-var _hint_popup_left := 0.0
 var _pickup_items: Array = []
 var _timer_label: Label
 var _hp_label: Label
@@ -111,6 +107,8 @@ var _boss_hp_bar: ProgressBar
 var _boss_hp_label: Label
 var _interlude_overlay: InterludeOverlay
 var _shown_interludes := {}
+var _tutorial_overlay: TutorialOverlay
+var _shown_tutorials := {}
 var _pending_encounter_index := -1
 
 
@@ -126,6 +124,7 @@ func _ready() -> void:
 	_create_exit_door_visual()
 	_create_ui()
 	_create_interlude_overlay()
+	_create_tutorial_overlay()
 
 	_dungeon_sequence = ENCOUNTER_CATALOG.get_dungeon_sequence(DUNGEON_ID)
 	_load_encounter(0)
@@ -161,8 +160,8 @@ func _load_encounter(index: int, skip_interlude: bool = false) -> void:
 	_create_boss(_current_encounter.get("boss", {}))
 	_create_blue_beacon(_current_encounter.get("blue_beacon", {}))
 	_create_pickups(_current_encounter.get("pickups", []))
-	_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
 	_update_ui()
+	_try_show_tutorial(TUTORIAL_CATALOG.get_room_entry(_encounter_index))
 
 
 func _try_start_interlude(index: int) -> bool:
@@ -188,6 +187,22 @@ func _create_interlude_overlay() -> void:
 	_interlude_overlay = INTERLUDE_OVERLAY_SCENE.instantiate()
 	_interlude_overlay.finished.connect(_on_interlude_finished)
 	add_child(_interlude_overlay)
+
+
+func _create_tutorial_overlay() -> void:
+	_tutorial_overlay = TUTORIAL_OVERLAY_SCENE.instantiate()
+	add_child(_tutorial_overlay)
+
+
+func _try_show_tutorial(config: Dictionary) -> bool:
+	if config.is_empty():
+		return false
+	var tutorial_id: String = config.get("id", "")
+	if tutorial_id.is_empty() or _shown_tutorials.has(tutorial_id):
+		return false
+	_shown_tutorials[tutorial_id] = true
+	_tutorial_overlay.show_card(config, _language)
+	return true
 
 
 func _on_interlude_finished() -> void:
@@ -373,13 +388,13 @@ func _apply_pickup(kind: String) -> void:
 		_crossbar_available = true
 		player.crossbar_enabled = true
 		_status_label.text = _t("steel_crossbar_pickup")
+	_try_show_tutorial(TUTORIAL_CATALOG.get_pickup(kind))
 
 
 func _process(delta: float) -> void:
 	_handle_restart()
 	_handle_debug_room_navigation()
 	_handle_language_toggle()
-	_update_room_hint_popup(delta)
 	if _state == "room_clear":
 		_update_emitters(false)
 		_update_blue_beacon(false)
@@ -440,10 +455,6 @@ func _cycle_language() -> void:
 
 
 func _refresh_visible_text() -> void:
-	if is_instance_valid(_hint_popup_footer):
-		_hint_popup_footer.text = _t("hint_popup_footer")
-	if is_instance_valid(_hint_popup) and _hint_popup.visible:
-		_show_room_hint_popup(_current_encounter.get("popup_hint", {}))
 	_update_ui()
 
 
@@ -752,92 +763,7 @@ func _create_ui() -> void:
 	_hint_label.add_theme_font_size_override("font_size", 16)
 	ui.add_child(_hint_label)
 
-	_create_hint_popup(ui)
 	_on_player_hit_points_changed(player.hit_points)
-
-
-func _create_hint_popup(ui: CanvasLayer) -> void:
-	_hint_popup = Panel.new()
-	_hint_popup.name = "RoomHintPopup"
-	_hint_popup.size = HINT_POPUP_SIZE
-	_hint_popup.position = (get_viewport_rect().size - HINT_POPUP_SIZE) * 0.5
-	_hint_popup.visible = false
-	_hint_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.025, 0.023, 0.030, 0.86)
-	style.border_color = Color(0.62, 0.82, 0.92, 0.72)
-	style.set_border_width_all(2)
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
-	_hint_popup.add_theme_stylebox_override("panel", style)
-	ui.add_child(_hint_popup)
-
-	_hint_popup_title = Label.new()
-	_hint_popup_title.position = Vector2(28, 22)
-	_hint_popup_title.size = Vector2(HINT_POPUP_SIZE.x - 48, 30)
-	_hint_popup_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint_popup_title.add_theme_font_size_override("font_size", 24)
-	_hint_popup.add_child(_hint_popup_title)
-
-	_hint_popup_body = Label.new()
-	_hint_popup_body.position = Vector2(42, 68)
-	_hint_popup_body.size = Vector2(HINT_POPUP_SIZE.x - 84, 92)
-	_hint_popup_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint_popup_body.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_hint_popup_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_hint_popup_body.add_theme_font_size_override("font_size", 18)
-	_hint_popup.add_child(_hint_popup_body)
-
-	_hint_popup_footer = Label.new()
-	_hint_popup_footer.position = Vector2(28, 172)
-	_hint_popup_footer.size = Vector2(HINT_POPUP_SIZE.x - 56, 24)
-	_hint_popup_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint_popup_footer.text = _t("hint_popup_footer")
-	_hint_popup_footer.add_theme_font_size_override("font_size", 14)
-	_hint_popup.add_child(_hint_popup_footer)
-
-
-func _show_room_hint_popup(config: Dictionary) -> void:
-	if not is_instance_valid(_hint_popup):
-		return
-	var body := _localize(config.get("body", ""))
-	if body.is_empty():
-		_hint_popup.visible = false
-		_hint_popup_left = 0.0
-		return
-	_hint_popup_title.text = _localize(config.get("title", _current_encounter.get("title", "")))
-	_hint_popup_body.text = body
-	_hint_popup_left = config.get("duration", 5.0)
-	_hint_popup.visible = true
-
-
-func _update_room_hint_popup(delta: float) -> void:
-	if not is_instance_valid(_hint_popup) or not _hint_popup.visible:
-		return
-	_hint_popup_left -= delta
-	if _hint_popup_left <= 0.0 or _room_hint_dismiss_input():
-		_hint_popup.visible = false
-		_hint_popup_left = 0.0
-
-
-func _room_hint_dismiss_input() -> bool:
-	return (
-		Input.is_key_pressed(KEY_W)
-		or Input.is_key_pressed(KEY_A)
-		or Input.is_key_pressed(KEY_S)
-		or Input.is_key_pressed(KEY_D)
-		or Input.is_key_pressed(KEY_UP)
-		or Input.is_key_pressed(KEY_DOWN)
-		or Input.is_key_pressed(KEY_LEFT)
-		or Input.is_key_pressed(KEY_RIGHT)
-		or Input.is_key_pressed(KEY_SPACE)
-		or Input.is_key_pressed(KEY_E)
-		or Input.is_key_pressed(KEY_ENTER)
-		or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-		or Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-	)
 
 
 func _t(key: String) -> String:
