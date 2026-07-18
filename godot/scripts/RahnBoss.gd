@@ -10,10 +10,13 @@ const MOVE_TEXTURE := preload("res://assets/actors/rahn/rahn_move_sheet.png")
 const ACTION_TEXTURE := preload("res://assets/actors/rahn/rahn_action_sheet.png")
 const DEFEAT_TEXTURE := preload("res://assets/actors/rahn/rahn_defeat_sheet.png")
 const ARENA_RECT := Rect2(Vector2(130.0, 110.0), Vector2(1020.0, 500.0))
-const FRAME_SIZE := Vector2(256.0, 256.0)
+const FRAME_SIZE := Vector2(288.0, 288.0)
 const FIRST_PLACE_DELAY := 0.65
 const SECOND_PLACE_DELAY := 0.58
 const DEFEAT_TIME := 0.65
+const MOVE_START_DISTANCE := 18.0
+const MOVE_STOP_DISTANCE := 8.0
+const TURN_RESPONSE := 8.0
 
 @export var max_hit_points := 70
 @export var move_speed := 185.0
@@ -37,6 +40,7 @@ var _volley_timer := 0.0
 var _reposition_timer := 0.0
 var _combat_age := 0.0
 var _was_running := false
+var _moving := false
 var _action_playing := false
 var _hit_flash := 0.0
 var _defeated := false
@@ -63,6 +67,7 @@ func _physics_process(delta: float) -> void:
 
 	if _defeated:
 		velocity = Vector2.ZERO
+		_moving = false
 		_defeat_time_left = maxf(0.0, _defeat_time_left - delta)
 		if _defeat_time_left <= 0.0 and not _defeat_emitted:
 			_defeat_emitted = true
@@ -71,6 +76,7 @@ func _physics_process(delta: float) -> void:
 
 	if not combat_running:
 		velocity = Vector2.ZERO
+		_moving = false
 		_was_running = false
 		_update_animation()
 		return
@@ -82,22 +88,32 @@ func _physics_process(delta: float) -> void:
 		_reposition_timer = reposition_interval
 
 	_combat_age += delta
-	_update_movement()
+	_update_movement(delta)
 	_update_resonator_plan(delta)
 	_update_animation()
 
 
-func _update_movement() -> void:
+func _update_movement(delta: float) -> void:
 	var target := Vector2(
 		640.0 + cos(_combat_age * 0.72) * 270.0,
 		250.0 + sin(_combat_age * 0.51) * 105.0
 	)
 	var offset := target - global_position
-	velocity = offset.normalized() * move_speed if offset.length() > 12.0 else Vector2.ZERO
+	var distance := offset.length()
+	if _moving:
+		_moving = distance > MOVE_STOP_DISTANCE
+	else:
+		_moving = distance > MOVE_START_DISTANCE
+	velocity = offset.normalized() * move_speed if _moving else Vector2.ZERO
 	move_and_slide()
 	global_position = global_position.clamp(ARENA_RECT.position, ARENA_RECT.end)
 	if velocity.length_squared() > 1.0:
-		_visual_root.rotation = velocity.angle() + PI * 0.5
+		var target_rotation := velocity.angle() + PI * 0.5
+		_visual_root.rotation = lerp_angle(
+			_visual_root.rotation,
+			target_rotation,
+			clampf(delta * TURN_RESPONSE, 0.0, 1.0)
+		)
 
 
 func _update_resonator_plan(delta: float) -> void:
@@ -211,7 +227,7 @@ func _clear_resonators() -> void:
 
 
 func _play_action() -> void:
-	if _defeated:
+	if _defeated or _action_playing:
 		return
 	_action_playing = true
 	_body.play(&"action")
@@ -220,7 +236,7 @@ func _play_action() -> void:
 func _update_animation() -> void:
 	if _action_playing or _defeated:
 		return
-	var next := &"move" if velocity.length_squared() > 1.0 else &"anchor"
+	var next := &"move" if _moving else &"anchor"
 	if _body.animation != next:
 		_body.play(next)
 

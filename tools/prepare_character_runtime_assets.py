@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageStat
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,7 +17,11 @@ RAW = ROOT / "sprites_orig"
 ACTORS = ROOT / "godot" / "assets" / "actors"
 INTERLUDE = ROOT / "godot" / "assets" / "interlude" / "characters"
 FRAME_SIZE = 256
+RAHN_CELL_SIZE = 288
 ALPHA_THRESHOLD = 8
+RAHN_ACTION_SCALE = 0.92
+RAHN_REGISTRATION_BOX = (95, 95, 161, 165)
+RAHN_REGISTRATION_RADIUS = 18
 
 
 def clean_transparency(image: Image.Image) -> Image.Image:
@@ -79,6 +83,64 @@ def split_strip(image: Image.Image, frames: int) -> list[Image.Image]:
     ]
 
 
+def scale_canvas_frame(image: Image.Image, scale: float) -> Image.Image:
+    """Scale a fixed-size frame around its pivot without changing its cell."""
+    size = max(1, round(FRAME_SIZE * scale))
+    resized = image.resize((size, size), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (FRAME_SIZE, FRAME_SIZE), (0, 0, 0, 0))
+    offset = ((FRAME_SIZE - size) // 2, (FRAME_SIZE - size) // 2)
+    canvas.alpha_composite(resized, offset)
+    return clean_transparency(canvas)
+
+
+def rahn_registration_shift(
+    reference: Image.Image,
+    candidate: Image.Image,
+) -> tuple[int, int]:
+    """Match the stable head/torso patch and return candidate pixel offset."""
+    reference_rgb = Image.new("RGB", reference.size, (0, 0, 0))
+    reference_rgb.paste(reference.convert("RGB"), mask=reference.getchannel("A"))
+    candidate_rgb = Image.new("RGB", candidate.size, (0, 0, 0))
+    candidate_rgb.paste(candidate.convert("RGB"), mask=candidate.getchannel("A"))
+    reference_crop = reference_rgb.crop(RAHN_REGISTRATION_BOX)
+    left, top, right, bottom = RAHN_REGISTRATION_BOX
+    best_score = float("inf")
+    best_shift = (0, 0)
+    for y_shift in range(-RAHN_REGISTRATION_RADIUS, RAHN_REGISTRATION_RADIUS + 1):
+        for x_shift in range(-RAHN_REGISTRATION_RADIUS, RAHN_REGISTRATION_RADIUS + 1):
+            candidate_crop = candidate_rgb.crop(
+                (
+                    left - x_shift,
+                    top - y_shift,
+                    right - x_shift,
+                    bottom - y_shift,
+                )
+            )
+            difference = ImageChops.difference(reference_crop, candidate_crop)
+            rms = ImageStat.Stat(difference).rms
+            score = sum(channel * channel for channel in rms)
+            if score < best_score:
+                best_score = score
+                best_shift = (x_shift, y_shift)
+    return best_shift
+
+
+def place_rahn_frame(
+    image: Image.Image,
+    reference: Image.Image,
+) -> Image.Image:
+    """Register into a padded cell so alignment never clips extended limbs."""
+    shift = rahn_registration_shift(reference, image)
+    padding = (RAHN_CELL_SIZE - FRAME_SIZE) // 2
+    canvas = Image.new(
+        "RGBA",
+        (RAHN_CELL_SIZE, RAHN_CELL_SIZE),
+        (0, 0, 0, 0),
+    )
+    canvas.alpha_composite(image, (padding + shift[0], padding + shift[1]))
+    return clean_transparency(canvas)
+
+
 def join_strip(frames: list[Image.Image]) -> Image.Image:
     strip = Image.new(
         "RGBA",
@@ -101,18 +163,29 @@ def main() -> None:
     rahn_dir = ACTORS / "rahn"
     colorless_dir = ACTORS / "colorless"
 
-    rahn_anchor = normalize_frame(
+    rahn_anchor_source = normalize_frame(
         Image.open(RAW / "rahn_topdown_anchor_alpha_cropped.png"),
-        max_extent=214,
+        max_extent=198,
     )
-    save(rahn_anchor, rahn_dir / "rahn_anchor.png")
 
     move_source = clean_transparency(Image.open(RAW / "rahn_move_sheet.png"))
-    move_frames = split_strip(move_source, 4)
+    move_sources = split_strip(move_source, 4)
+    rahn_reference = move_sources[0]
+    move_frames = [
+        place_rahn_frame(frame, rahn_reference)
+        for frame in move_sources
+    ]
     save(join_strip(move_frames), rahn_dir / "rahn_move_sheet.png")
 
     action_source = clean_transparency(Image.open(RAW / "rahn_action_23_sheet.png"))
-    action_two, action_three = split_strip(action_source, 2)
+    action_two_source, action_three_source = [
+        scale_canvas_frame(frame, RAHN_ACTION_SCALE)
+        for frame in split_strip(action_source, 2)
+    ]
+    rahn_anchor = place_rahn_frame(rahn_anchor_source, rahn_reference)
+    save(rahn_anchor, rahn_dir / "rahn_anchor.png")
+    action_two = place_rahn_frame(action_two_source, rahn_reference)
+    action_three = place_rahn_frame(action_three_source, rahn_reference)
     action_frames = [
         rahn_anchor,
         action_two,
@@ -122,10 +195,11 @@ def main() -> None:
     ]
     save(join_strip(action_frames), rahn_dir / "rahn_action_sheet.png")
 
-    rahn_defeat = normalize_frame(
+    rahn_defeat_source = normalize_frame(
         Image.open(RAW / "rahn_defeat_alpha_cropped.png"),
         max_extent=244,
     )
+    rahn_defeat = place_rahn_frame(rahn_defeat_source, rahn_reference)
     save(rahn_defeat, rahn_dir / "rahn_defeat_sheet.png")
 
     colorless_defeat = normalize_frame(
