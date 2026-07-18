@@ -14,8 +14,8 @@ const RESONANCE_NODE_RADIUS = 28.0
 const EMITTER_HITBOX_RADIUS := WaveEmitter.HITBOX_RADIUS
 const MIN_ERASE_SEGMENT = 72.0
 const ERASE_ARC_WIDTH = 0.30
-const SAFE_GAP_CLEAR_WIDTH := 48.0
-const SAFE_GAP_CORE_WIDTH := 20.0
+const SAFE_GAP_CLEAR_WIDTH := 32.0
+const SAFE_GAP_CORE_WIDTH := 13.333333
 const SAFE_GAP_JAMB_DEPTH := 28.0
 const SAFE_GAP_BOUNDARY_GLOW_WIDTH := Wave.SHARED_CREST_WIDTH
 const SAFE_GAP_BOUNDARY_LINE_WIDTH := Wave.SHARED_CREST_WIDTH * 0.425
@@ -582,9 +582,9 @@ func _draw_merged_arc_safe_gap(gap: Dictionary) -> void:
 	var start_angle: float = gap["start"]
 	var end_angle: float = gap["end"]
 	var point_count = maxi(8, int(ceil(absf(end_angle - start_angle) / TAU * 160.0)))
-	var clear := Color(0.42, 0.41, 0.39, 0.96)
+	var clear := Color(0.91, 0.90, 0.87, 0.88)
 	var calm := _safe_gap_body_color(gap)
-	calm.a = 0.14
+	calm.a = 0.10
 	draw_arc(center, radius, start_angle, end_angle, point_count, clear, SAFE_GAP_CLEAR_WIDTH, true)
 	draw_arc(center, radius, start_angle, end_angle, point_count, calm, SAFE_GAP_CORE_WIDTH, true)
 
@@ -600,9 +600,9 @@ func _draw_merged_line_safe_gap(gap: Dictionary) -> void:
 	var base = protected_wave.global_position + protected_wave.line_direction * protected_wave.radius
 	var start = base + tangent * float(gap["start"])
 	var end = base + tangent * float(gap["end"])
-	var clear := Color(0.42, 0.41, 0.39, 0.96)
+	var clear := Color(0.91, 0.90, 0.87, 0.88)
 	var calm := _safe_gap_body_color(gap)
-	calm.a = 0.14
+	calm.a = 0.10
 	draw_line(start, end, clear, SAFE_GAP_CLEAR_WIDTH, true)
 	draw_line(start, end, calm, SAFE_GAP_CORE_WIDTH, true)
 	_draw_line_safe_gap_jamb(start, tangent, 1.0, protected_wave, _safe_gap_edge_inner_color(gap, true))

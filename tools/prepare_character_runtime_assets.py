@@ -102,7 +102,8 @@ def main() -> None:
     colorless_dir = ACTORS / "colorless"
 
     rahn_anchor = normalize_frame(
-        Image.open(RAW / "rahn_topdown_anchor_alpha_cropped.png")
+        Image.open(RAW / "rahn_topdown_anchor_alpha_cropped.png"),
+        max_extent=214,
     )
     save(rahn_anchor, rahn_dir / "rahn_anchor.png")
 
