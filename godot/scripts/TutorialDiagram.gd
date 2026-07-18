@@ -111,7 +111,11 @@ func _draw_player(center: Vector2) -> void:
 
 
 func _draw_resonator_sprite(center: Vector2) -> void:
-	draw_texture_rect(RESONATOR_TEXTURE, Rect2(center - Vector2(34, 34), Vector2(68, 68)), false)
+	var source_size := RESONATOR_TEXTURE.get_size()
+	var draw_height := 68.0
+	var draw_width := draw_height * source_size.x / source_size.y
+	var draw_size := Vector2(draw_width, draw_height)
+	draw_texture_rect(RESONATOR_TEXTURE, Rect2(center - draw_size * 0.5, draw_size), false)
 
 
 func _draw_prompt(texture: Texture2D, rect: Rect2) -> void:

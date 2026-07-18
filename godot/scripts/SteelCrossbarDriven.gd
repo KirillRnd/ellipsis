@@ -5,7 +5,7 @@ const SHORT_LIFETIME := 0.72
 const LONG_LIFETIME := 2.70
 const SHORT_MAX_FRONTS := 1
 const LONG_MAX_FRONTS := 3
-const CONTACT_RADIUS := 18.0
+const CONTACT_RADIUS := 45.0
 const MIN_GAP_WIDTH := 112.0
 const MAX_GAP_WIDTH := 176.0
 

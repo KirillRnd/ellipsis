@@ -33,8 +33,13 @@ func _draw() -> void:
 	var alpha := 0.35 + 0.65 * remaining
 	_draw_damage_reach(alpha)
 
-	var size := Vector2(58, 58)
-	draw_texture_rect(RESONATOR_TEXTURE, Rect2(-size * 0.5, size), false, Color(1.0, 1.0, 1.0, alpha))
+	var visual_size := _texture_size_for_height(RESONATOR_TEXTURE, 58.0)
+	draw_texture_rect(
+		RESONATOR_TEXTURE,
+		Rect2(-visual_size * 0.5, visual_size),
+		false,
+		Color(1.0, 1.0, 1.0, alpha)
+	)
 
 	var hitbox_color := Color(0.78, 0.58, 1.0, 0.95 * alpha)
 	draw_circle(Vector2.ZERO, 5.0, Color(0.50, 0.25, 1.0, 0.75 * alpha))
@@ -50,3 +55,10 @@ func _draw() -> void:
 func _draw_damage_reach(alpha: float) -> void:
 	draw_circle(Vector2.ZERO, DAMAGE_RADIUS, Color(0.44, 0.19, 1.0, 0.035 * alpha))
 	draw_arc(Vector2.ZERO, DAMAGE_RADIUS, 0.0, TAU, 192, Color(0.64, 0.42, 1.0, 0.24 * alpha), 2.0, true)
+
+
+func _texture_size_for_height(texture: Texture2D, height: float) -> Vector2:
+	var source_size := texture.get_size()
+	if source_size.y <= 0.0:
+		return Vector2(height, height)
+	return Vector2(height * source_size.x / source_size.y, height)
