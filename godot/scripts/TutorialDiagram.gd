@@ -59,13 +59,20 @@ func _draw_movement() -> void:
 
 
 func _draw_safe_gap() -> void:
-	var red_center := Vector2(285, 225)
-	var blue_center := Vector2(485, 225)
-	_draw_wave_arc(red_center, 150.0, -2.45, 2.45, RED)
-	_draw_wave_arc(blue_center, 105.0, PI - 2.2, PI + 2.2, BLUE)
-	_draw_safe_gap_arc(red_center, 150.0, -0.72, -0.34, RED, BLUE)
-	_draw_player(Vector2(495, 82))
-	_draw_arrow(Vector2(468, 105), Vector2(420, 132), Color.WHITE)
+	var red_center := Vector2(285, 180)
+	var blue_center := Vector2(485, 180)
+	var red_radius := 150.0
+	var blue_radius := 120.0
+	_draw_wave_arc(red_center, red_radius, -2.45, 2.45, RED)
+	_draw_wave_arc(blue_center, blue_radius, PI - 2.2, PI + 2.2, BLUE)
+	var intersections := _circle_intersections(red_center, red_radius, blue_center, blue_radius)
+	for point in intersections:
+		var red_angle: float = (point - red_center).angle()
+		var blue_angle: float = (point - blue_center).angle()
+		_draw_safe_gap_arc(red_center, red_radius, red_angle - 0.30, red_angle + 0.30, RED, BLUE)
+		_draw_safe_gap_arc(blue_center, blue_radius, blue_angle - 0.30, blue_angle + 0.30, BLUE, RED)
+	_draw_player(Vector2(545, 74))
+	_draw_arrow(Vector2(512, 96), intersections[0] if not intersections.is_empty() else Vector2(420, 105), Color.WHITE)
 
 
 func _draw_resonator() -> void:
@@ -78,34 +85,59 @@ func _draw_resonator() -> void:
 
 
 func _draw_blue_violet() -> void:
-	var left := Vector2(235, 225)
-	var right := Vector2(465, 225)
-	_draw_wave_arc(left, 155.0, -1.0, 1.0, BLUE)
-	_draw_wave_arc(right, 155.0, PI - 1.0, PI + 1.0, VIOLET)
+	var left := Vector2(235, 180)
+	var right := Vector2(465, 180)
+	var radius := 155.0
+	_draw_wave_arc(left, radius, -1.0, 1.0, BLUE)
+	_draw_wave_arc(right, radius, PI - 1.0, PI + 1.0, VIOLET)
 	_draw_resonator_sprite(right)
-	_draw_resonance_node(Vector2(350, 225), "blue_violet")
+	for point in _circle_intersections(left, radius, right, radius):
+		_draw_resonance_node(point, "blue_violet")
 	_draw_prompt(KEY_E, Rect2(44, 120, 56, 56))
 	_draw_prompt(MOUSE_RIGHT, Rect2(44, 215, 56, 56))
 
 
 func _draw_violet_pair() -> void:
-	var left := Vector2(245, 225)
-	var right := Vector2(475, 225)
+	var left := Vector2(245, 180)
+	var right := Vector2(475, 180)
+	var radius := 155.0
 	_draw_resonator_sprite(left)
 	_draw_resonator_sprite(right)
-	_draw_wave_arc(left, 155.0, -1.0, 1.0, VIOLET)
-	_draw_wave_arc(right, 155.0, PI - 1.0, PI + 1.0, VIOLET)
-	_draw_resonance_node(Vector2(360, 225), "violet_violet")
+	_draw_wave_arc(left, radius, -1.0, 1.0, VIOLET)
+	_draw_wave_arc(right, radius, PI - 1.0, PI + 1.0, VIOLET)
+	for point in _circle_intersections(left, radius, right, radius):
+		_draw_resonance_node(point, "violet_violet")
 	_draw_prompt(MOUSE_RIGHT, Rect2(50, 185, 64, 64))
 
 
 func _draw_crossbar() -> void:
-	_draw_prompt(MOUSE_LEFT, Rect2(45, 145, 66, 66))
-	draw_texture_rect(CROSSBAR_TEXTURE, Rect2(270, 140, 72, 100), false)
-	_draw_wave_arc(Vector2(360, 205), 150.0, -0.62, 0.62, RED)
-	_draw_safe_gap_arc(Vector2(360, 205), 150.0, -0.18, 0.18, RED, CROSSBAR_GREY)
-	_draw_player(Vector2(545, 205))
-	_draw_arrow(Vector2(125, 178), Vector2(262, 190), Color.WHITE)
+	var short_center := Vector2(175, 205)
+	var short_radius := 100.0
+	var long_center := Vector2(450, 205)
+	var long_radius := 135.0
+	_draw_prompt(MOUSE_LEFT, Rect2(45, 52, 60, 60))
+	_draw_prompt(MOUSE_LEFT, Rect2(370, 52, 60, 60))
+	draw_arc(Vector2(400, 82), 38.0, -PI * 0.5, PI * 1.35, 32, Color.WHITE, 3.0, true)
+	_draw_wave_arc(short_center, short_radius, -1.0, 1.0, RED)
+	_draw_safe_gap_arc(
+		short_center,
+		short_radius,
+		-SteelCrossbarDriven.MIN_GAP_WIDTH * 0.5 / short_radius,
+		SteelCrossbarDriven.MIN_GAP_WIDTH * 0.5 / short_radius,
+		RED,
+		CROSSBAR_GREY
+	)
+	_draw_crossbar_sprite(short_center + Vector2(short_radius, 0.0), 72.0)
+	_draw_wave_arc(long_center, long_radius, -1.0, 1.0, RED)
+	_draw_safe_gap_arc(
+		long_center,
+		long_radius,
+		-SteelCrossbarDriven.MAX_GAP_WIDTH * 0.5 / long_radius,
+		SteelCrossbarDriven.MAX_GAP_WIDTH * 0.5 / long_radius,
+		RED,
+		CROSSBAR_GREY
+	)
+	_draw_crossbar_sprite(long_center + Vector2(long_radius, 0.0), 72.0)
 
 
 func _draw_player(center: Vector2) -> void:
@@ -124,6 +156,12 @@ func _draw_resonator_sprite(center: Vector2) -> void:
 	draw_texture_rect(RESONATOR_TEXTURE, Rect2(center - draw_size * 0.5, draw_size), false)
 
 
+func _draw_crossbar_sprite(center: Vector2, height: float) -> void:
+	var source_size := CROSSBAR_TEXTURE.get_size()
+	var draw_size := Vector2(height * source_size.x / source_size.y, height)
+	draw_texture_rect(CROSSBAR_TEXTURE, Rect2(center - draw_size * 0.5, draw_size), false)
+
+
 func _draw_prompt(texture: Texture2D, rect: Rect2) -> void:
 	var source_size := texture.get_size()
 	if source_size.x <= 0.0 or source_size.y <= 0.0:
@@ -131,6 +169,35 @@ func _draw_prompt(texture: Texture2D, rect: Rect2) -> void:
 	var scale_factor := minf(rect.size.x / source_size.x, rect.size.y / source_size.y)
 	var draw_size := source_size * scale_factor
 	draw_texture_rect(texture, Rect2(rect.get_center() - draw_size * 0.5, draw_size), false)
+
+
+func _circle_intersections(
+	first_center: Vector2,
+	first_radius: float,
+	second_center: Vector2,
+	second_radius: float
+) -> Array[Vector2]:
+	var delta := second_center - first_center
+	var distance := delta.length()
+	if (
+		distance <= 0.0001
+		or distance > first_radius + second_radius
+		or distance < absf(first_radius - second_radius)
+	):
+		return []
+	var along := (
+		first_radius * first_radius
+		- second_radius * second_radius
+		+ distance * distance
+	) / (2.0 * distance)
+	var height := sqrt(maxf(0.0, first_radius * first_radius - along * along))
+	var direction := delta / distance
+	var midpoint := first_center + direction * along
+	var perpendicular := Vector2(-direction.y, direction.x)
+	return [
+		midpoint - perpendicular * height,
+		midpoint + perpendicular * height,
+	]
 
 
 func _draw_wave_arc(

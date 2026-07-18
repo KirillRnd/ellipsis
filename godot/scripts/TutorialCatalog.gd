@@ -34,6 +34,10 @@ static func get_room_entry(room_index: int) -> Dictionary:
 				},
 				"diagram": "blue_violet",
 			}
+		4:
+			return get_pickup("resonator_capacity")
+		5:
+			return get_pickup("steel_crossbar")
 		_:
 			return {}
 
@@ -55,18 +59,18 @@ static func get_pickup(kind: String) -> Dictionary:
 				"id": "violet_resonator_pair",
 				"title": {"ru": "ДВА РЕЗОНАТОРА", "en": "TWO RESONATORS"},
 				"body": {
-					"ru": "Теперь доступны два Резонатора. Один ПКМ одновременно запускает обе Волны. Их пересечение создаёт Ф/Ф Резонанс — полностью управляемую тобой схему.",
-					"en": "Two Resonators are now available. One RMB fires both Waves. Their intersection creates Violet/Violet Resonance—a pattern entirely under your control.",
+					"ru": "Подбери второй Резонатор. Один ПКМ одновременно запускает обе Волны. В точках их пересечения возникает Ф/Ф Резонанс — полностью управляемая тобой схема.",
+					"en": "Pick up the second Resonator. One RMB fires both Waves. Violet/Violet Resonance appears at their intersection points—a pattern entirely under your control.",
 				},
 				"diagram": "violet_pair",
 			}
 		"steel_crossbar":
 			return {
 				"id": "driven_crossbar",
-				"title": {"ru": "КОВЫРЯЛКА", "en": "THE PRYING STICK"},
+				"title": {"ru": "КОВЫРЯЛКА: ПОГЛОЩЕНИЕ", "en": "THE PRYING STICK: ABSORPTION"},
 				"body": {
-					"ru": "Ковырялка вызывает Погашение Волны. Короткий ЛКМ быстро вбивает клин. Удерживай ЛКМ, наведи и отпусти, чтобы создать более широкий и долгий безопасный разрыв.",
-					"en": "The Prying Stick causes Wave Cancellation. Tap LMB to drive a quick wedge. Hold LMB, aim, and release to create a wider, longer safe gap.",
+					"ru": "Подбери Ковырялку. Короткий ЛКМ быстро Поглощает одну Волну и создаёт узкий разрыв. Удерживай ЛКМ, наведи и отпусти: широкий долгий разрыв успевает Поглотить до трёх Волн.",
+					"en": "Pick up the Prying Stick. Tap LMB to Absorb one Wave and open a narrow gap. Hold LMB, aim, and release: the wider lasting gap can Absorb up to three Waves.",
 				},
 				"diagram": "crossbar",
 			}

@@ -40,13 +40,17 @@ func _init() -> void:
 		return
 	if not await _expect_room_entry_tutorial(main, 3, true):
 		return
-	if not await _expect_room_entry_tutorial(main, 4, false):
+	if not await _expect_room_entry_tutorial(main, 4, true):
 		return
-	if not _expect_pickup_tutorial(main, "resonator_capacity"):
+	main._apply_pickup("resonator_capacity")
+	if main._tutorial_overlay.is_active():
+		_fail("room 5 pickup must not repeat its entry tutorial")
 		return
-	if not await _expect_room_entry_tutorial(main, 5, false):
+	if not await _expect_room_entry_tutorial(main, 5, true):
 		return
-	if not _expect_pickup_tutorial(main, "steel_crossbar"):
+	main._apply_pickup("steel_crossbar")
+	if main._tutorial_overlay.is_active():
+		_fail("room 6 pickup must not repeat its entry tutorial")
 		return
 	for room_index in [6, 7]:
 		if not await _expect_room_entry_tutorial(main, room_index, false):
@@ -92,6 +96,22 @@ func _init() -> void:
 		if polygon.size() < 3 or not polygon[-1].is_equal_approx(expected_endpoints[index]):
 			_fail("ability readiness must fill the square clockwise")
 			return
+
+	var diagram := TutorialDiagram.new()
+	var first_center := Vector2(235.0, 180.0)
+	var second_center := Vector2(465.0, 180.0)
+	var intersections := diagram._circle_intersections(first_center, 155.0, second_center, 155.0)
+	if intersections.size() != 2:
+		_fail("tutorial resonance geometry must have two intersections")
+		return
+	for point in intersections:
+		if (
+			not is_equal_approx(point.distance_to(first_center), 155.0)
+			or not is_equal_approx(point.distance_to(second_center), 155.0)
+		):
+			_fail("tutorial resonance nodes must lie on both wave crests")
+			return
+	diagram.free()
 
 	print("ONBOARDING_HUD_SMOKE_OK")
 	main.queue_free()
