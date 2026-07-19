@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="SoundEvent" format=3 uid="uid://qptshspus6kw"]
+
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_event"]
+[ext_resource type="Script" uid="uid://2pj38oxrsfyq" path="res://scripts/audio/SoundLayer.gd" id="2_layer"]
+[ext_resource type="AudioStream" uid="uid://cipykeucl26r0" path="res://assets/audio/sfx/crowbar_charged_02_sword_strike.wav" id="2_qafwk"]
+[ext_resource type="AudioStream" uid="uid://csmwsklfuaam7" path="res://assets/audio/sfx/crowbar_charged_01_resonant_metal.wav" id="3_kfn6w"]
+
+[sub_resource type="Resource" id="SoundLayer_charge"]
+script = ExtResource("2_layer")
+display_name = &"Charge release"
+stream = ExtResource("2_qafwk")
+bus = &"SFX_Player"
+volume_db = -6.0
+random_volume_db = 0.25
+pitch_min = 0.96
+
+[sub_resource type="Resource" id="SoundLayer_metal"]
+script = ExtResource("2_layer")
+display_name = &"Heavy metal seating"
+stream = ExtResource("3_kfn6w")
+bus = &"SFX_Player"
+volume_db = -16.0
+random_volume_db = 0.35
+pitch_min = 0.92
+pitch_max = 0.98
+delay_min_seconds = 0.008
+delay_max_seconds = 0.018
+
+[sub_resource type="Resource" id="SoundLayer_tail"]
+script = ExtResource("2_layer")
+display_name = &"Resonant steel tail"
+bus = &"SFX_Player"
+volume_db = -4.0
+random_volume_db = 0.25
+pitch_min = 0.94
+delay_min_seconds = 0.025
+delay_max_seconds = 0.05
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"crossbar.install.charged"
+concurrency_group = &"crossbar_install"
+max_instances = 2
+cooldown_ms = 50
+priority = 40
+steal_oldest = true
+layers = Array[ExtResource("2_layer")]([SubResource("SoundLayer_charge"), SubResource("SoundLayer_metal"), SubResource("SoundLayer_tail")])

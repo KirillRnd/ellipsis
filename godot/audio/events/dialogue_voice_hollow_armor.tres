@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="SoundEvent" format=3 uid="uid://clsos55xno8fc"]
+
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_event"]
+[ext_resource type="Script" uid="uid://2pj38oxrsfyq" path="res://scripts/audio/SoundLayer.gd" id="2_layer"]
+[ext_resource type="AudioStream" uid="uid://bk5oatguoqnqd" path="res://assets/audio/dialogue/dialogue_hollow_armor.wav" id="3_stream"]
+
+[sub_resource type="Resource" id="SoundLayer_voice"]
+script = ExtResource("2_layer")
+display_name = &"Hollow dead-metal breath"
+stream = ExtResource("3_stream")
+bus = &"Dialogue"
+volume_db = -12.0
+random_volume_db = 0.6
+pitch_min = 0.92
+pitch_max = 0.99
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"dialogue.voice.hollow_armor"
+concurrency_group = &"dialogue.voice"
+cooldown_ms = 55
+priority = 5
+steal_oldest = true
+layers = Array[ExtResource("2_layer")]([SubResource("SoundLayer_voice")])

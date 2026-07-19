@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="SoundEvent" format=3 uid="uid://b7icjfhbbxi2n"]
+
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_event"]
+[ext_resource type="Script" uid="uid://2pj38oxrsfyq" path="res://scripts/audio/SoundLayer.gd" id="2_layer"]
+[ext_resource type="AudioStream" uid="uid://b0nk0deokdf4p" path="res://assets/audio/dialogue/dialogue_varn_friendly_beam.wav" id="3_stream"]
+
+[sub_resource type="Resource" id="SoundLayer_voice"]
+script = ExtResource("2_layer")
+display_name = &"Varn calm beam voice"
+stream = ExtResource("3_stream")
+bus = &"Dialogue"
+volume_db = -17.0
+random_volume_db = 0.7
+pitch_min = 0.96
+pitch_max = 1.04
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"dialogue.voice.varn"
+concurrency_group = &"dialogue.voice"
+cooldown_ms = 40
+priority = 5
+steal_oldest = true
+layers = Array[ExtResource("2_layer")]([SubResource("SoundLayer_voice")])

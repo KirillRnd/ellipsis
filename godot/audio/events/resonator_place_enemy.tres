@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="SoundEvent" format=3 uid="uid://djh71auwnshgg"]
+
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_event"]
+[ext_resource type="AudioStream" uid="uid://clu7b5fu34ojy" path="res://assets/audio/sfx/resonator_player_01_gear_lock.wav" id="2_i7gxo"]
+[ext_resource type="Script" uid="uid://2pj38oxrsfyq" path="res://scripts/audio/SoundLayer.gd" id="2_layer"]
+[ext_resource type="AudioStream" uid="uid://c3mkek1a0se3x" path="res://assets/audio/sfx/resonator_enemy_03_plasma_powerup.wav" id="3_i7gxo"]
+
+[sub_resource type="Resource" id="SoundLayer_mechanism"]
+script = ExtResource("2_layer")
+display_name = &"Hostile mechanism"
+stream = ExtResource("2_i7gxo")
+bus = &"SFX_Enemy"
+random_volume_db = 0.4
+pitch_min = 0.96
+
+[sub_resource type="Resource" id="SoundLayer_threat"]
+script = ExtResource("2_layer")
+display_name = &"Threat accent"
+stream = ExtResource("3_i7gxo")
+bus = &"SFX_Enemy"
+volume_db = -5.0
+random_volume_db = 0.5
+pitch_min = 0.94
+pitch_max = 0.99
+delay_min_seconds = 0.09
+delay_max_seconds = 0.22
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"resonator.place.enemy"
+max_instances = 3
+cooldown_ms = 60
+priority = 30
+steal_oldest = true
+layers = Array[ExtResource("2_layer")]([SubResource("SoundLayer_mechanism"), SubResource("SoundLayer_threat")])

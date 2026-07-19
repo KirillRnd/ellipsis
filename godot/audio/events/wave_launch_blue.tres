@@ -1,0 +1,47 @@
+[gd_resource type="Resource" script_class="SoundEvent" format=3 uid="uid://5c2hs37b47a3"]
+
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_event"]
+[ext_resource type="Script" uid="uid://2pj38oxrsfyq" path="res://scripts/audio/SoundLayer.gd" id="2_layer"]
+[ext_resource type="AudioStream" uid="uid://cleaonughkchf" path="res://assets/audio/sfx/wave_blue_01_warp_slide.wav" id="2_mk7hj"]
+
+[sub_resource type="Resource" id="SoundLayer_attack"]
+script = ExtResource("2_layer")
+display_name = &"Heavy light-wave attack"
+stream = ExtResource("2_mk7hj")
+bus = &"SFX_Waves"
+volume_db = 1.0
+random_volume_db = 0.3
+pitch_min = 0.91
+pitch_max = 0.96
+delay_min_seconds = 0.05
+delay_max_seconds = 0.1
+max_distance = 1800.0
+
+[sub_resource type="Resource" id="SoundLayer_body"]
+script = ExtResource("2_layer")
+display_name = &"Blue wave body"
+bus = &"SFX_Waves"
+volume_db = -3.0
+pitch_min = 0.92
+pitch_max = 0.97
+max_distance = 1800.0
+
+[sub_resource type="Resource" id="SoundLayer_tail"]
+script = ExtResource("2_layer")
+display_name = &"Blue low tail"
+bus = &"SFX_Waves"
+volume_db = -6.0
+pitch_min = 0.9
+pitch_max = 0.95
+delay_min_seconds = 0.03
+delay_max_seconds = 0.055
+max_distance = 1800.0
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"wave.launch.blue"
+concurrency_group = &"player_waves"
+max_instances = 6
+priority = 18
+steal_oldest = true
+layers = Array[ExtResource("2_layer")]([SubResource("SoundLayer_attack"), SubResource("SoundLayer_body"), SubResource("SoundLayer_tail")])

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="SoundEvent" format=3 uid="uid://y115rki150a5"]
+
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_event"]
+[ext_resource type="Script" uid="uid://2pj38oxrsfyq" path="res://scripts/audio/SoundLayer.gd" id="2_layer"]
+[ext_resource type="AudioStream" uid="uid://nnadotnts2n1" path="res://assets/audio/sfx/wave_red_03_horror_impact.wav" id="2_y7vt6"]
+
+[sub_resource type="Resource" id="SoundLayer_attack"]
+script = ExtResource("2_layer")
+display_name = &"Hostile wave attack"
+stream = ExtResource("2_y7vt6")
+bus = &"SFX_Waves"
+volume_db = 1.0
+random_volume_db = 0.5
+pitch_min = 0.96
+pitch_max = 1.02
+delay_min_seconds = 0.05
+delay_max_seconds = 0.1
+max_distance = 1900.0
+
+[resource]
+script = ExtResource("1_event")
+event_id = &"wave.launch.red"
+concurrency_group = &"enemy_waves"
+max_instances = 8
+priority = 25
+steal_oldest = true
+layers = Array[ExtResource("2_layer")]([SubResource("SoundLayer_attack")])

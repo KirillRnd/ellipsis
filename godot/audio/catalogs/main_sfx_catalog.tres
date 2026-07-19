@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="AudioCatalog" format=3 uid="uid://dwy8ive65luhc"]
+
+[ext_resource type="Script" uid="uid://d2vfccxtlmucp" path="res://scripts/audio/AudioCatalog.gd" id="1_catalog"]
+[ext_resource type="Script" uid="uid://be68ud5vqs376" path="res://scripts/audio/SoundEvent.gd" id="1_d3el8"]
+[ext_resource type="Resource" uid="uid://qd2exxq55g6c" path="res://audio/events/resonator_place_player.tres" id="2_player_place"]
+[ext_resource type="Resource" uid="uid://djh71auwnshgg" path="res://audio/events/resonator_place_enemy.tres" id="3_enemy_place"]
+[ext_resource type="Resource" uid="uid://cklqbf3o64t63" path="res://audio/events/wave_launch_purple.tres" id="4_purple"]
+[ext_resource type="Resource" uid="uid://5c2hs37b47a3" path="res://audio/events/wave_launch_blue.tres" id="5_blue"]
+[ext_resource type="Resource" uid="uid://y115rki150a5" path="res://audio/events/wave_launch_red.tres" id="6_red"]
+[ext_resource type="Resource" uid="uid://dhkv5bwju7bcf" path="res://audio/events/crossbar_install_quick.tres" id="7_quick"]
+[ext_resource type="Resource" uid="uid://qptshspus6kw" path="res://audio/events/crossbar_install_charged.tres" id="8_charged"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_colorless.tres" id="9_voice_colorless"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_cron.tres" id="10_voice_cron"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_rahn.tres" id="11_voice_rahn"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_violet.tres" id="12_voice_violet"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_irvel.tres" id="13_voice_irvel"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_tiu.tres" id="14_voice_tiu"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_golden.tres" id="15_voice_golden"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_orum.tres" id="16_voice_orum"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_varn.tres" id="17_voice_varn"]
+[ext_resource type="Resource" path="res://audio/events/dialogue_voice_hollow_armor.tres" id="18_voice_hollow"]
+
+[resource]
+script = ExtResource("1_catalog")
+events = Array[ExtResource("1_d3el8")]([ExtResource("2_player_place"), ExtResource("3_enemy_place"), ExtResource("4_purple"), ExtResource("5_blue"), ExtResource("6_red"), ExtResource("7_quick"), ExtResource("8_charged"), ExtResource("9_voice_colorless"), ExtResource("10_voice_cron"), ExtResource("11_voice_rahn"), ExtResource("12_voice_violet"), ExtResource("13_voice_irvel"), ExtResource("14_voice_tiu"), ExtResource("15_voice_golden"), ExtResource("16_voice_orum"), ExtResource("17_voice_varn"), ExtResource("18_voice_hollow")])
