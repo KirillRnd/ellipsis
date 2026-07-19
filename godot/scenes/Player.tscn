@@ -1,14 +1,29 @@
-[gd_scene load_steps=28 format=3]
+[gd_scene format=3 uid="uid://thcjpkrkxpcf"]
 
-[ext_resource type="Script" path="res://scripts/PlayerController.gd" id="1"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_idle_sheet.png" id="2_idle"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_move_sheet.png" id="3_move"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_hit_sheet.png" id="4_hit"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_dash_sheet.png" id="5_dash"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_place_resonator_two_state_sheet.png" id="6_place"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_crossbar_empty_hands_two_state_sheet.png" id="7_crossbar"]
+[ext_resource type="Script" uid="uid://gxqxoulrob0w" path="res://scripts/PlayerController.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://c0brmbcinmue5" path="res://assets/actors/colorless/colorless_idle_sheet.png" id="2_idle"]
+[ext_resource type="Texture2D" uid="uid://ba5iv6fco8oon" path="res://assets/actors/colorless/colorless_move_sheet.png" id="3_move"]
+[ext_resource type="Texture2D" uid="uid://dfgfabdbvr3xm" path="res://assets/actors/colorless/colorless_hit_sheet.png" id="4_hit"]
+[ext_resource type="Texture2D" uid="uid://bovxk5gdxnar7" path="res://assets/actors/colorless/colorless_dash_sheet.png" id="5_dash"]
+[ext_resource type="Texture2D" uid="uid://cayuy62pfb5m6" path="res://assets/actors/colorless/colorless_place_resonator_two_state_sheet.png" id="6_place"]
+[ext_resource type="Texture2D" uid="uid://dwotoqq1bhq03" path="res://assets/actors/colorless/colorless_crossbar_empty_hands_two_state_sheet.png" id="7_crossbar"]
 [ext_resource type="PackedScene" path="res://scenes/SteelCrossbarTopdown.tscn" id="8_crossbar_scene"]
-[ext_resource type="Texture2D" path="res://assets/actors/colorless/colorless_defeat_sheet.png" id="9_defeat"]
+[ext_resource type="Texture2D" uid="uid://dph6sa1lbpi8c" path="res://assets/actors/colorless/colorless_defeat_sheet.png" id="9_defeat"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_player"]
+radius = 21.377558
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_idle_0"]
+atlas = ExtResource("2_idle")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_crossbar_0"]
+atlas = ExtResource("7_crossbar")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_crossbar_1"]
+atlas = ExtResource("7_crossbar")
+region = Rect2(256, 0, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_dash_0"]
 atlas = ExtResource("5_dash")
@@ -22,9 +37,17 @@ region = Rect2(256, 0, 256, 512)
 atlas = ExtResource("5_dash")
 region = Rect2(512, 0, 256, 512)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_idle_0"]
-atlas = ExtResource("2_idle")
+[sub_resource type="AtlasTexture" id="AtlasTexture_defeat_0"]
+atlas = ExtResource("9_defeat")
 region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hit_0"]
+atlas = ExtResource("4_hit")
+region = Rect2(0, 0, 256, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hit_1"]
+atlas = ExtResource("4_hit")
+region = Rect2(256, 0, 256, 256)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_idle_1"]
 atlas = ExtResource("2_idle")
@@ -46,14 +69,6 @@ region = Rect2(512, 0, 256, 256)
 atlas = ExtResource("3_move")
 region = Rect2(768, 0, 256, 256)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_hit_0"]
-atlas = ExtResource("4_hit")
-region = Rect2(0, 0, 256, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_hit_1"]
-atlas = ExtResource("4_hit")
-region = Rect2(256, 0, 256, 256)
-
 [sub_resource type="AtlasTexture" id="AtlasTexture_place_0"]
 atlas = ExtResource("6_place")
 region = Rect2(0, 0, 256, 256)
@@ -61,21 +76,6 @@ region = Rect2(0, 0, 256, 256)
 [sub_resource type="AtlasTexture" id="AtlasTexture_place_1"]
 atlas = ExtResource("6_place")
 region = Rect2(256, 0, 256, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_crossbar_0"]
-atlas = ExtResource("7_crossbar")
-region = Rect2(0, 0, 256, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_crossbar_1"]
-atlas = ExtResource("7_crossbar")
-region = Rect2(256, 0, 256, 256)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_defeat_0"]
-atlas = ExtResource("9_defeat")
-region = Rect2(0, 0, 256, 256)
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_player"]
-radius = 8.0
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_colorless"]
 animations = [{
@@ -95,7 +95,7 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_idle_0")
 }],
-"loop": false,
+"loop": 0,
 "name": &"crossbar_aim",
 "speed": 12.5
 }, {
@@ -115,17 +115,9 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_idle_0")
 }],
-"loop": false,
+"loop": 0,
 "name": &"crossbar_drive",
 "speed": 12.5
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_defeat_0")
-}],
-"loop": false,
-"name": &"defeat",
-"speed": 1.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -137,9 +129,17 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_dash_2")
 }],
-"loop": false,
+"loop": 0,
 "name": &"dash",
 "speed": 24.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_defeat_0")
+}],
+"loop": 0,
+"name": &"defeat",
+"speed": 1.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -148,7 +148,7 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_hit_1")
 }],
-"loop": false,
+"loop": 0,
 "name": &"hit",
 "speed": 8.0
 }, {
@@ -162,7 +162,7 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_idle_0")
 }],
-"loop": true,
+"loop": 1,
 "name": &"idle",
 "speed": 2.4
 }, {
@@ -185,7 +185,7 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_move_2")
 }],
-"loop": true,
+"loop": 1,
 "name": &"move",
 "speed": 7.0
 }, {
@@ -199,29 +199,30 @@ animations = [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_place_0")
 }],
-"loop": false,
+"loop": 0,
 "name": &"place_resonator",
 "speed": 5.0
 }]
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="CharacterBody2D" unique_id=1373291875]
 script = ExtResource("1")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1766261241]
 shape = SubResource("CircleShape2D_player")
 
-[node name="VisualRoot" type="Node2D" parent="."]
+[node name="VisualRoot" type="Node2D" parent="." unique_id=1135002282]
 scale = Vector2(0.35, 0.35)
 
-[node name="CrossbarPivot" type="Node2D" parent="VisualRoot"]
+[node name="CrossbarPivot" type="Node2D" parent="VisualRoot" unique_id=728868931]
 visible = false
-position = Vector2(0, -104)
 z_index = -1
+position = Vector2(0, -104)
 
-[node name="Crossbar" parent="VisualRoot/CrossbarPivot" instance=ExtResource("8_crossbar_scene")]
+[node name="Crossbar" parent="VisualRoot/CrossbarPivot" unique_id=773325602 instance=ExtResource("8_crossbar_scene")]
 scale = Vector2(0.149143, 0.149143)
 
-[node name="Body" type="AnimatedSprite2D" parent="VisualRoot"]
+[node name="Body" type="AnimatedSprite2D" parent="VisualRoot" unique_id=844698522]
 sprite_frames = SubResource("SpriteFrames_colorless")
-animation = &"idle"
-centered = true
+animation = &"crossbar_aim"
+frame = 4
+frame_progress = 1.0
