@@ -12,6 +12,7 @@ var _footer: Label
 var _diagram: TutorialDiagram
 var _tutorial_id := ""
 var _language := "ru"
+var _config := {}
 var _active := false
 var _input_armed := false
 var _tree_was_paused := false
@@ -28,14 +29,10 @@ func show_card(config: Dictionary, language: String) -> void:
 	if config.is_empty():
 		return
 	_tutorial_id = config.get("id", "")
+	_config = config
 	_language = language
-	_title.text = _localize(config.get("title", ""))
-	_body.text = _localize(config.get("body", ""))
+	_refresh_text()
 	_diagram.set_diagram_kind(config.get("diagram", ""))
-	_footer.text = _localize({
-		"en": "LMB / ENTER — CONTINUE",
-		"ru": "ЛКМ / ENTER — ПРОДОЛЖИТЬ",
-	})
 	_tree_was_paused = get_tree().paused
 	get_tree().paused = true
 	_active = true
@@ -46,6 +43,12 @@ func show_card(config: Dictionary, language: String) -> void:
 
 func is_active() -> bool:
 	return _active
+
+
+func set_language(language: String) -> void:
+	_language = language
+	if _active:
+		_refresh_text()
 
 
 func close_card() -> void:
@@ -66,6 +69,11 @@ func _arm_input() -> void:
 
 func _input(event: InputEvent) -> void:
 	if not _active:
+		return
+	var settings := get_node_or_null("/root/Settings")
+	if is_instance_valid(settings) and (
+		settings.is_open() or settings.is_menu_button_pointer_event(event)
+	):
 		return
 	var close_requested: bool = (
 		event is InputEventMouseButton
@@ -89,6 +97,15 @@ func _localize(value) -> String:
 		var localized: Dictionary = value
 		return str(localized.get(_language, localized.get("en", "")))
 	return str(value)
+
+
+func _refresh_text() -> void:
+	_title.text = _localize(_config.get("title", ""))
+	_body.text = _localize(_config.get("body", ""))
+	_footer.text = _localize({
+		"en": "LMB / ENTER — CONTINUE",
+		"ru": "ЛКМ / ENTER — ПРОДОЛЖИТЬ",
+	})
 
 
 func _build_ui() -> void:

@@ -3,6 +3,44 @@ extends CanvasLayer
 
 signal finished
 
+const DEFAULT_CHARACTERS_PER_SECOND := 34.0
+const DEFAULT_CHARACTERS_PER_SOUND := 2
+const TYPEWRITER_SPEED_MULTIPLIER := 1.7
+const SPEAKER_VOICE_IDS := {
+	"COLORLESS": &"colorless",
+	"CRON": &"cron",
+	"RAHN": &"rahn",
+	"TIU": &"tiu",
+	"IRVEL": &"irvel",
+	"GOLDEN KNIGHT": &"golden",
+	"ORUM": &"orum",
+	"VARN": &"varn",
+	"UNDEAD": &"hollow_armor",
+}
+const VOICE_PROFILES := {
+	&"colorless": {"event": &"dialogue.voice.colorless", "speed": 35.0, "step": 2},
+	&"cron": {"event": &"dialogue.voice.cron", "speed": 31.0, "step": 2},
+	&"rahn": {"event": &"dialogue.voice.rahn", "speed": 25.0, "step": 2},
+	&"violet": {"event": &"dialogue.voice.violet", "speed": 38.0, "step": 2},
+	&"irvel": {"event": &"dialogue.voice.irvel", "speed": 32.0, "step": 3},
+	&"tiu": {"event": &"dialogue.voice.tiu", "speed": 39.0, "step": 2},
+	&"golden": {"event": &"dialogue.voice.golden", "speed": 24.0, "step": 3},
+	&"orum": {"event": &"dialogue.voice.orum", "speed": 27.0, "step": 2},
+	&"varn": {"event": &"dialogue.voice.varn", "speed": 30.0, "step": 2},
+	&"hollow_armor": {"event": &"dialogue.voice.hollow_armor", "speed": 21.0, "step": 3},
+}
+const PUNCTUATION_PAUSES := {
+	",": 0.055,
+	";": 0.075,
+	":": 0.075,
+	".": 0.13,
+	"!": 0.14,
+	"?": 0.14,
+	"…": 0.18,
+	"—": 0.08,
+	"–": 0.08,
+}
+
 var _background: TextureRect
 var _left: TextureRect
 var _right: TextureRect
@@ -13,12 +51,38 @@ var _messages: Array = []
 var _message_index := 0
 var _language := "ru"
 var _active := false
+var _full_dialogue_text := ""
+var _revealed_characters := 0
+var _reveal_accumulator := 0.0
+var _punctuation_pause_remaining := 0.0
+var _typing_active := false
+var _characters_per_second := DEFAULT_CHARACTERS_PER_SECOND
+var _characters_per_sound := DEFAULT_CHARACTERS_PER_SOUND
+var _characters_until_sound := 0
+var _voice_event: StringName = &"dialogue.voice.colorless"
+var _audio: AudioRuntime
 
 
 func _ready() -> void:
 	layer = 50
+	_audio = get_node_or_null("/root/Audio") as AudioRuntime
 	_build_ui()
 	visible = false
+
+
+func _process(delta: float) -> void:
+	if not _active or not _typing_active:
+		return
+	if _punctuation_pause_remaining > 0.0:
+		_punctuation_pause_remaining = maxf(0.0, _punctuation_pause_remaining - delta)
+		return
+	_reveal_accumulator += delta
+	var character_interval := 1.0 / maxf(1.0, _characters_per_second)
+	while _typing_active and _reveal_accumulator >= character_interval:
+		_reveal_accumulator -= character_interval
+		_reveal_next_character()
+		if _punctuation_pause_remaining > 0.0:
+			break
 
 
 func show_interlude(config: Dictionary, language: String) -> void:
@@ -41,8 +105,12 @@ func show_interlude(config: Dictionary, language: String) -> void:
 func advance() -> void:
 	if not _active:
 		return
+	if _typing_active:
+		_finish_typing()
+		return
 	_message_index += 1
 	if _message_index >= _messages.size():
+		_finish_typing()
 		_active = false
 		visible = false
 		finished.emit()
@@ -54,8 +122,23 @@ func is_active() -> bool:
 	return _active
 
 
+func is_typing() -> bool:
+	return _typing_active
+
+
+func set_language(language: String) -> void:
+	_language = language
+	if _active:
+		_show_message()
+
+
 func _input(event: InputEvent) -> void:
 	if not _active:
+		return
+	var settings := get_node_or_null("/root/Settings")
+	if is_instance_valid(settings) and (
+		settings.is_open() or settings.is_menu_button_pointer_event(event)
+	):
 		return
 	var advance_requested: bool = (
 		event is InputEventMouseButton
@@ -76,8 +159,81 @@ func _input(event: InputEvent) -> void:
 func _show_message() -> void:
 	var message: Dictionary = _messages[_message_index]
 	_speaker.text = _localize(message.get("speaker", ""))
-	_dialogue.text = _localize(message.get("text", ""))
+	_full_dialogue_text = _localize(message.get("text", ""))
+	_dialogue.text = _full_dialogue_text
+	_dialogue.visible_characters = 0
+	_revealed_characters = 0
+	_reveal_accumulator = 0.0
+	_punctuation_pause_remaining = 0.0
+	_typing_active = not _full_dialogue_text.is_empty()
+	_configure_voice(message)
 	_counter.text = "%d / %d    [LMB / ENTER]" % [_message_index + 1, _messages.size()]
+
+
+func _configure_voice(message: Dictionary) -> void:
+	var voice_id := StringName(str(message.get("voice", "")))
+	if voice_id.is_empty():
+		voice_id = _resolve_speaker_voice(message.get("speaker", ""))
+	var profile: Dictionary = VOICE_PROFILES.get(voice_id, VOICE_PROFILES[&"colorless"])
+	_voice_event = profile.get("event", &"dialogue.voice.colorless")
+	_characters_per_second = maxf(
+		1.0,
+		float(message.get("characters_per_second", profile.get("speed", DEFAULT_CHARACTERS_PER_SECOND)))
+		* TYPEWRITER_SPEED_MULTIPLIER
+	)
+	_characters_per_sound = maxi(
+		1,
+		int(message.get("characters_per_sound", profile.get("step", DEFAULT_CHARACTERS_PER_SOUND)))
+	)
+	_characters_until_sound = 0
+
+
+func _resolve_speaker_voice(speaker_value) -> StringName:
+	var canonical_name := ""
+	if typeof(speaker_value) == TYPE_DICTIONARY:
+		var localized_names: Dictionary = speaker_value
+		canonical_name = str(localized_names.get("en", ""))
+	else:
+		canonical_name = str(speaker_value)
+	return SPEAKER_VOICE_IDS.get(canonical_name.strip_edges().to_upper(), &"colorless")
+
+
+func _reveal_next_character() -> void:
+	if _revealed_characters >= _full_dialogue_text.length():
+		_finish_typing()
+		return
+	var character := _full_dialogue_text.substr(_revealed_characters, 1)
+	_revealed_characters += 1
+	_dialogue.visible_characters = _revealed_characters
+	if PUNCTUATION_PAUSES.has(character):
+		_punctuation_pause_remaining = (
+			float(PUNCTUATION_PAUSES[character]) / TYPEWRITER_SPEED_MULTIPLIER
+		)
+		_characters_until_sound = 0
+	elif not character.strip_edges().is_empty():
+		if _characters_until_sound <= 0:
+			_play_voice_phoneme()
+			_characters_until_sound = _characters_per_sound - 1
+		else:
+			_characters_until_sound -= 1
+	if _revealed_characters >= _full_dialogue_text.length():
+		_finish_typing()
+
+
+func _play_voice_phoneme() -> void:
+	if not is_instance_valid(_audio):
+		_audio = get_node_or_null("/root/Audio") as AudioRuntime
+	if _audio != null:
+		_audio.play_global(_voice_event)
+
+
+func _finish_typing() -> void:
+	_typing_active = false
+	_punctuation_pause_remaining = 0.0
+	_reveal_accumulator = 0.0
+	_revealed_characters = _full_dialogue_text.length()
+	if is_instance_valid(_dialogue):
+		_dialogue.visible_characters = -1
 
 
 func _localize(value) -> String:

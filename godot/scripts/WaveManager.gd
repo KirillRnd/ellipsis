@@ -4,6 +4,11 @@ extends Node2D
 signal danger_changed(danger_value: int)
 
 const WAVE_SCENE = preload("res://scenes/Wave.tscn")
+const WAVE_AUDIO_EVENTS := {
+	"resonator": &"wave.launch.purple",
+	"blue": &"wave.launch.blue",
+	"red": &"wave.launch.red",
+}
 const ARENA_RECT = Rect2(Vector2(80, 60), Vector2(1120, 600))
 const PLAYER_WAVE_DAMAGE = 1
 const BLUE_VIOLET_RESONANCE_DAMAGE := 6
@@ -33,6 +38,7 @@ var waves: Array = []
 var player_waves: Array = []
 var _last_danger_value = 0
 var _resonance_damage_marks = {}
+@onready var _audio: AudioRuntime = get_node_or_null("/root/Audio") as AudioRuntime
 
 
 func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: Dictionary = {}):
@@ -45,6 +51,9 @@ func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: 
 		host.move_child(wave, get_index())
 
 	wave.setup(wave_owner, wave_kind, origin, config)
+	var audio_event: StringName = WAVE_AUDIO_EVENTS.get(wave_kind, &"")
+	if _audio != null and not audio_event.is_empty():
+		_audio.play_2d(audio_event, origin)
 	wave.expired.connect(_on_wave_expired)
 	waves.append(wave)
 	if wave_owner == "player":
@@ -90,11 +99,14 @@ func get_point_danger(global_point: Vector2) -> int:
 		return 0
 
 	var safe_gaps := _build_safe_gaps()
+	var active_enemy_waves := []
 	for enemy_wave in enemy_waves:
-		if _point_inside_safe_gap(global_point, enemy_wave, safe_gaps):
-			return -1
+		if _front_exists_at(global_point, enemy_wave, safe_gaps):
+			active_enemy_waves.append(enemy_wave)
+	if active_enemy_waves.is_empty():
+		return -1
 
-	if _point_on_enemy_interference_node(global_point):
+	if _point_on_enemy_interference_node(global_point, safe_gaps):
 		return ENEMY_NODE_DAMAGE
 
 	return 1
@@ -110,15 +122,10 @@ func _enemy_crests_at(global_point: Vector2, margin: float) -> Array:
 	return result
 
 
-func _point_on_enemy_interference_node(global_point: Vector2) -> bool:
-	var enemies = _enemy_waves()
-	for a_index in range(enemies.size()):
-		var a = enemies[a_index]
-		for b_index in range(a_index + 1, enemies.size()):
-			var b = enemies[b_index]
-			for point in _front_intersections(a, b):
-				if ARENA_RECT.has_point(point) and point.distance_to(global_point) <= NODE_HIT_RADIUS:
-					return true
+func _point_on_enemy_interference_node(global_point: Vector2, safe_gaps: Array) -> bool:
+	for point in _enemy_interference_points(safe_gaps):
+		if point.distance_to(global_point) <= NODE_HIT_RADIUS:
+			return true
 	return false
 
 
@@ -149,37 +156,41 @@ func _damage_emitters() -> void:
 					target.take_damage(PLAYER_WAVE_DAMAGE)
 
 		if target.can_take_resonance_damage():
-			for pair in _player_resonance_pairs():
-				var first = pair["first"]
-				var second = pair["second"]
-				var resonance_type: String = pair["type"]
+			for resonance_node in _player_resonance_nodes(safe_gaps):
+				var first = resonance_node["first"]
+				var second = resonance_node["second"]
+				var resonance_type: String = resonance_node["type"]
 				var key = "%s:%s:%s" % [first.get_instance_id(), second.get_instance_id(), target_id]
 				if _resonance_damage_marks.has(key):
 					continue
-				for point in _front_intersections(first, second):
-					if point.distance_to(target.global_position) <= RESONANCE_NODE_RADIUS:
-						if _point_inside_safe_gap(point, first, safe_gaps) or _point_inside_safe_gap(point, second, safe_gaps):
-							continue
-						_resonance_damage_marks[key] = true
-						target.take_damage(_resonance_damage(resonance_type))
-						break
+				var point: Vector2 = resonance_node["point"]
+				if point.distance_to(target.global_position) <= RESONANCE_NODE_RADIUS:
+					_resonance_damage_marks[key] = true
+					target.take_damage(_resonance_damage(resonance_type))
 
 
 func _draw() -> void:
-	_draw_player_erasure()
-	_draw_enemy_interference_nodes()
-	_draw_player_interference_nodes()
+	var safe_gaps := _build_safe_gaps()
+	_draw_player_erasure(safe_gaps)
+	_draw_enemy_interference_nodes(safe_gaps)
+	_draw_player_interference_nodes(safe_gaps)
 
 
-func _draw_player_erasure() -> void:
-	for gap in _build_safe_gaps():
+func _draw_player_erasure(safe_gaps: Array) -> void:
+	for gap in safe_gaps:
 		if gap.get("shape", "") == "line":
 			_draw_merged_line_safe_gap(gap)
 		else:
 			_draw_merged_arc_safe_gap(gap)
 
 
-func _draw_enemy_interference_nodes() -> void:
+func _draw_enemy_interference_nodes(safe_gaps: Array) -> void:
+	for point in _enemy_interference_points(safe_gaps):
+		_draw_enemy_danger_node(point)
+
+
+func _enemy_interference_points(safe_gaps: Array) -> Array[Vector2]:
+	var result: Array[Vector2] = []
 	var enemies = _enemy_waves()
 	for a_index in range(enemies.size()):
 		var a = enemies[a_index]
@@ -189,21 +200,31 @@ func _draw_enemy_interference_nodes() -> void:
 			var b = enemies[b_index]
 			if not is_instance_valid(b):
 				continue
-			for point in _front_intersections(a, b):
+			for point in _active_front_intersections(a, b, safe_gaps):
 				if ARENA_RECT.has_point(point):
-					_draw_enemy_danger_node(point)
+					result.append(point)
+	return result
 
 
-func _draw_player_interference_nodes() -> void:
-	var safe_gaps := _build_safe_gaps()
+func _draw_player_interference_nodes(safe_gaps: Array) -> void:
+	for resonance_node in _player_resonance_nodes(safe_gaps):
+		_draw_player_resonance_node(resonance_node["point"], resonance_node["type"])
+
+
+func _player_resonance_nodes(safe_gaps: Array) -> Array:
+	var result := []
 	for pair in _player_resonance_pairs():
 		var first = pair["first"]
 		var second = pair["second"]
-		for point in _front_intersections(first, second):
+		for point in _active_front_intersections(first, second, safe_gaps):
 			if ARENA_RECT.has_point(point):
-				if _point_inside_safe_gap(point, first, safe_gaps) or _point_inside_safe_gap(point, second, safe_gaps):
-					continue
-				_draw_player_resonance_node(point, pair["type"])
+				result.append({
+					"point": point,
+					"first": first,
+					"second": second,
+					"type": pair["type"],
+				})
+	return result
 
 
 func _player_resonance_pairs() -> Array:
@@ -469,6 +490,21 @@ func _point_inside_safe_gap(global_point: Vector2, protected_wave, safe_gaps: Ar
 		elif _point_inside_arc_safe_gap(global_point, gap):
 			return true
 	return false
+
+
+func _front_exists_at(global_point: Vector2, wave, safe_gaps: Array) -> bool:
+	return is_instance_valid(wave) and not _point_inside_safe_gap(global_point, wave, safe_gaps)
+
+
+func _active_front_intersections(first, second, safe_gaps: Array) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	for point in _front_intersections(first, second):
+		if not _front_exists_at(point, first, safe_gaps):
+			continue
+		if not _front_exists_at(point, second, safe_gaps):
+			continue
+		result.append(point)
+	return result
 
 
 func _point_inside_arc_safe_gap(global_point: Vector2, gap: Dictionary) -> bool:
