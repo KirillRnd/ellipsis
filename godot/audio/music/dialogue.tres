@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="MusicCue" format=3 uid="uid://dbnb3bakj1xew"]
 
 [ext_resource type="Script" uid="uid://ytmuo5jk6u3d" path="res://scripts/audio/MusicCue.gd" id="1_cue"]
-[ext_resource type="AudioStream" uid="uid://bjfvjdyle3lo7" path="res://assets/audio/music/The Idle Mechanism.wav" id="2_stream"]
+[ext_resource type="AudioStream" uid="uid://d2jhgnbwfdxxg" path="res://assets/audio/music/The Idle Mechanism.mp3" id="2_stream"]
 
 [resource]
 script = ExtResource("1_cue")

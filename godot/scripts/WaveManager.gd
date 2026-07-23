@@ -18,7 +18,6 @@ const NODE_HIT_RADIUS = 26.0
 const RESONANCE_NODE_RADIUS = 28.0
 const EMITTER_HITBOX_RADIUS := WaveEmitter.HITBOX_RADIUS
 const MIN_ERASE_SEGMENT = 72.0
-const ERASE_ARC_WIDTH = 0.30
 const SAFE_GAP_CLEAR_WIDTH := 32.0
 const SAFE_GAP_CORE_WIDTH := 13.333333
 const SAFE_GAP_JAMB_DEPTH := 28.0
@@ -393,12 +392,13 @@ func _append_safe_gap(raw_by_wave: Dictionary, protected_wave, suppress_wave, po
 
 func _append_arc_safe_gap(gaps: Array, protected_wave, suppress_wave, point: Vector2) -> void:
 	var radius: float = protected_wave.radius
-	if radius * ERASE_ARC_WIDTH * 2.0 < MIN_ERASE_SEGMENT:
+	if radius <= 0.0:
 		return
 
 	var angle := _normalize_angle_positive((point - protected_wave.global_position).angle())
-	var start := angle - ERASE_ARC_WIDTH
-	var end := angle + ERASE_ARC_WIDTH
+	var half_angle := minf(MIN_ERASE_SEGMENT * 0.5 / radius, PI)
+	var start := angle - half_angle
+	var end := angle + half_angle
 	_append_normalized_arc_interval(gaps, protected_wave, suppress_wave, start, end)
 
 

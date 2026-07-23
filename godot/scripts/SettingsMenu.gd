@@ -145,9 +145,12 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		open_settings()
 		return
-	if not event.is_action_pressed(TOGGLE_ACTION):
+	if not event is InputEventKey:
 		return
-	if event is InputEventKey and event.echo:
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo:
+		return
+	if not key_event.is_action_pressed(TOGGLE_ACTION):
 		return
 	get_viewport().set_input_as_handled()
 	if _is_open:
@@ -190,7 +193,7 @@ func open_settings() -> void:
 	_is_open = true
 	_modal_root.visible = true
 	_menu_button.visible = false
-	_close_button.grab_focus()
+	get_viewport().gui_release_focus()
 
 
 func close_settings() -> void:
@@ -201,7 +204,7 @@ func close_settings() -> void:
 	_screen_option.collapse()
 	_modal_root.visible = false
 	_menu_button.visible = true
-	_menu_button.grab_focus()
+	get_viewport().gui_release_focus()
 	if _tree_was_paused:
 		get_tree().paused = true
 		return
@@ -358,7 +361,7 @@ func _build_ui() -> void:
 	_menu_button.offset_top = 16.0
 	_menu_button.offset_right = -16.0
 	_menu_button.offset_bottom = 62.0
-	_menu_button.focus_mode = Control.FOCUS_ALL
+	_menu_button.focus_mode = Control.FOCUS_NONE
 	_menu_button.add_theme_font_size_override("font_size", 18)
 	_menu_button.add_theme_stylebox_override("normal", _make_button_style(Color(0.025, 0.03, 0.04, 0.92)))
 	_menu_button.add_theme_stylebox_override("hover", _make_button_style(Color(0.10, 0.12, 0.15, 0.98)))
@@ -414,6 +417,7 @@ func _build_ui() -> void:
 	_close_button.position = Vector2(536, 18)
 	_close_button.size = Vector2(46, 46)
 	_close_button.tooltip_text = "Esc"
+	_close_button.focus_mode = Control.FOCUS_NONE
 	_close_button.add_theme_font_size_override("font_size", 28)
 	_close_button.flat = true
 	_close_button.pressed.connect(close_settings)
