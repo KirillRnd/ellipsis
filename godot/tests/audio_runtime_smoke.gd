@@ -37,11 +37,23 @@ const REQUIRED_MUSIC_CUES := {
 	&"rooms": 0.0,
 	&"rahn_dialogue": 7.4,
 	&"rahn_battle": 56.0,
-	&"demo_clear": 185.0,
+	&"demo_clear": 176.0,
 }
+
+const REQUIRED_MUSIC_FILES := [
+	"res://assets/audio/music/Crimson Steppe.mp3",
+	"res://assets/audio/music/Gears of the Gilded Age.mp3",
+	"res://assets/audio/music/Gilded Rust.mp3",
+	"res://assets/audio/music/Idling the War Machine.mp3",
+	"res://assets/audio/music/The Clockwork Garden.mp3",
+	"res://assets/audio/music/The Idle Mechanism.mp3",
+	"res://assets/audio/music/Watchful Silence.mp3",
+]
 
 const MUSIC_VOLUME_DB := -5.036
 const MUSIC_FADE_SECONDS := 0.4
+const MUSIC_BUS_BASE_LINEAR := 0.9
+const DIALOGUE_BUS_LINEAR := 0.8
 
 
 func _init() -> void:
@@ -55,6 +67,11 @@ func _init() -> void:
 	if not catalog_errors.is_empty():
 		_fail("audio catalog validation failed: %s" % ", ".join(catalog_errors))
 		return
+	for music_path in REQUIRED_MUSIC_FILES:
+		var music_stream := ResourceLoader.load(music_path)
+		if not (music_stream is AudioStreamMP3):
+			_fail("music file is not a loadable MP3: %s" % music_path)
+			return
 	var music_director: MusicDirector = audio.get_node("MusicDirector") as MusicDirector
 	var music_cues := music_director.catalog.build_index()
 	for cue_id in REQUIRED_MUSIC_CUES:
@@ -91,6 +108,18 @@ func _init() -> void:
 		if AudioServer.get_bus_index(bus_name) < 0:
 			_fail("missing audio bus: %s" % bus_name)
 			return
+	var settings = root.get_node_or_null("Settings")
+	if settings == null or not is_equal_approx(
+		db_to_linear(settings._music_base_db), MUSIC_BUS_BASE_LINEAR
+	):
+		_fail("Music bus base volume must be 90 percent")
+		return
+	var dialogue_bus_index := AudioServer.get_bus_index(&"Dialogue")
+	if not is_equal_approx(
+		db_to_linear(AudioServer.get_bus_volume_db(dialogue_bus_index)), DIALOGUE_BUS_LINEAR
+	):
+		_fail("Dialogue bus volume must be 80 percent")
+		return
 	if not audio.set_bus_volume_linear(&"SFX", 0.75):
 		_fail("SFX bus volume cannot be changed")
 		return

@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://5qhlgpt6t2yx"
+path="res://.godot/imported/Crimson Steppe.mp3-fad0bd6459362291f3bf6296c97ada16.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/music/Crimson Steppe.mp3"
+dest_files=["res://.godot/imported/Crimson Steppe.mp3-fad0bd6459362291f3bf6296c97ada16.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

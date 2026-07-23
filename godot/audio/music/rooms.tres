@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="MusicCue" format=3 uid="uid://bbvkf7h3a4yb7"]
 
 [ext_resource type="Script" uid="uid://ytmuo5jk6u3d" path="res://scripts/audio/MusicCue.gd" id="1_cue"]
-[ext_resource type="AudioStream" uid="uid://bk8nnyssqvfln" path="res://assets/audio/music/Gears of the Gilded Age.wav" id="2_stream"]
+[ext_resource type="AudioStream" uid="uid://bagfedjq7l8ui" path="res://assets/audio/music/Gears of the Gilded Age.mp3" id="2_stream"]
 
 [resource]
 script = ExtResource("1_cue")

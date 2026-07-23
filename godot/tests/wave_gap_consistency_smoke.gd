@@ -12,6 +12,7 @@ func _init() -> void:
 	_run_test("blue/violet resonance", test_blue_violet_resonance_requires_both_present_crests)
 	_run_test("violet/violet resonance", test_violet_violet_resonance_requires_both_present_crests)
 	_run_test("blue and violet cancellation", test_blue_and_violet_cancellation_remove_enemy_nodes)
+	_run_test("fixed arc gap length", test_arc_gap_has_fixed_world_length_at_all_radii)
 	_run_test("partially erased overlap", test_one_erased_enemy_crest_does_not_hide_another_active_crest)
 	_run_test("fully erased crest", test_fully_erased_enemy_crest_is_safe)
 	if _failed:
@@ -43,6 +44,13 @@ func _free_tracked() -> void:
 
 func assert_eq(actual: Variant, expected: Variant, message: String) -> void:
 	if _failed or actual == expected:
+		return
+	_failed = true
+	push_error("%s: expected %s, got %s" % [message, expected, actual])
+
+
+func assert_approx(actual: float, expected: float, tolerance: float, message: String) -> void:
+	if _failed or absf(actual - expected) <= tolerance:
 		return
 	_failed = true
 	push_error("%s: expected %s, got %s" % [message, expected, actual])
@@ -164,6 +172,25 @@ func test_blue_and_violet_cancellation_remove_enemy_nodes() -> void:
 			_manager._enemy_interference_points(safe_gaps).size(),
 			0,
 			"%s cancellation must remove a red danger node with its erased crests" % counter_kind,
+		)
+
+
+func test_arc_gap_has_fixed_world_length_at_all_radii() -> void:
+	for radius in [40.0, 100.0, 350.0]:
+		var protected_wave := _wave("enemy", "red", Vector2(500.0, 300.0), radius)
+		var suppress_wave := _wave("player", "resonator", Vector2(500.0, 300.0), radius)
+		var point := protected_wave.global_position + Vector2.DOWN * radius
+		var gaps := []
+		_manager._append_arc_safe_gap(gaps, protected_wave, suppress_wave, point)
+		assert_eq(gaps.size(), 1, "an intersecting circular crest must always receive a gap")
+		if gaps.is_empty():
+			return
+		var arc_length: float = (float(gaps[0]["end"]) - float(gaps[0]["start"])) * radius
+		assert_approx(
+			arc_length,
+			WaveManager.MIN_ERASE_SEGMENT,
+			0.001,
+			"circular gap length must not change with wave radius",
 		)
 
 

@@ -179,9 +179,9 @@ func _init() -> void:
 		return
 	if (
 		not is_instance_valid(music_director._active_player)
-		or music_director._active_player.get_playback_position() < 184.9
+		or music_director._active_player.get_playback_position() < 175.9
 	):
-		_fail("the demo clear music must start at 185 seconds")
+		_fail("the demo clear music must start at 176 seconds")
 		return
 
 	if main._shown_tutorials.size() != EXPECTED_TUTORIAL_COUNT:
