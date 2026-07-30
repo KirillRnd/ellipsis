@@ -48,6 +48,10 @@ func _init() -> void:
 	settings.set_language(initial_language)
 	var music_director: MusicDirector = root.get_node("Audio/MusicDirector") as MusicDirector
 
+	if main.player._body.animation != &"idle":
+		_fail("player must start in the idle animation")
+		return
+
 	var phase_cursor = main.get_node_or_null("PhaseCursor")
 	if not is_instance_valid(phase_cursor):
 		_fail("phase cursor is missing from the main scene")
@@ -246,7 +250,9 @@ func _init() -> void:
 	root.get_node("Audio").stop_music(0.0)
 	root.get_node("Audio").stop_all_sfx()
 	main.queue_free()
+	root.get_node("Settings").queue_free()
 	await process_frame
+	await create_timer(0.2).timeout
 	quit()
 
 
