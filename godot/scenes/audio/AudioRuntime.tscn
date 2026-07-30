@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/audio/AudioRuntime.gd" id="1_runtime"]
+[ext_resource type="Resource" path="res://audio/catalogs/main_sfx_catalog.tres" id="2_sfx"]
+[ext_resource type="Script" path="res://scripts/audio/MusicDirector.gd" id="3_music"]
+[ext_resource type="Resource" path="res://audio/catalogs/main_music_catalog.tres" id="4_music_catalog"]
+
+[node name="Audio" type="Node"]
+script = ExtResource("1_runtime")
+sfx_catalog = ExtResource("2_sfx")
+
+[node name="MusicDirector" type="Node" parent="."]
+script = ExtResource("3_music")
+catalog = ExtResource("4_music_catalog")
+
+[node name="TrackA" type="AudioStreamPlayer" parent="MusicDirector"]
+bus = &"Music"
+
+[node name="TrackB" type="AudioStreamPlayer" parent="MusicDirector"]
+bus = &"Music"
