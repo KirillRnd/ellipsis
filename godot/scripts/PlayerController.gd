@@ -222,10 +222,17 @@ func _release_crossbar() -> void:
 
 
 func _update_crossbar_aim_direction() -> void:
-	var direction := get_global_mouse_position() - global_position
+	var direction := _get_pointer_world_position() - global_position
 	if direction.length_squared() > 0.0:
 		_crossbar_aim_direction = direction.normalized()
 		_last_move_dir = _crossbar_aim_direction
+
+
+func _get_pointer_world_position() -> Vector2:
+	var phase_cursor := get_tree().get_first_node_in_group("phase_cursor")
+	if is_instance_valid(phase_cursor) and phase_cursor.has_method("get_world_position"):
+		return phase_cursor.get_world_position()
+	return get_global_mouse_position()
 
 
 func _hold_crossbar_at_aim_frame() -> void:
@@ -440,5 +447,4 @@ func _on_body_frame_changed() -> void:
 func _update_dash_frame_offset() -> void:
 	var frame_index := clampi(_body.frame, 0, DASH_FRAME_OFFSETS.size() - 1)
 	_body.offset = DASH_FRAME_OFFSETS[frame_index]
-
 

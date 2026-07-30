@@ -580,11 +580,18 @@ func _fire_resonator_volley() -> bool:
 
 
 func _get_resonator_target_position() -> Vector2:
-	var target: Vector2 = get_global_mouse_position()
+	var target := _get_pointer_world_position()
 	var offset: Vector2 = target - player.global_position
 	if offset.length() > _resonator_place_range:
 		target = player.global_position + offset.normalized() * _resonator_place_range
 	return target.clamp(PlayerController.ARENA_RECT.position, PlayerController.ARENA_RECT.end)
+
+
+func _get_pointer_world_position() -> Vector2:
+	var phase_cursor := get_tree().get_first_node_in_group("phase_cursor")
+	if is_instance_valid(phase_cursor) and phase_cursor.has_method("get_world_position"):
+		return phase_cursor.get_world_position()
+	return get_global_mouse_position()
 
 
 func _place_resonator(target: Vector2) -> bool:

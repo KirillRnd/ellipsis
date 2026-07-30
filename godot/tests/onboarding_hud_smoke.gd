@@ -1,12 +1,74 @@
 extends SceneTree
 
 const EXPECTED_TUTORIAL_COUNT := 6
+const PHASE_CURSOR_SCRIPT = preload("res://scripts/PhaseCursor.gd")
+const EXPECTED_GAMEPLAY_ACTIONS := [
+	"move_left",
+	"move_right",
+	"move_up",
+	"move_down",
+	"dash",
+	"crossbar",
+	"place_resonator",
+	"resonator_volley",
+	"cursor_left",
+	"cursor_right",
+	"cursor_up",
+	"cursor_down",
+	"toggle_pause_menu",
+]
 
 
 func _init() -> void:
+	for action_name in EXPECTED_GAMEPLAY_ACTIONS:
+		if not InputMap.has_action(action_name):
+			_fail("missing gameplay input action: %s" % action_name)
+			return
+
 	var main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+
+	var phase_cursor = main.get_node_or_null("PhaseCursor")
+	if not is_instance_valid(phase_cursor):
+		_fail("phase cursor is missing from the main scene")
+		return
+	var cursor_visual := phase_cursor.get_node_or_null("Visual") as TextureRect
+	if not is_instance_valid(cursor_visual) or cursor_visual.texture == null:
+		_fail("phase cursor visual is missing")
+		return
+	if not is_equal_approx(cursor_visual.size.x, PHASE_CURSOR_SCRIPT.MOUSE_SIZE):
+		_fail("phase cursor must start at the mouse scale")
+		return
+
+	var mouse_motion := InputEventMouseMotion.new()
+	mouse_motion.position = Vector2(420.0, 250.0)
+	phase_cursor._input(mouse_motion)
+	if not phase_cursor.get_world_position().is_equal_approx(mouse_motion.position):
+		_fail("mouse motion must update the shared cursor hotspot")
+		return
+
+	var gamepad_start: Vector2 = phase_cursor.get_world_position()
+	Input.action_press("cursor_right")
+	phase_cursor._process(0.1)
+	Input.action_release("cursor_right")
+	if phase_cursor.get_world_position().x <= gamepad_start.x:
+		_fail("right stick must move the shared cursor")
+		return
+	if not is_equal_approx(cursor_visual.size.x, PHASE_CURSOR_SCRIPT.GAMEPAD_SIZE):
+		_fail("gamepad cursor must use the readable gamepad scale")
+		return
+
+	var touch := InputEventScreenTouch.new()
+	touch.position = Vector2(600.0, 360.0)
+	touch.pressed = true
+	phase_cursor._input(touch)
+	if not phase_cursor.get_world_position().is_equal_approx(touch.position):
+		_fail("touch input must place the shared cursor hotspot directly under the tap")
+		return
+	if not is_equal_approx(cursor_visual.size.x, PHASE_CURSOR_SCRIPT.TOUCH_SIZE):
+		_fail("touch cursor must use the readable touch scale")
+		return
 
 	if main._state != "interlude":
 		_fail("room 1 must begin with a narrative interlude")
