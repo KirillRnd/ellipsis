@@ -60,6 +60,7 @@ const UI_TEXT := {
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
 @onready var arena: Arena = $Arena
+@onready var _audio: AudioRuntime = get_node_or_null("/root/Audio") as AudioRuntime
 
 var _state := "combat"
 var _elapsed := 0.0
@@ -332,6 +333,11 @@ func _on_player_crossbar_drive_impact(
 	add_child(_driven_crossbar)
 	_driven_crossbar.setup(origin, direction, is_oriented)
 	wave_manager.set_driven_crossbar(_driven_crossbar)
+	if _audio != null:
+		_audio.play_2d(
+			&"crossbar.install.charged" if is_oriented else &"crossbar.install.quick",
+			origin,
+		)
 
 
 func _on_player_crossbar_action_started(_animation_name: StringName) -> void:
@@ -609,6 +615,8 @@ func _place_resonator(target: Vector2) -> bool:
 	resonator.expired.connect(_on_resonator_expired)
 	add_child(resonator)
 	_resonators.append(resonator)
+	if _audio != null:
+		_audio.play_2d(&"resonator.place.player", target)
 	player.play_action(&"place_resonator", target - player.global_position)
 	_status_label.text = _t("resonator_set")
 	return true

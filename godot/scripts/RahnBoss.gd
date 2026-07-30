@@ -27,6 +27,7 @@ const TURN_RESPONSE := 8.0
 
 @onready var _visual_root: Node2D = $VisualRoot
 @onready var _body: AnimatedSprite2D = $VisualRoot/Body
+@onready var _audio: AudioRuntime = get_node_or_null("/root/Audio") as AudioRuntime
 
 var player
 var wave_manager
@@ -165,6 +166,8 @@ func _place_resonator(target: Vector2) -> void:
 	resonator.global_position = target
 	get_parent().add_child(resonator)
 	_active_resonators.append(resonator)
+	if _audio != null:
+		_audio.play_2d(&"resonator.place.enemy", target)
 	_placement_count += 1
 	_play_action()
 

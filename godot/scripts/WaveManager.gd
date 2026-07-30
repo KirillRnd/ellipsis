@@ -4,6 +4,11 @@ extends Node2D
 signal danger_changed(danger_value: int)
 
 const WAVE_SCENE = preload("res://scenes/Wave.tscn")
+const WAVE_AUDIO_EVENTS := {
+	"resonator": &"wave.launch.purple",
+	"blue": &"wave.launch.blue",
+	"red": &"wave.launch.red",
+}
 const ARENA_RECT = Rect2(Vector2(80, 60), Vector2(1120, 600))
 const PLAYER_WAVE_DAMAGE = 1
 const BLUE_VIOLET_RESONANCE_DAMAGE := 6
@@ -33,6 +38,7 @@ var waves: Array = []
 var player_waves: Array = []
 var _last_danger_value = 0
 var _resonance_damage_marks = {}
+@onready var _audio: AudioRuntime = get_node_or_null("/root/Audio") as AudioRuntime
 
 
 func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: Dictionary = {}):
@@ -45,6 +51,9 @@ func spawn_wave(wave_owner: String, wave_kind: String, origin: Vector2, config: 
 		host.move_child(wave, get_index())
 
 	wave.setup(wave_owner, wave_kind, origin, config)
+	var audio_event: StringName = WAVE_AUDIO_EVENTS.get(wave_kind, &"")
+	if _audio != null and not audio_event.is_empty():
+		_audio.play_2d(audio_event, origin)
 	wave.expired.connect(_on_wave_expired)
 	waves.append(wave)
 	if wave_owner == "player":
