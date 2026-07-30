@@ -77,13 +77,32 @@ func _init() -> void:
 	if music_director.get_current_cue_id() != &"dialogue":
 		_fail("ordinary interludes must use the dialogue music cue")
 		return
+	if not main._interlude_overlay.is_typing():
+		_fail("interlude dialogue must begin with typewriter reveal")
+		return
+	var audio_runtime: AudioRuntime = root.get_node("Audio") as AudioRuntime
+	var visible_before: int = main._interlude_overlay._dialogue.visible_characters
+	main._interlude_overlay._process(0.04)
+	if main._interlude_overlay._dialogue.visible_characters <= visible_before:
+		_fail("typewriter processing must reveal dialogue characters")
+		return
+	if audio_runtime.get_active_voice_count() <= 0:
+		_fail("revealing dialogue characters must play a voice phoneme")
+		return
 	var first_message_index: int = main._interlude_overlay._message_index
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	main._interlude_overlay._input(click)
+	if (
+		main._interlude_overlay._message_index != first_message_index
+		or main._interlude_overlay.is_typing()
+	):
+		_fail("first LMB must reveal the current interlude line")
+		return
+	main._interlude_overlay._input(click)
 	if main._interlude_overlay._message_index != first_message_index + 1:
-		_fail("LMB must advance an interlude")
+		_fail("second LMB must advance an interlude")
 		return
 	while main._interlude_overlay.is_active():
 		main._interlude_overlay.advance()
