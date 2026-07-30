@@ -1,27 +1,137 @@
 extends SceneTree
 
 const EXPECTED_TUTORIAL_COUNT := 6
+const PHASE_CURSOR_SCRIPT = preload("res://scripts/PhaseCursor.gd")
+const EXPECTED_GAMEPLAY_ACTIONS := [
+	"move_left",
+	"move_right",
+	"move_up",
+	"move_down",
+	"dash",
+	"crossbar",
+	"place_resonator",
+	"resonator_volley",
+	"cursor_left",
+	"cursor_right",
+	"cursor_up",
+	"cursor_down",
+	"toggle_pause_menu",
+]
 
 
 func _init() -> void:
+	for action_name in EXPECTED_GAMEPLAY_ACTIONS:
+		if not InputMap.has_action(action_name):
+			_fail("missing gameplay input action: %s" % action_name)
+			return
+
+	await process_frame
 	var main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	var settings := root.get_node_or_null("Settings") as SettingsMenu
+	if not is_instance_valid(settings) or not is_instance_valid(settings._menu_button):
+		_fail("settings autoload or menu button is missing")
+		return
+	if main._language != settings.current_language:
+		_fail(
+			"main language must initialize from persisted settings: main=%s settings=%s"
+			% [main._language, settings.current_language]
+		)
+		return
+	var initial_language: String = settings.current_language
+	var alternate_language := "en" if initial_language == "ru" else "ru"
+	settings.set_language(alternate_language)
+	if main._language != alternate_language:
+		_fail("settings language changes must propagate to main")
+		return
+	settings.set_language(initial_language)
+	var music_director: MusicDirector = root.get_node("Audio/MusicDirector") as MusicDirector
+
+	if main.player._body.animation != &"idle":
+		_fail("player must start in the idle animation")
+		return
+
+	var phase_cursor = main.get_node_or_null("PhaseCursor")
+	if not is_instance_valid(phase_cursor):
+		_fail("phase cursor is missing from the main scene")
+		return
+	var cursor_visual := phase_cursor.get_node_or_null("Visual") as TextureRect
+	if not is_instance_valid(cursor_visual) or cursor_visual.texture == null:
+		_fail("phase cursor visual is missing")
+		return
+	if not is_equal_approx(cursor_visual.size.x, PHASE_CURSOR_SCRIPT.MOUSE_SIZE):
+		_fail("phase cursor must start at the mouse scale")
+		return
+
+	var mouse_motion := InputEventMouseMotion.new()
+	mouse_motion.position = Vector2(420.0, 250.0)
+	phase_cursor._input(mouse_motion)
+	if not phase_cursor.get_world_position().is_equal_approx(mouse_motion.position):
+		_fail("mouse motion must update the shared cursor hotspot")
+		return
+
+	var gamepad_start: Vector2 = phase_cursor.get_world_position()
+	Input.action_press("cursor_right")
+	phase_cursor._process(0.1)
+	Input.action_release("cursor_right")
+	if phase_cursor.get_world_position().x <= gamepad_start.x:
+		_fail("right stick must move the shared cursor")
+		return
+	if not is_equal_approx(cursor_visual.size.x, PHASE_CURSOR_SCRIPT.GAMEPAD_SIZE):
+		_fail("gamepad cursor must use the readable gamepad scale")
+		return
+
+	var touch := InputEventScreenTouch.new()
+	touch.position = Vector2(600.0, 360.0)
+	touch.pressed = true
+	phase_cursor._input(touch)
+	if not phase_cursor.get_world_position().is_equal_approx(touch.position):
+		_fail("touch input must place the shared cursor hotspot directly under the tap")
+		return
+	if not is_equal_approx(cursor_visual.size.x, PHASE_CURSOR_SCRIPT.TOUCH_SIZE):
+		_fail("touch cursor must use the readable touch scale")
+		return
 
 	if main._state != "interlude":
 		_fail("room 1 must begin with a narrative interlude")
+		return
+	if music_director.get_current_cue_id() != &"dialogue":
+		_fail("ordinary interludes must use the dialogue music cue")
+		return
+	if not main._interlude_overlay.is_typing():
+		_fail("interlude dialogue must begin with typewriter reveal")
+		return
+	var audio_runtime: AudioRuntime = root.get_node("Audio") as AudioRuntime
+	var visible_before: int = main._interlude_overlay._dialogue.visible_characters
+	main._interlude_overlay._process(0.04)
+	if main._interlude_overlay._dialogue.visible_characters <= visible_before:
+		_fail("typewriter processing must reveal dialogue characters")
+		return
+	if audio_runtime.get_active_voice_count() <= 0:
+		_fail("revealing dialogue characters must play a voice phoneme")
 		return
 	var first_message_index: int = main._interlude_overlay._message_index
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	main._interlude_overlay._input(click)
+	if (
+		main._interlude_overlay._message_index != first_message_index
+		or main._interlude_overlay.is_typing()
+	):
+		_fail("first LMB must reveal the current interlude line")
+		return
+	main._interlude_overlay._input(click)
 	if main._interlude_overlay._message_index != first_message_index + 1:
-		_fail("LMB must advance an interlude")
+		_fail("second LMB must advance an interlude")
 		return
 	while main._interlude_overlay.is_active():
 		main._interlude_overlay.advance()
 	await process_frame
+	if music_director.get_current_cue_id() != &"rooms":
+		_fail("ordinary rooms must use the rooms music cue")
+		return
 
 	if not main._tutorial_overlay.is_active() or not paused:
 		_fail("room 1 tutorial must pause gameplay")
@@ -55,6 +165,29 @@ func _init() -> void:
 	for room_index in [6, 7]:
 		if not await _expect_room_entry_tutorial(main, room_index, false):
 			return
+	if music_director.get_current_cue_id() != &"rahn_battle":
+		_fail("Rahn's room must use the Rahn battle music cue")
+		return
+
+	main._load_encounter(7)
+	await process_frame
+	if music_director.get_current_cue_id() != &"rahn_dialogue":
+		_fail("Rahn's interlude must use the Rahn dialogue music cue")
+		return
+	while main._interlude_overlay.is_active():
+		main._interlude_overlay.advance()
+	await process_frame
+	if music_director.get_current_cue_id() != &"rahn_battle":
+		_fail("Rahn's battle cue must resume after his interlude")
+		return
+	main._on_rahn_defeat_started(main._rahn_boss)
+	if not music_director.get_current_cue_id().is_empty():
+		_fail("Rahn's defeat animation must start the battle music fade")
+		return
+	main._set_state("victory")
+	if music_director.get_current_cue_id() != &"demo_clear":
+		_fail("victory must start the demo clear music cue")
+		return
 
 	if main._shown_tutorials.size() != EXPECTED_TUTORIAL_COUNT:
 		_fail("tutorials must be one-shot and total exactly six")
@@ -114,8 +247,12 @@ func _init() -> void:
 	diagram.free()
 
 	print("ONBOARDING_HUD_SMOKE_OK")
+	root.get_node("Audio").stop_music(0.0)
+	root.get_node("Audio").stop_all_sfx()
 	main.queue_free()
+	root.get_node("Settings").queue_free()
 	await process_frame
+	await create_timer(0.2).timeout
 	quit()
 
 

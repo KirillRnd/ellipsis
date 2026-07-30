@@ -28,12 +28,19 @@ const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
 const RESONATOR_VOLLEY_INTERVAL := 2.35 * 0.25
 const MAX_ACTIVE_RESONATORS := 2
+const MUSIC_DIALOGUE := &"dialogue"
+const MUSIC_ROOMS := &"rooms"
+const MUSIC_RAHN_DIALOGUE := &"rahn_dialogue"
+const MUSIC_RAHN_BATTLE := &"rahn_battle"
+const MUSIC_DEMO_CLEAR := &"demo_clear"
+const RAHN_DEFEAT_MUSIC_FADE_SECONDS := 1.25
+const RAHN_INTERLUDE_ID := "rahn_meeting"
 const PICKUP_VISUAL_HEIGHT := 64.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
 const UI_TEXT := {
 	"blue_source": {"en": "BLUE SOURCE", "ru": "СИНИЙ ИСТОЧНИК"},
-	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | RMB volley | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | ПКМ залп | N/P комнаты | F2 язык | R повтор"},
+	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | RMB volley | Esc menu", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | ПКМ залп | Esc меню"},
 	"counter_ready": {"en": "COUNTER READY", "ru": "КОНТРВОЛНА ГОТОВА"},
 	"resonator_volley": {"en": "RESONATOR VOLLEY", "ru": "ЗАЛП РЕЗОНАТОРА"},
 	"danger_node": {"en": "DANGER NODE", "ru": "ОПАСНЫЙ УЗЕЛ"},
@@ -60,6 +67,8 @@ const UI_TEXT := {
 @onready var wave_manager = $WaveManager
 @onready var player = $Player
 @onready var arena: Arena = $Arena
+@onready var _audio: AudioRuntime = get_node_or_null("/root/Audio") as AudioRuntime
+@onready var _settings = get_node_or_null("/root/Settings")
 
 var _state := "combat"
 var _elapsed := 0.0
@@ -115,6 +124,9 @@ var _pending_encounter_index := -1
 
 
 func _ready() -> void:
+	if is_instance_valid(_settings):
+		_language = _settings.current_language
+		_settings.language_changed.connect(_on_settings_language_changed)
 	wave_manager.player = player
 	player.crossbar_action_started.connect(_on_player_crossbar_action_started)
 	player.crossbar_drive_impact.connect(_on_player_crossbar_drive_impact)
@@ -160,6 +172,8 @@ func _load_encounter(index: int, skip_interlude: bool = false) -> void:
 		emitter.defeated.connect(_on_emitter_defeated)
 
 	_create_boss(_current_encounter.get("boss", {}))
+	if _audio != null:
+		_audio.play_music(MUSIC_RAHN_BATTLE if is_instance_valid(_rahn_boss) else MUSIC_ROOMS)
 	_create_blue_beacon(_current_encounter.get("blue_beacon", {}))
 	_create_pickups(_current_encounter.get("pickups", []))
 	_update_ui()
@@ -177,6 +191,10 @@ func _try_start_interlude(index: int) -> bool:
 	_pending_encounter_index = index
 	_clear_current_encounter()
 	_state = "interlude"
+	if _audio != null:
+		_audio.play_music(
+			MUSIC_RAHN_DIALOGUE if interlude_id == RAHN_INTERLUDE_ID else MUSIC_DIALOGUE
+		)
 	_exit_unlocked = false
 	player.controls_enabled = false
 	player.velocity = Vector2.ZERO
@@ -263,9 +281,9 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 		1,
 		MAX_ACTIVE_RESONATORS
 	)
-	_resonator_place_was_down = Input.is_key_pressed(KEY_E)
+	_resonator_place_was_down = Input.is_action_pressed("place_resonator")
 	_resonator_place_cooldown = 0.0
-	_resonator_volley_was_down = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	_resonator_volley_was_down = Input.is_action_pressed("resonator_volley")
 	_resonator_volley_active = false
 	_resonator_volley_cooldown = 0.0
 	_objective = encounter.get("objective", "defeat_emitters")
@@ -315,6 +333,7 @@ func _create_boss(config: Dictionary) -> void:
 	_rahn_boss.player = player
 	_rahn_boss.wave_manager = wave_manager
 	_rahn_boss.hit_points_changed.connect(_on_boss_hit_points_changed)
+	_rahn_boss.defeat_started.connect(_on_rahn_defeat_started)
 	_rahn_boss.defeated.connect(_on_rahn_defeated)
 	add_child(_rahn_boss)
 	wave_manager.set_boss_target(_rahn_boss)
@@ -332,6 +351,11 @@ func _on_player_crossbar_drive_impact(
 	add_child(_driven_crossbar)
 	_driven_crossbar.setup(origin, direction, is_oriented)
 	wave_manager.set_driven_crossbar(_driven_crossbar)
+	if _audio != null:
+		_audio.play_2d(
+			&"crossbar.install.charged" if is_oriented else &"crossbar.install.quick",
+			origin,
+		)
 
 
 func _on_player_crossbar_action_started(_animation_name: StringName) -> void:
@@ -452,11 +476,23 @@ func _cycle_language() -> void:
 	var current_index := SUPPORTED_LANGUAGES.find(_language)
 	if current_index < 0:
 		current_index = 0
-	_language = SUPPORTED_LANGUAGES[(current_index + 1) % SUPPORTED_LANGUAGES.size()]
+	var next_language: String = SUPPORTED_LANGUAGES[(current_index + 1) % SUPPORTED_LANGUAGES.size()]
+	if is_instance_valid(_settings):
+		_settings.set_language(next_language)
+	else:
+		_on_settings_language_changed(next_language)
+
+
+func _on_settings_language_changed(language: String) -> void:
+	_language = language if language in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
 	_refresh_visible_text()
 
 
 func _refresh_visible_text() -> void:
+	if is_instance_valid(_interlude_overlay):
+		_interlude_overlay.set_language(_language)
+	if is_instance_valid(_tutorial_overlay):
+		_tutorial_overlay.set_language(_language)
 	_update_ui()
 
 
@@ -530,10 +566,8 @@ func _on_blue_beacon_fired(origin: Vector2) -> void:
 
 
 func _handle_resonator_input() -> void:
-	_advance_resonator_place_input(Input.is_key_pressed(KEY_E))
-	_advance_resonator_volley_input(
-		Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-	)
+	_advance_resonator_place_input(Input.is_action_pressed("place_resonator"))
+	_advance_resonator_volley_input(Input.is_action_pressed("resonator_volley"))
 
 
 func _advance_resonator_place_input(resonator_place_down: bool) -> void:
@@ -582,11 +616,18 @@ func _fire_resonator_volley() -> bool:
 
 
 func _get_resonator_target_position() -> Vector2:
-	var target: Vector2 = get_global_mouse_position()
+	var target := _get_pointer_world_position()
 	var offset: Vector2 = target - player.global_position
 	if offset.length() > _resonator_place_range:
 		target = player.global_position + offset.normalized() * _resonator_place_range
 	return target.clamp(PlayerController.ARENA_RECT.position, PlayerController.ARENA_RECT.end)
+
+
+func _get_pointer_world_position() -> Vector2:
+	var phase_cursor := get_tree().get_first_node_in_group("phase_cursor")
+	if is_instance_valid(phase_cursor) and phase_cursor.has_method("get_world_position"):
+		return phase_cursor.get_world_position()
+	return get_global_mouse_position()
 
 
 func _place_resonator(target: Vector2) -> bool:
@@ -604,6 +645,8 @@ func _place_resonator(target: Vector2) -> bool:
 	resonator.expired.connect(_on_resonator_expired)
 	add_child(resonator)
 	_resonators.append(resonator)
+	if _audio != null:
+		_audio.play_2d(&"resonator.place.player", target)
 	player.play_action(&"place_resonator", target - player.global_position)
 	_status_label.text = _t("resonator_set")
 	return true
@@ -660,6 +703,13 @@ func _on_boss_hit_points_changed(current: int, maximum: int) -> void:
 	_boss_hp_label.text = "RAHN  %d/%d" % [current, maximum]
 
 
+func _on_rahn_defeat_started(boss) -> void:
+	if boss != _rahn_boss or _state != "combat":
+		return
+	if _audio != null:
+		_audio.stop_music(RAHN_DEFEAT_MUSIC_FADE_SECONDS)
+
+
 func _on_rahn_defeated(boss) -> void:
 	if boss != _rahn_boss or _state != "combat":
 		return
@@ -696,6 +746,8 @@ func _set_state(new_state: String) -> void:
 	_set_exit_gate_open(false)
 	if _state == "victory":
 		_status_label.text = _t("demo_clear")
+		if _audio != null:
+			_audio.play_music(MUSIC_DEMO_CLEAR)
 		_set_controls_text()
 	elif _state == "defeat":
 		_status_label.text = _t("defeat")

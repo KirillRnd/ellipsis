@@ -75,7 +75,7 @@ atlas = ExtResource("9_defeat")
 region = Rect2(0, 0, 256, 256)
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_player"]
-radius = 8.0
+radius = 21.377558
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_colorless"]
 animations = [{

@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://bagfedjq7l8ui"
+path="res://.godot/imported/Gears of the Gilded Age.mp3-eacb0b0e69188e49e208aedc72b9e7da.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/music/Gears of the Gilded Age.mp3"
+dest_files=["res://.godot/imported/Gears of the Gilded Age.mp3-eacb0b0e69188e49e208aedc72b9e7da.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
