@@ -97,7 +97,12 @@ func _init() -> void:
 	audio.set_bus_volume_linear(&"SFX", 1.0)
 
 	audio.stop_all_sfx()
+	audio.stop_music(0.0)
+	var settings := root.get_node_or_null("Settings")
+	if is_instance_valid(settings):
+		settings.queue_free()
 	print("AUDIO_RUNTIME_SMOKE_OK")
+	await process_frame
 	quit()
 
 

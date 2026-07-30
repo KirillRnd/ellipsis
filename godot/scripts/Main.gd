@@ -40,7 +40,7 @@ const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
 const UI_TEXT := {
 	"blue_source": {"en": "BLUE SOURCE", "ru": "СИНИЙ ИСТОЧНИК"},
-	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | RMB volley | N/P rooms | F2 language | R retry", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | ПКМ залп | N/P комнаты | F2 язык | R повтор"},
+	"controls": {"en": "WASD move | Space dash | LMB crossbar | E resonator | RMB volley | Esc menu", "ru": "WASD ходьба | Space рывок | ЛКМ поперечина | E резонатор | ПКМ залп | Esc меню"},
 	"counter_ready": {"en": "COUNTER READY", "ru": "КОНТРВОЛНА ГОТОВА"},
 	"resonator_volley": {"en": "RESONATOR VOLLEY", "ru": "ЗАЛП РЕЗОНАТОРА"},
 	"danger_node": {"en": "DANGER NODE", "ru": "ОПАСНЫЙ УЗЕЛ"},
@@ -68,6 +68,7 @@ const UI_TEXT := {
 @onready var player = $Player
 @onready var arena: Arena = $Arena
 @onready var _audio: AudioRuntime = get_node_or_null("/root/Audio") as AudioRuntime
+@onready var _settings = get_node_or_null("/root/Settings")
 
 var _state := "combat"
 var _elapsed := 0.0
@@ -123,6 +124,9 @@ var _pending_encounter_index := -1
 
 
 func _ready() -> void:
+	if is_instance_valid(_settings):
+		_language = _settings.current_language
+		_settings.language_changed.connect(_on_settings_language_changed)
 	wave_manager.player = player
 	player.crossbar_action_started.connect(_on_player_crossbar_action_started)
 	player.crossbar_drive_impact.connect(_on_player_crossbar_drive_impact)
@@ -472,11 +476,23 @@ func _cycle_language() -> void:
 	var current_index := SUPPORTED_LANGUAGES.find(_language)
 	if current_index < 0:
 		current_index = 0
-	_language = SUPPORTED_LANGUAGES[(current_index + 1) % SUPPORTED_LANGUAGES.size()]
+	var next_language: String = SUPPORTED_LANGUAGES[(current_index + 1) % SUPPORTED_LANGUAGES.size()]
+	if is_instance_valid(_settings):
+		_settings.set_language(next_language)
+	else:
+		_on_settings_language_changed(next_language)
+
+
+func _on_settings_language_changed(language: String) -> void:
+	_language = language if language in SUPPORTED_LANGUAGES else DEFAULT_LANGUAGE
 	_refresh_visible_text()
 
 
 func _refresh_visible_text() -> void:
+	if is_instance_valid(_interlude_overlay):
+		_interlude_overlay.set_language(_language)
+	if is_instance_valid(_tutorial_overlay):
+		_tutorial_overlay.set_language(_language)
 	_update_ui()
 
 

@@ -25,9 +25,27 @@ func _init() -> void:
 			_fail("missing gameplay input action: %s" % action_name)
 			return
 
+	await process_frame
 	var main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	var settings := root.get_node_or_null("Settings") as SettingsMenu
+	if not is_instance_valid(settings) or not is_instance_valid(settings._menu_button):
+		_fail("settings autoload or menu button is missing")
+		return
+	if main._language != settings.current_language:
+		_fail(
+			"main language must initialize from persisted settings: main=%s settings=%s"
+			% [main._language, settings.current_language]
+		)
+		return
+	var initial_language: String = settings.current_language
+	var alternate_language := "en" if initial_language == "ru" else "ru"
+	settings.set_language(alternate_language)
+	if main._language != alternate_language:
+		_fail("settings language changes must propagate to main")
+		return
+	settings.set_language(initial_language)
 	var music_director: MusicDirector = root.get_node("Audio/MusicDirector") as MusicDirector
 
 	var phase_cursor = main.get_node_or_null("PhaseCursor")

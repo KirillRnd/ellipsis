@@ -135,6 +135,11 @@ func set_language(language: String) -> void:
 func _input(event: InputEvent) -> void:
 	if not _active:
 		return
+	var settings := get_node_or_null("/root/Settings")
+	if is_instance_valid(settings) and (
+		settings.is_open() or settings.is_menu_button_pointer_event(event)
+	):
+		return
 	var advance_requested: bool = (
 		event is InputEventMouseButton
 		and event.button_index == MOUSE_BUTTON_LEFT
