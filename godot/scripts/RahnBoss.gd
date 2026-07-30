@@ -2,6 +2,7 @@ class_name RahnBoss
 extends CharacterBody2D
 
 signal hit_points_changed(current: int, maximum: int)
+signal defeat_started(boss)
 signal defeated(boss)
 
 const RED_RESONATOR_SCENE := preload("res://scenes/RedResonator.tscn")
@@ -219,6 +220,7 @@ func _start_defeat() -> void:
 	_clear_resonators()
 	_body.modulate = Color.WHITE
 	_body.play(&"defeat")
+	defeat_started.emit(self)
 
 
 func _clear_resonators() -> void:

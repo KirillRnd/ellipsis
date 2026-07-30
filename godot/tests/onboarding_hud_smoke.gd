@@ -28,6 +28,7 @@ func _init() -> void:
 	var main = load("res://main.tscn").instantiate()
 	root.add_child(main)
 	await process_frame
+	var music_director: MusicDirector = root.get_node("Audio/MusicDirector") as MusicDirector
 
 	var phase_cursor = main.get_node_or_null("PhaseCursor")
 	if not is_instance_valid(phase_cursor):
@@ -73,6 +74,9 @@ func _init() -> void:
 	if main._state != "interlude":
 		_fail("room 1 must begin with a narrative interlude")
 		return
+	if music_director.get_current_cue_id() != &"dialogue":
+		_fail("ordinary interludes must use the dialogue music cue")
+		return
 	var first_message_index: int = main._interlude_overlay._message_index
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
@@ -84,6 +88,9 @@ func _init() -> void:
 	while main._interlude_overlay.is_active():
 		main._interlude_overlay.advance()
 	await process_frame
+	if music_director.get_current_cue_id() != &"rooms":
+		_fail("ordinary rooms must use the rooms music cue")
+		return
 
 	if not main._tutorial_overlay.is_active() or not paused:
 		_fail("room 1 tutorial must pause gameplay")
@@ -117,6 +124,29 @@ func _init() -> void:
 	for room_index in [6, 7]:
 		if not await _expect_room_entry_tutorial(main, room_index, false):
 			return
+	if music_director.get_current_cue_id() != &"rahn_battle":
+		_fail("Rahn's room must use the Rahn battle music cue")
+		return
+
+	main._load_encounter(7)
+	await process_frame
+	if music_director.get_current_cue_id() != &"rahn_dialogue":
+		_fail("Rahn's interlude must use the Rahn dialogue music cue")
+		return
+	while main._interlude_overlay.is_active():
+		main._interlude_overlay.advance()
+	await process_frame
+	if music_director.get_current_cue_id() != &"rahn_battle":
+		_fail("Rahn's battle cue must resume after his interlude")
+		return
+	main._on_rahn_defeat_started(main._rahn_boss)
+	if not music_director.get_current_cue_id().is_empty():
+		_fail("Rahn's defeat animation must start the battle music fade")
+		return
+	main._set_state("victory")
+	if music_director.get_current_cue_id() != &"demo_clear":
+		_fail("victory must start the demo clear music cue")
+		return
 
 	if main._shown_tutorials.size() != EXPECTED_TUTORIAL_COUNT:
 		_fail("tutorials must be one-shot and total exactly six")
@@ -176,6 +206,8 @@ func _init() -> void:
 	diagram.free()
 
 	print("ONBOARDING_HUD_SMOKE_OK")
+	root.get_node("Audio").stop_music(0.0)
+	root.get_node("Audio").stop_all_sfx()
 	main.queue_free()
 	await process_frame
 	quit()

@@ -28,6 +28,13 @@ const DEFAULT_RESONATOR_PLACE_RANGE := 190.0
 const RESONATOR_PLACE_COOLDOWN := 0.55
 const RESONATOR_VOLLEY_INTERVAL := 2.35 * 0.25
 const MAX_ACTIVE_RESONATORS := 2
+const MUSIC_DIALOGUE := &"dialogue"
+const MUSIC_ROOMS := &"rooms"
+const MUSIC_RAHN_DIALOGUE := &"rahn_dialogue"
+const MUSIC_RAHN_BATTLE := &"rahn_battle"
+const MUSIC_DEMO_CLEAR := &"demo_clear"
+const RAHN_DEFEAT_MUSIC_FADE_SECONDS := 1.25
+const RAHN_INTERLUDE_ID := "rahn_meeting"
 const PICKUP_VISUAL_HEIGHT := 64.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
@@ -161,6 +168,8 @@ func _load_encounter(index: int, skip_interlude: bool = false) -> void:
 		emitter.defeated.connect(_on_emitter_defeated)
 
 	_create_boss(_current_encounter.get("boss", {}))
+	if _audio != null:
+		_audio.play_music(MUSIC_RAHN_BATTLE if is_instance_valid(_rahn_boss) else MUSIC_ROOMS)
 	_create_blue_beacon(_current_encounter.get("blue_beacon", {}))
 	_create_pickups(_current_encounter.get("pickups", []))
 	_update_ui()
@@ -178,6 +187,10 @@ func _try_start_interlude(index: int) -> bool:
 	_pending_encounter_index = index
 	_clear_current_encounter()
 	_state = "interlude"
+	if _audio != null:
+		_audio.play_music(
+			MUSIC_RAHN_DIALOGUE if interlude_id == RAHN_INTERLUDE_ID else MUSIC_DIALOGUE
+		)
 	_exit_unlocked = false
 	player.controls_enabled = false
 	player.velocity = Vector2.ZERO
@@ -316,6 +329,7 @@ func _create_boss(config: Dictionary) -> void:
 	_rahn_boss.player = player
 	_rahn_boss.wave_manager = wave_manager
 	_rahn_boss.hit_points_changed.connect(_on_boss_hit_points_changed)
+	_rahn_boss.defeat_started.connect(_on_rahn_defeat_started)
 	_rahn_boss.defeated.connect(_on_rahn_defeated)
 	add_child(_rahn_boss)
 	wave_manager.set_boss_target(_rahn_boss)
@@ -673,6 +687,13 @@ func _on_boss_hit_points_changed(current: int, maximum: int) -> void:
 	_boss_hp_label.text = "RAHN  %d/%d" % [current, maximum]
 
 
+func _on_rahn_defeat_started(boss) -> void:
+	if boss != _rahn_boss or _state != "combat":
+		return
+	if _audio != null:
+		_audio.stop_music(RAHN_DEFEAT_MUSIC_FADE_SECONDS)
+
+
 func _on_rahn_defeated(boss) -> void:
 	if boss != _rahn_boss or _state != "combat":
 		return
@@ -709,6 +730,8 @@ func _set_state(new_state: String) -> void:
 	_set_exit_gate_open(false)
 	if _state == "victory":
 		_status_label.text = _t("demo_clear")
+		if _audio != null:
+			_audio.play_music(MUSIC_DEMO_CLEAR)
 		_set_controls_text()
 	elif _state == "defeat":
 		_status_label.text = _t("defeat")
