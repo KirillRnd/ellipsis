@@ -263,9 +263,9 @@ func _apply_encounter_settings(encounter: Dictionary) -> void:
 		1,
 		MAX_ACTIVE_RESONATORS
 	)
-	_resonator_place_was_down = Input.is_key_pressed(KEY_E)
+	_resonator_place_was_down = Input.is_action_pressed("place_resonator")
 	_resonator_place_cooldown = 0.0
-	_resonator_volley_was_down = Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
+	_resonator_volley_was_down = Input.is_action_pressed("resonator_volley")
 	_resonator_volley_active = false
 	_resonator_volley_cooldown = 0.0
 	_objective = encounter.get("objective", "defeat_emitters")
@@ -530,10 +530,8 @@ func _on_blue_beacon_fired(origin: Vector2) -> void:
 
 
 func _handle_resonator_input() -> void:
-	_advance_resonator_place_input(Input.is_key_pressed(KEY_E))
-	_advance_resonator_volley_input(
-		Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
-	)
+	_advance_resonator_place_input(Input.is_action_pressed("place_resonator"))
+	_advance_resonator_volley_input(Input.is_action_pressed("resonator_volley"))
 
 
 func _advance_resonator_place_input(resonator_place_down: bool) -> void:

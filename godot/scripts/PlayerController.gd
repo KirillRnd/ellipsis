@@ -122,7 +122,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_crossbar_input(delta)
 
-	var dash_down := Input.is_key_pressed(KEY_SPACE)
+	var dash_down := Input.is_action_pressed("dash")
 	var dash_started := (
 		dash_enabled
 		and dash_down
@@ -157,20 +157,11 @@ func _physics_process(delta: float) -> void:
 
 
 func _read_move_input() -> Vector2:
-	var dir := Vector2.ZERO
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		dir.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		dir.x += 1.0
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		dir.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		dir.y += 1.0
-	return dir.normalized()
+	return Input.get_vector("move_left", "move_right", "move_up", "move_down")
 
 
 func _update_crossbar_input(delta: float) -> void:
-	var crossbar_down := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	var crossbar_down := Input.is_action_pressed("crossbar")
 	_advance_crossbar_input(crossbar_down, delta)
 
 
@@ -449,6 +440,5 @@ func _on_body_frame_changed() -> void:
 func _update_dash_frame_offset() -> void:
 	var frame_index := clampi(_body.frame, 0, DASH_FRAME_OFFSETS.size() - 1)
 	_body.offset = DASH_FRAME_OFFSETS[frame_index]
-
 
 
