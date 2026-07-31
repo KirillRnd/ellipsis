@@ -46,6 +46,14 @@ func _init() -> void:
 		_fail("settings language changes must propagate to main")
 		return
 	settings.set_language(initial_language)
+	var tree_was_paused := paused
+	paused = true
+	settings.open_settings()
+	settings.close_settings()
+	paused = tree_was_paused
+	if settings._menu_button.has_focus():
+		_fail("closing settings must not focus the persistent menu button")
+		return
 	var music_director: MusicDirector = root.get_node("Audio/MusicDirector") as MusicDirector
 
 	if main.player._body.animation != &"idle":

@@ -199,9 +199,9 @@ func close_settings() -> void:
 	_is_open = false
 	_language_option.collapse()
 	_screen_option.collapse()
+	_close_button.release_focus()
 	_modal_root.visible = false
 	_menu_button.visible = true
-	_menu_button.grab_focus()
 	if _tree_was_paused:
 		get_tree().paused = true
 		return
@@ -358,7 +358,7 @@ func _build_ui() -> void:
 	_menu_button.offset_top = 16.0
 	_menu_button.offset_right = -16.0
 	_menu_button.offset_bottom = 62.0
-	_menu_button.focus_mode = Control.FOCUS_ALL
+	_menu_button.focus_mode = Control.FOCUS_NONE
 	_menu_button.add_theme_font_size_override("font_size", 18)
 	_menu_button.add_theme_stylebox_override("normal", _make_button_style(Color(0.025, 0.03, 0.04, 0.92)))
 	_menu_button.add_theme_stylebox_override("hover", _make_button_style(Color(0.10, 0.12, 0.15, 0.98)))
