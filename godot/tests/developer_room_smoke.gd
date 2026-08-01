@@ -58,6 +58,12 @@ func _run() -> void:
 		room._fire_cascade_step()
 		room._fire_cascade_step()
 		_expect(room._waves.size() == 4, "each straight resonator emits one line per cascade step")
+	room._clear_room()
+	room._load_preset(8) # Zh/Zh
+	room._fire_cascade_step()
+	room._fire_cascade_step()
+	_expect(room._waves[0]["volley_index"] == room._waves[1]["volley_index"], "corresponding straight waves share one volley index")
+	_expect(room._waves[0]["volley_index"] != room._waves[2]["volley_index"], "successive straight cascades receive distinct volley indices")
 
 	var base_spiral := {"geometry": "spiral", "origin": Vector2.ZERO, "angle": 0.0, "age": 2.0, "spiral_chirality": 1.0}
 	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_OMEGA * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL, TAU), "each spiral crosses a fixed point once per circle cascade period")

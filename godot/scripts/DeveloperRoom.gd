@@ -29,6 +29,8 @@ var _language := "ru"
 var _selected_color := 0
 var _next_source_id := 1
 var _next_wave_id := 1
+var _next_volley_index := 1
+var _current_volley_index := 0
 var _resonators: Array[DeveloperResonator] = []
 var _waves: Array[Dictionary] = []
 var _cursor_position := ARENA_RECT.get_center()
@@ -173,6 +175,8 @@ func _draw_resonances() -> void:
 			var resonance := ResonanceCatalog.resonance_spec(first["color_index"], second["color_index"])
 			if resonance.is_empty():
 				continue
+			if resonance["id"] == "yy" and first["volley_index"] != second["volley_index"]:
+				continue
 			var visible_points: Array[Vector2] = []
 			for point in DeveloperWaveGeometry.intersections(first, second):
 				if not ARENA_RECT.grow(-3.0).has_point(point):
@@ -281,6 +285,8 @@ func _load_preset(index: int) -> void:
 
 
 func _fire_volley() -> void:
+	_current_volley_index = _next_volley_index
+	_next_volley_index += 1
 	for source in _resonators:
 		source.trigger()
 		_spawn_wave(source, "short", false)
@@ -288,6 +294,8 @@ func _fire_volley() -> void:
 
 
 func _fire_cascade_step() -> void:
+	_current_volley_index = _next_volley_index
+	_next_volley_index += 1
 	for source in _resonators:
 		source.trigger()
 		var spec := ResonanceCatalog.color_spec(source.color_index)
@@ -303,6 +311,7 @@ func _spawn_wave(source: DeveloperResonator, spiral_mode: String, persistent: bo
 	var spec := ResonanceCatalog.color_spec(source.color_index)
 	_waves.append({
 		"id": _next_wave_id,
+		"volley_index": _current_volley_index,
 		"source_id": source.sequence_id,
 		"color_index": source.color_index,
 		"geometry": spec["geometry"],
@@ -359,6 +368,8 @@ func _clear_room() -> void:
 	_resonators.clear()
 	_waves.clear()
 	_resonance_birth_ages.clear()
+	_next_volley_index = 1
+	_current_volley_index = 0
 	_update_stats()
 
 

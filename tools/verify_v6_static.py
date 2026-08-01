@@ -146,6 +146,19 @@ def verify_exact_restorations() -> None:
     require("each bush branch grows for exactly one cascade period" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover sequential Z/Y branch timing")
     require("branching bush animation starts directly from its second step" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the requested Z/Y start phase")
 
+    for yy_contract in (
+        "const YY_LINE_COUNT := 13",
+        "const YY_LINE_DELAY := 0.035",
+        "const YY_LINE_REVEAL_TIME := 0.10",
+        "const YY_PLATEAU_TIME := 0.22",
+        "const YY_FADE_TIME := 0.95",
+        "float(line_index) / float(YY_LINE_COUNT - 1)",
+    ):
+        require(yy_contract in renderer, f"Missing accepted Y/Y sector-fan contract: {yy_contract}")
+    require('resonance["id"] == "yy" and first["volley_index"] != second["volley_index"]' in room, "Y/Y must only pair corresponding A_k/B_k waves")
+    require('"volley_index": _current_volley_index' in room, "Every developer wave must retain its shared volley index")
+    require("corresponding straight waves share one volley index" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover corresponding Y/Y cascade pairs")
+
     require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
     for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
         require(coefficient in renderer, f"Missing accepted grid/Voronoi coefficient {coefficient}")
