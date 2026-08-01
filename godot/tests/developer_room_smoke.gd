@@ -40,8 +40,28 @@ func _run() -> void:
 	_expect(room._resonators[0].sequence_id == 2, "sixth placement removes the oldest resonator by FIFO")
 	room._fire_volley()
 	_expect(room._waves.size() == room.MAX_RESONATORS, "volley creates one wave per active resonator")
+	for wave in room._waves:
+		if wave["geometry"] == "spiral":
+			_expect(wave["spiral_mode"] == "short" and not wave["persistent"], "manual volley creates the short attached spiral")
 	room._clear_room()
 	_expect(room._resonators.is_empty() and room._waves.is_empty(), "clear removes sources and waves")
+	room._load_preset(6) # Z/Z
+	room._fire_cascade_step()
+	_expect(room._waves.size() == 2, "continuous Z/Z starts one long spiral per resonator")
+	room._fire_cascade_step()
+	_expect(room._waves.size() == 2, "continuous cascade does not stack long spirals")
+	for wave in room._waves:
+		_expect(wave["spiral_mode"] == "long" and wave["persistent"], "continuous green wave is a persistent long spiral")
+
+	var base_spiral := {"geometry": "spiral", "origin": Vector2.ZERO, "angle": 0.0, "age": 2.0, "spiral_chirality": 1.0}
+	var short_spiral := base_spiral.duplicate()
+	short_spiral["spiral_mode"] = "short"
+	var short_points := DeveloperWaveGeometry.front_points(short_spiral)
+	_expect(is_equal_approx(short_points[-1].length(), DeveloperWaveGeometry.SPIRAL_PITCH * TAU * 1.5), "short spiral remains exactly 1.5 turns")
+	var long_spiral := base_spiral.duplicate()
+	long_spiral["spiral_mode"] = "long"
+	var long_points := DeveloperWaveGeometry.front_points(long_spiral)
+	_expect(is_equal_approx(long_points[-1].length(), DeveloperWaveGeometry.SPIRAL_PITCH * TAU * 3.0), "long spiral stops growing at three turns")
 	room.queue_free()
 	await process_frame
 	_finish()

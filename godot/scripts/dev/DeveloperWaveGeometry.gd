@@ -2,6 +2,13 @@ class_name DeveloperWaveGeometry
 extends RefCounted
 
 const EPSILON := 0.0001
+const SPIRAL_MAX_TURNS := 3.0
+const SPIRAL_SHORT_TURNS := 1.5
+const SPIRAL_GROW_TIME := 0.72
+const SPIRAL_PITCH := 11.5
+const SPIRAL_BUILD_ROTATION_PER_TURN_DEG := 25.0
+const SPIRAL_ROTATION_SPEED_DEG := 68.0
+const SPIRAL_SAMPLES_PER_TURN := 96.0
 
 
 static func front_points(wave: Dictionary) -> PackedVector2Array:
@@ -82,13 +89,37 @@ static func _circle_points(wave: Dictionary) -> PackedVector2Array:
 
 static func _spiral_points(wave: Dictionary) -> PackedVector2Array:
 	var points := PackedVector2Array()
-	var theta_max := minf(6.0 * PI, wave["extent"] / 11.5)
-	for i in range(73):
-		var theta := theta_max * float(i) / 72.0
-		var radius := 11.5 * theta
-		var angle: float = theta + float(wave["angle"]) - float(wave["age"]) * 2.4
-		points.append(wave["origin"] + Vector2.from_angle(angle) * radius)
+	var age := maxf(float(wave["age"]), 0.0)
+	var mode: String = wave.get("spiral_mode", "short")
+	var travelled_turns := SPIRAL_MAX_TURNS * age / SPIRAL_GROW_TIME
+	var visible_turns := minf(SPIRAL_MAX_TURNS, travelled_turns) if mode == "long" else minf(SPIRAL_SHORT_TURNS, travelled_turns)
+	if visible_turns <= 0.0:
+		return points
+	var first_turn := 0.0 if mode == "long" else maxf(0.0, travelled_turns - SPIRAL_SHORT_TURNS)
+	var chirality := float(wave.get("spiral_chirality", 1.0))
+	var theta_start := TAU * first_turn
+	var theta_span := TAU * visible_turns
+	var sample_count := maxi(2, ceili(visible_turns * SPIRAL_SAMPLES_PER_TURN))
+	var rotation := _spiral_spring_rotation(age, chirality)
+	for i in range(sample_count + 1):
+		var local_theta := theta_span * float(i) / float(sample_count)
+		var theta := theta_start + local_theta
+		var radius := SPIRAL_PITCH * local_theta
+		var angle := float(wave["angle"]) + chirality * theta + rotation
+		points.append(Vector2(wave["origin"]) + Vector2.from_angle(angle) * radius)
 	return points
+
+
+static func _spiral_spring_rotation(age: float, chirality: float) -> float:
+	var rotation_degrees: float
+	if age <= SPIRAL_GROW_TIME:
+		var growth := clampf(age / SPIRAL_GROW_TIME, 0.0, 1.0)
+		var growing_turns := SPIRAL_MAX_TURNS * growth
+		rotation_degrees = -SPIRAL_BUILD_ROTATION_PER_TURN_DEG * growth * growing_turns
+	else:
+		rotation_degrees = -SPIRAL_BUILD_ROTATION_PER_TURN_DEG * SPIRAL_MAX_TURNS
+		rotation_degrees -= SPIRAL_ROTATION_SPEED_DEG * (age - SPIRAL_GROW_TIME)
+	return deg_to_rad(rotation_degrees) * chirality
 
 
 static func _line_points(wave: Dictionary) -> PackedVector2Array:

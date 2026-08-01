@@ -125,7 +125,7 @@ def verify_exact_restorations() -> None:
 
     require("ContinuousCascadeButton" in room, "Developer room needs a toggleable continuous cascade")
     fire_volley = room.split("func _fire_volley()", 1)[1].split("\n\nfunc ", 1)[0]
-    require(fire_volley.count('_waves.append({') == 1, "Manual volley must remain a single front per resonator")
+    require(fire_volley.count('_spawn_wave(source, "short", false)') == 1, "Manual volley must create one short front per resonator")
     require("CASCADE_COUNT" not in room, "Manual volley must not be expanded into a cascade")
 
     require(curve_data.count("Vector2(") == 1920, "Expected four complete accepted 480-point contour tables")
@@ -173,8 +173,28 @@ def verify_developer_timing() -> None:
     require(renderer.count("118.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL") == 2, "Grid spacing must follow the actual developer cascade cadence")
 
 
+def verify_spiral_modes() -> None:
+    room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
+    geometry = (GODOT / "scripts" / "dev" / "DeveloperWaveGeometry.gd").read_text(encoding="utf-8")
+    smoke = (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8")
+    require("const SPIRAL_MAX_TURNS := 3.0" in geometry, "Long spiral must stop growing at three turns")
+    require("const SPIRAL_SHORT_TURNS := 1.5" in geometry, "Short spiral must remain one and a half turns long")
+    require("const SPIRAL_GROW_TIME := 0.72" in geometry, "Spiral growth timing must match the accepted source")
+    require("const SPIRAL_ROTATION_SPEED_DEG := 68.0" in geometry, "Mature spiral rotation must match the accepted source")
+    require("visible_turns := minf(SPIRAL_MAX_TURNS" in geometry and "else minf(SPIRAL_SHORT_TURNS" in geometry, "Geometry must distinguish long and short spiral limits")
+    require("travelled_turns - SPIRAL_SHORT_TURNS" in geometry, "Short spiral tail must erase while its front keeps travelling")
+    require("var radius := SPIRAL_PITCH * local_theta" in geometry, "Erasing short spiral must remain attached to its resonator")
+    require("rotation_degrees -= SPIRAL_ROTATION_SPEED_DEG" in geometry, "Spiral must keep counter-rotating after growth stops")
+    require('_spawn_wave(source, "long", true)' in room, "Held cascade must maintain a persistent long spiral")
+    require("if not _has_long_spiral(source.sequence_id)" in room, "Cascade must not stack long spirals")
+    require('wave.get("spiral_mode", "") == "long"' in room, "Persistent long spiral must be tracked per resonator")
+    require("short spiral remains exactly 1.5 turns" in smoke, "Developer smoke test must cover short spiral length")
+    require("long spiral stops growing at three turns" in smoke, "Developer smoke test must cover long spiral growth cap")
+    require("continuous cascade does not stack long spirals" in smoke, "Developer smoke test must cover held spiral persistence")
+
+
 def main() -> int:
-    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations, verify_developer_presets, verify_developer_timing)
+    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations, verify_developer_presets, verify_developer_timing, verify_spiral_modes)
     try:
         for check in checks:
             check()

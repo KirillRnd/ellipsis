@@ -72,12 +72,12 @@ func _process(delta: float) -> void:
 			_cascade_accumulator += scaled_delta
 			while _cascade_accumulator >= CASCADE_PERIOD:
 				_cascade_accumulator -= CASCADE_PERIOD
-				_fire_volley()
+				_fire_cascade_step()
 		for wave in _waves:
 			wave["age"] += scaled_delta
 			wave["extent"] = wave["age"] * WAVE_SPEED
 		for index in range(_waves.size() - 1, -1, -1):
-			if _waves[index]["age"] >= WAVE_LIFETIME:
+			if not bool(_waves[index].get("persistent", false)) and _waves[index]["age"] >= WAVE_LIFETIME:
 				_waves.remove_at(index)
 	_update_stats()
 	queue_redraw()
@@ -272,20 +272,58 @@ func _load_preset(index: int) -> void:
 func _fire_volley() -> void:
 	for source in _resonators:
 		source.trigger()
+		_spawn_wave(source, "short", false)
+	_trim_waves()
+
+
+func _fire_cascade_step() -> void:
+	for source in _resonators:
+		source.trigger()
 		var spec := ResonanceCatalog.color_spec(source.color_index)
-		_waves.append({
-			"id": _next_wave_id,
-			"source_id": source.sequence_id,
-			"color_index": source.color_index,
-			"geometry": spec["geometry"],
-			"origin": source.position,
-			"angle": source.front_angle,
-			"age": 0.0,
-			"extent": 0.0,
-		})
-		_next_wave_id += 1
+		if spec["geometry"] == "spiral":
+			if not _has_long_spiral(source.sequence_id):
+				_spawn_wave(source, "long", true)
+		else:
+			_spawn_wave(source, "short", false)
+	_trim_waves()
+
+
+func _spawn_wave(source: DeveloperResonator, spiral_mode: String, persistent: bool) -> void:
+	var spec := ResonanceCatalog.color_spec(source.color_index)
+	_waves.append({
+		"id": _next_wave_id,
+		"source_id": source.sequence_id,
+		"color_index": source.color_index,
+		"geometry": spec["geometry"],
+		"origin": source.position,
+		"angle": source.front_angle,
+		"spiral_mode": spiral_mode,
+		"spiral_chirality": 1.0 if cos(source.front_angle) >= 0.0 else -1.0,
+		"persistent": persistent,
+		"age": 0.0,
+		"extent": 0.0,
+	})
+	_next_wave_id += 1
+
+
+func _has_long_spiral(source_id: int) -> bool:
+	for wave in _waves:
+		if wave["source_id"] == source_id and wave.get("spiral_mode", "") == "long":
+			return true
+	return false
+
+
+func _trim_waves() -> void:
 	while _waves.size() > MAX_WAVES:
-		_waves.pop_front()
+		var removable := -1
+		for index in range(_waves.size()):
+			if not bool(_waves[index].get("persistent", false)):
+				removable = index
+				break
+		if removable >= 0:
+			_waves.remove_at(removable)
+		else:
+			break
 
 
 func _remove_last_resonator() -> void:
@@ -327,6 +365,10 @@ func _toggle_simulation() -> void:
 func _toggle_cascade() -> void:
 	_cascade_enabled = not _cascade_enabled
 	_cascade_accumulator = CASCADE_PERIOD if _cascade_enabled else 0.0
+	if not _cascade_enabled:
+		for index in range(_waves.size() - 1, -1, -1):
+			if bool(_waves[index].get("persistent", false)):
+				_waves.remove_at(index)
 	_refresh_text()
 
 

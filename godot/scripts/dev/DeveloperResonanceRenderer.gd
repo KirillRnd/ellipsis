@@ -117,7 +117,7 @@ static func _draw_radial_fourier(canvas: CanvasItem, groups: Array, phase: float
 		var color := ResonanceCatalog.resonance_color(2, 3)
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
-			var spiral_parameter := point.distance_to(Vector2(green_wave["origin"])) / 11.5
+			var spiral_parameter := point.distance_to(Vector2(green_wave["origin"])) / DeveloperWaveGeometry.SPIRAL_PITCH
 			var stages := clampi(int(spiral_parameter / PI) + 1, 1, 3)
 			var orientation := (point - Vector2(green_wave["origin"])).angle() - PI * 0.5
 			for stage in range(stages):
