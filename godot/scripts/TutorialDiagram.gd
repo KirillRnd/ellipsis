@@ -49,11 +49,11 @@ func _draw() -> void:
 
 func _draw_movement() -> void:
 	_draw_player(Vector2(520, 205))
-	_draw_prompt(KEY_W, Rect2(105, 100, 54, 54))
-	_draw_prompt(KEY_A, Rect2(48, 157, 54, 54))
-	_draw_prompt(KEY_S, Rect2(105, 157, 54, 54))
-	_draw_prompt(KEY_D, Rect2(162, 157, 54, 54))
-	_draw_prompt(KEY_SPACE, Rect2(105, 235, 54, 54))
+	_draw_action_prompt(&"move_up", KEY_W, Rect2(105, 100, 54, 54))
+	_draw_action_prompt(&"move_left", KEY_A, Rect2(48, 157, 54, 54))
+	_draw_action_prompt(&"move_down", KEY_S, Rect2(105, 157, 54, 54))
+	_draw_action_prompt(&"move_right", KEY_D, Rect2(162, 157, 54, 54))
+	_draw_action_prompt(&"dash", KEY_SPACE, Rect2(105, 235, 54, 54))
 	_draw_wave_arc(Vector2(490, 205), 135.0, -1.18, 1.18, RED)
 	_draw_arrow(Vector2(365, 205), Vector2(275, 205), Color.WHITE)
 
@@ -76,8 +76,8 @@ func _draw_safe_gap() -> void:
 
 
 func _draw_resonator() -> void:
-	_draw_prompt(KEY_E, Rect2(42, 120, 64, 64))
-	_draw_prompt(MOUSE_RIGHT, Rect2(42, 220, 64, 64))
+	_draw_action_prompt(&"place_resonator", KEY_E, Rect2(42, 120, 64, 64))
+	_draw_action_prompt(&"resonator_volley", MOUSE_RIGHT, Rect2(42, 220, 64, 64))
 	_draw_resonator_sprite(Vector2(265, 205))
 	_draw_wave_arc(Vector2(265, 205), 145.0, -1.05, 1.05, VIOLET)
 	_draw_arrow(Vector2(120, 152), Vector2(212, 190), Color.WHITE)
@@ -93,8 +93,8 @@ func _draw_blue_violet() -> void:
 	_draw_resonator_sprite(right)
 	for point in _circle_intersections(left, radius, right, radius):
 		_draw_resonance_node(point, "blue_violet")
-	_draw_prompt(KEY_E, Rect2(44, 120, 56, 56))
-	_draw_prompt(MOUSE_RIGHT, Rect2(44, 215, 56, 56))
+	_draw_action_prompt(&"place_resonator", KEY_E, Rect2(44, 120, 56, 56))
+	_draw_action_prompt(&"resonator_volley", MOUSE_RIGHT, Rect2(44, 215, 56, 56))
 
 
 func _draw_violet_pair() -> void:
@@ -107,7 +107,7 @@ func _draw_violet_pair() -> void:
 	_draw_wave_arc(right, radius, PI - 1.0, PI + 1.0, VIOLET)
 	for point in _circle_intersections(left, radius, right, radius):
 		_draw_resonance_node(point, "violet_violet")
-	_draw_prompt(MOUSE_RIGHT, Rect2(50, 185, 64, 64))
+	_draw_action_prompt(&"resonator_volley", MOUSE_RIGHT, Rect2(50, 185, 64, 64))
 
 
 func _draw_crossbar() -> void:
@@ -115,8 +115,8 @@ func _draw_crossbar() -> void:
 	var short_radius := 100.0
 	var long_center := Vector2(450, 205)
 	var long_radius := 135.0
-	_draw_prompt(MOUSE_LEFT, Rect2(45, 52, 60, 60))
-	_draw_prompt(MOUSE_LEFT, Rect2(370, 52, 60, 60))
+	_draw_action_prompt(&"crossbar", MOUSE_LEFT, Rect2(45, 52, 60, 60))
+	_draw_action_prompt(&"crossbar", MOUSE_LEFT, Rect2(370, 52, 60, 60))
 	draw_arc(Vector2(400, 82), 38.0, -PI * 0.5, PI * 1.35, 32, Color.WHITE, 3.0, true)
 	_draw_wave_arc(short_center, short_radius, -1.0, 1.0, RED)
 	_draw_safe_gap_arc(
@@ -169,6 +169,26 @@ func _draw_prompt(texture: Texture2D, rect: Rect2) -> void:
 	var scale_factor := minf(rect.size.x / source_size.x, rect.size.y / source_size.y)
 	var draw_size := source_size * scale_factor
 	draw_texture_rect(texture, Rect2(rect.get_center() - draw_size * 0.5, draw_size), false)
+
+
+func _draw_action_prompt(action: StringName, fallback: Texture2D, rect: Rect2) -> void:
+	var settings = get_node_or_null("/root/Settings")
+	if not is_instance_valid(settings):
+		_draw_prompt(fallback, rect)
+		return
+	var text: String = settings.get_action_short_text(action)
+	draw_rect(rect, Color(0.025, 0.03, 0.04, 0.96), true)
+	draw_rect(rect, Color(0.88, 0.91, 0.96, 0.94), false, 2.0)
+	var font_size := 18 if text.length() <= 4 else 13
+	draw_string(
+		ThemeDB.fallback_font,
+		Vector2(rect.position.x + 2.0, rect.get_center().y + font_size * 0.34),
+		text,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		rect.size.x - 4.0,
+		font_size,
+		Color.WHITE
+	)
 
 
 func _circle_intersections(

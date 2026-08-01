@@ -7,6 +7,7 @@ var _prompt: Texture2D
 var _item: Texture2D
 var _kind := ""
 var _caption := ""
+var _prompt_text := ""
 var _counter := ""
 var _readiness := 0.0
 var _enabled := false
@@ -39,6 +40,11 @@ func set_caption(caption: String) -> void:
 	queue_redraw()
 
 
+func set_prompt_text(prompt_text: String) -> void:
+	_prompt_text = prompt_text
+	queue_redraw()
+
+
 func _draw() -> void:
 	draw_rect(FILL_RECT, Color(0.025, 0.030, 0.040, 0.94), true)
 	if _readiness > 0.001:
@@ -52,7 +58,11 @@ func _draw() -> void:
 		var item_rect := _contain_texture_rect(_item, Rect2(22.0, 18.0, 56.0, 62.0))
 		draw_texture_rect(_item, item_rect, false, Color(1.0, 1.0, 1.0, 0.95 if _enabled else 0.34))
 
-	if is_instance_valid(_prompt):
+	if not _prompt_text.is_empty():
+		draw_rect(Rect2(2.0, 1.0, 34.0, 30.0), Color(0.025, 0.03, 0.04, 0.96), true)
+		draw_rect(Rect2(2.0, 1.0, 34.0, 30.0), Color(0.82, 0.86, 0.92, 0.92), false, 1.0)
+		draw_string(ThemeDB.fallback_font, Vector2(3.0, 21.0), _prompt_text, HORIZONTAL_ALIGNMENT_CENTER, 32.0, 11, Color.WHITE)
+	elif is_instance_valid(_prompt):
 		draw_texture_rect(_prompt, Rect2(2.0, 1.0, 30.0, 30.0), false)
 	if not _counter.is_empty():
 		draw_string(

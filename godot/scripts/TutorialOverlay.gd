@@ -22,6 +22,9 @@ func _ready() -> void:
 	layer = 60
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_ui()
+	var settings = get_node_or_null("/root/Settings")
+	if is_instance_valid(settings):
+		settings.bindings_changed.connect(_diagram.queue_redraw)
 	visible = false
 
 

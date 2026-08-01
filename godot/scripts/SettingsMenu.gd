@@ -2,6 +2,7 @@ class_name SettingsMenu
 extends CanvasLayer
 
 signal language_changed(language: String)
+signal bindings_changed
 
 
 class InlineOptionSelector:
@@ -93,6 +94,36 @@ const TOGGLE_ACTION := &"toggle_pause_menu"
 const RESUME_DURATION := 1.0
 const DEFAULT_LANGUAGE := "ru"
 const SUPPORTED_LANGUAGES := ["ru", "en"]
+const REBINDABLE_ACTIONS: Array[StringName] = [
+	&"move_left",
+	&"move_right",
+	&"move_up",
+	&"move_down",
+	&"dash",
+	&"crossbar",
+	&"place_resonator",
+	&"resonator_volley",
+	&"cursor_left",
+	&"cursor_right",
+	&"cursor_up",
+	&"cursor_down",
+	&"toggle_pause_menu",
+]
+const ACTION_TEXT := {
+	"move_left": {"ru": "Движение влево", "en": "Move left"},
+	"move_right": {"ru": "Движение вправо", "en": "Move right"},
+	"move_up": {"ru": "Движение вверх", "en": "Move up"},
+	"move_down": {"ru": "Движение вниз", "en": "Move down"},
+	"dash": {"ru": "Рывок", "en": "Dash"},
+	"crossbar": {"ru": "Ковырялка", "en": "Crossbar"},
+	"place_resonator": {"ru": "Поставить Резонатор", "en": "Place Resonator"},
+	"resonator_volley": {"ru": "Залп Резонаторов", "en": "Resonator volley"},
+	"cursor_left": {"ru": "Курсор влево", "en": "Cursor left"},
+	"cursor_right": {"ru": "Курсор вправо", "en": "Cursor right"},
+	"cursor_up": {"ru": "Курсор вверх", "en": "Cursor up"},
+	"cursor_down": {"ru": "Курсор вниз", "en": "Cursor down"},
+	"toggle_pause_menu": {"ru": "Меню / пауза", "en": "Menu / pause"},
+}
 
 var current_language := DEFAULT_LANGUAGE
 var _sfx_volume := 100.0
@@ -105,6 +136,10 @@ var _time_scale_before_pause := 1.0
 var _is_open := false
 var _resume_tween: Tween
 var _menu_button_enabled := true
+var _default_input_events := {}
+var _rebinding_action: StringName = &""
+var _pending_input_event: InputEvent
+var _pending_conflicts: Array[StringName] = []
 
 var _menu_button: Button
 var _modal_root: Control
@@ -121,12 +156,23 @@ var _sfx_value_label: Label
 var _music_label: Label
 var _music_slider: HSlider
 var _music_value_label: Label
+var _bindings_button: Button
+var _bindings_panel: Panel
+var _bindings_title: Label
+var _bindings_help: Label
+var _binding_buttons := {}
+var _binding_conflict_label: Label
+var _binding_confirm_button: Button
+var _binding_cancel_button: Button
+var _binding_reset_button: Button
+var _binding_back_button: Button
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 1000
 	_capture_editor_bus_levels()
+	_capture_default_input_events()
 	_load_settings()
 	_build_ui()
 	_apply_saved_settings()
@@ -142,6 +188,10 @@ func _exit_tree() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if not _rebinding_action.is_empty():
+		if _try_capture_binding_event(event):
+			get_viewport().set_input_as_handled()
+		return
 	if is_menu_button_pointer_event(event):
 		get_viewport().set_input_as_handled()
 		open_settings()
@@ -190,6 +240,8 @@ func open_settings() -> void:
 	get_tree().paused = true
 	_is_open = true
 	_modal_root.visible = true
+	_panel.visible = true
+	_bindings_panel.visible = false
 	_menu_button.visible = false
 	_close_button.grab_focus()
 
@@ -204,6 +256,7 @@ func close_settings() -> void:
 	if not _is_open:
 		return
 	_is_open = false
+	_cancel_pending_binding()
 	_language_option.collapse()
 	_screen_option.collapse()
 	_close_button.release_focus()
@@ -278,6 +331,24 @@ func is_fullscreen() -> bool:
 	return _fullscreen
 
 
+func get_action_binding_text(action: StringName) -> String:
+	if not InputMap.has_action(action):
+		return "—"
+	var labels: Array[String] = []
+	for event in InputMap.action_get_events(action):
+		labels.append(_event_text(event))
+	return " / ".join(labels) if not labels.is_empty() else "—"
+
+
+func get_action_short_text(action: StringName) -> String:
+	if not InputMap.has_action(action):
+		return "—"
+	var events := InputMap.action_get_events(action)
+	if events.is_empty():
+		return "—"
+	return _short_event_text(events[0])
+
+
 func _resume_gameplay() -> void:
 	var target_scale := maxf(_time_scale_before_pause, 0.001)
 	Engine.time_scale = maxf(target_scale * 0.01, 0.001)
@@ -331,6 +402,15 @@ func _load_settings() -> void:
 	_fullscreen = bool(config.get_value("display", "fullscreen", false))
 	_sfx_volume = clampf(float(config.get_value("audio", "sfx_volume", 100.0)), 0.0, 100.0)
 	_music_volume = clampf(float(config.get_value("audio", "music_volume", 100.0)), 0.0, 100.0)
+	for action in REBINDABLE_ACTIONS:
+		if not InputMap.has_action(action) or not config.has_section_key("input", str(action)):
+			continue
+		var stored_events = config.get_value("input", str(action), [])
+		if stored_events is Array:
+			InputMap.action_erase_events(action)
+			for event in stored_events:
+				if event is InputEvent:
+					InputMap.action_add_event(action, event)
 
 
 func _save_settings() -> void:
@@ -339,7 +419,21 @@ func _save_settings() -> void:
 	config.set_value("display", "fullscreen", _fullscreen)
 	config.set_value("audio", "sfx_volume", _sfx_volume)
 	config.set_value("audio", "music_volume", _music_volume)
+	for action in REBINDABLE_ACTIONS:
+		if InputMap.has_action(action):
+			config.set_value("input", str(action), InputMap.action_get_events(action))
 	config.save(SETTINGS_PATH)
+
+
+func _capture_default_input_events() -> void:
+	_default_input_events.clear()
+	for action in REBINDABLE_ACTIONS:
+		if not InputMap.has_action(action):
+			continue
+		var copies: Array[InputEvent] = []
+		for event in InputMap.action_get_events(action):
+			copies.append(event.duplicate(true))
+		_default_input_events[action] = copies
 
 
 func _apply_saved_settings() -> void:
@@ -468,6 +562,105 @@ func _build_ui() -> void:
 	_music_value_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_panel.add_child(_music_value_label)
 
+	_bindings_button = Button.new()
+	_bindings_button.name = "BindingsButton"
+	_bindings_button.position = Vector2(54, 420)
+	_bindings_button.size = Vector2(490, 46)
+	_bindings_button.add_theme_font_size_override("font_size", 19)
+	_bindings_button.pressed.connect(_open_bindings)
+	_panel.add_child(_bindings_button)
+
+	_build_bindings_ui()
+
+
+func _build_bindings_ui() -> void:
+	_bindings_panel = Panel.new()
+	_bindings_panel.name = "BindingsPanel"
+	_bindings_panel.anchor_left = 0.5
+	_bindings_panel.anchor_top = 0.5
+	_bindings_panel.anchor_right = 0.5
+	_bindings_panel.anchor_bottom = 0.5
+	_bindings_panel.offset_left = -430.0
+	_bindings_panel.offset_top = -320.0
+	_bindings_panel.offset_right = 430.0
+	_bindings_panel.offset_bottom = 320.0
+	_bindings_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_bindings_panel.add_theme_stylebox_override("panel", _make_button_style(Color(0.025, 0.03, 0.04, 0.99)))
+	_bindings_panel.visible = false
+	_modal_root.add_child(_bindings_panel)
+
+	_bindings_title = _make_label(Vector2(42, 22), Vector2(776, 42), 28)
+	_bindings_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bindings_panel.add_child(_bindings_title)
+	_bindings_help = _make_label(Vector2(42, 62), Vector2(776, 30), 16)
+	_bindings_help.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_bindings_help.add_theme_color_override("font_color", Color(0.68, 0.74, 0.82))
+	_bindings_panel.add_child(_bindings_help)
+
+	var scroll := ScrollContainer.new()
+	scroll.name = "BindingsScroll"
+	scroll.position = Vector2(36, 104)
+	scroll.size = Vector2(788, 390)
+	_bindings_panel.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.name = "BindingsList"
+	list.custom_minimum_size.x = 764.0
+	list.add_theme_constant_override("separation", 7)
+	scroll.add_child(list)
+
+	for action in REBINDABLE_ACTIONS:
+		if not InputMap.has_action(action):
+			continue
+		var row := HBoxContainer.new()
+		row.custom_minimum_size.y = 42.0
+		list.add_child(row)
+		var label := Label.new()
+		label.name = "%sLabel" % action
+		label.custom_minimum_size.x = 300.0
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.add_theme_font_size_override("font_size", 17)
+		row.add_child(label)
+		var button := Button.new()
+		button.name = "%sBinding" % action
+		button.custom_minimum_size = Vector2(444.0, 40.0)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.add_theme_font_size_override("font_size", 16)
+		button.pressed.connect(_begin_rebind.bind(action))
+		row.add_child(button)
+		_binding_buttons[action] = button
+
+	_binding_conflict_label = _make_label(Vector2(42, 502), Vector2(776, 30), 15)
+	_binding_conflict_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_binding_conflict_label.add_theme_color_override("font_color", Color(1.0, 0.70, 0.38))
+	_bindings_panel.add_child(_binding_conflict_label)
+
+	_binding_confirm_button = Button.new()
+	_binding_confirm_button.name = "ConfirmConflictButton"
+	_binding_confirm_button.position = Vector2(252, 536)
+	_binding_confirm_button.size = Vector2(170, 42)
+	_binding_confirm_button.pressed.connect(_confirm_conflicting_binding)
+	_bindings_panel.add_child(_binding_confirm_button)
+	_binding_cancel_button = Button.new()
+	_binding_cancel_button.name = "CancelBindingButton"
+	_binding_cancel_button.position = Vector2(438, 536)
+	_binding_cancel_button.size = Vector2(170, 42)
+	_binding_cancel_button.pressed.connect(_cancel_pending_binding)
+	_bindings_panel.add_child(_binding_cancel_button)
+
+	_binding_reset_button = Button.new()
+	_binding_reset_button.name = "ResetBindingsButton"
+	_binding_reset_button.position = Vector2(42, 584)
+	_binding_reset_button.size = Vector2(300, 42)
+	_binding_reset_button.pressed.connect(_reset_bindings)
+	_bindings_panel.add_child(_binding_reset_button)
+	_binding_back_button = Button.new()
+	_binding_back_button.name = "BindingsBackButton"
+	_binding_back_button.position = Vector2(518, 584)
+	_binding_back_button.size = Vector2(300, 42)
+	_binding_back_button.pressed.connect(_return_to_general_settings)
+	_bindings_panel.add_child(_binding_back_button)
+	_set_conflict_controls_visible(false)
+
 func _make_label(position: Vector2, size: Vector2, font_size: int) -> Label:
 	var label := Label.new()
 	label.position = position
@@ -502,6 +695,175 @@ func _make_button_style(background: Color) -> StyleBoxFlat:
 	return style
 
 
+func _open_bindings() -> void:
+	_cancel_pending_binding()
+	_panel.visible = false
+	_bindings_panel.visible = true
+	_refresh_binding_rows()
+	if not _binding_buttons.is_empty():
+		var first_button = _binding_buttons.values()[0]
+		if is_instance_valid(first_button):
+			first_button.grab_focus()
+
+
+func _return_to_general_settings() -> void:
+	_cancel_pending_binding()
+	_bindings_panel.visible = false
+	_panel.visible = true
+	_bindings_button.grab_focus()
+
+
+func _begin_rebind(action: StringName) -> void:
+	_rebinding_action = action
+	_pending_input_event = null
+	_pending_conflicts.clear()
+	_set_conflict_controls_visible(false)
+	_refresh_binding_rows()
+
+
+func _try_capture_binding_event(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		if not event.pressed or event.echo:
+			return false
+		if event.keycode == KEY_ESCAPE:
+			_cancel_pending_binding()
+			return true
+	elif event is InputEventMouseButton:
+		if not event.pressed:
+			return false
+	elif event is InputEventJoypadButton:
+		if not event.pressed:
+			return false
+	elif event is InputEventJoypadMotion:
+		if absf(event.axis_value) < 0.6:
+			return false
+	else:
+		return false
+
+	_pending_input_event = event.duplicate(true)
+	_pending_conflicts = _find_binding_conflicts(_rebinding_action, _pending_input_event)
+	if _pending_conflicts.is_empty():
+		_apply_pending_binding(false)
+	else:
+		_set_conflict_controls_visible(true)
+		_refresh_binding_rows()
+	return true
+
+
+func _find_binding_conflicts(target_action: StringName, event: InputEvent) -> Array[StringName]:
+	var conflicts: Array[StringName] = []
+	for action in REBINDABLE_ACTIONS:
+		if action == target_action or not InputMap.has_action(action):
+			continue
+		for existing in InputMap.action_get_events(action):
+			if existing.is_match(event):
+				conflicts.append(action)
+				break
+	return conflicts
+
+
+func _confirm_conflicting_binding() -> void:
+	_apply_pending_binding(true)
+
+
+func _apply_pending_binding(remove_conflicts: bool) -> void:
+	if _rebinding_action.is_empty() or not is_instance_valid(_pending_input_event):
+		return
+	if remove_conflicts:
+		for action in _pending_conflicts:
+			for existing in InputMap.action_get_events(action):
+				if existing.is_match(_pending_input_event):
+					InputMap.action_erase_event(action, existing)
+	InputMap.action_erase_events(_rebinding_action)
+	InputMap.action_add_event(_rebinding_action, _pending_input_event)
+	_rebinding_action = &""
+	_pending_input_event = null
+	_pending_conflicts.clear()
+	_set_conflict_controls_visible(false)
+	_save_settings()
+	_refresh_binding_rows()
+	bindings_changed.emit()
+
+
+func _cancel_pending_binding() -> void:
+	_rebinding_action = &""
+	_pending_input_event = null
+	_pending_conflicts.clear()
+	_set_conflict_controls_visible(false)
+	_refresh_binding_rows()
+
+
+func _reset_bindings() -> void:
+	_cancel_pending_binding()
+	for action in REBINDABLE_ACTIONS:
+		if not InputMap.has_action(action):
+			continue
+		InputMap.action_erase_events(action)
+		for event in _default_input_events.get(action, []):
+			InputMap.action_add_event(action, event.duplicate(true))
+	_save_settings()
+	_refresh_binding_rows()
+	bindings_changed.emit()
+
+
+func _set_conflict_controls_visible(visible: bool) -> void:
+	if is_instance_valid(_binding_confirm_button):
+		_binding_confirm_button.visible = visible
+	if is_instance_valid(_binding_cancel_button):
+		_binding_cancel_button.visible = visible
+	if is_instance_valid(_binding_conflict_label) and not visible:
+		_binding_conflict_label.text = ""
+
+
+func _refresh_binding_rows() -> void:
+	if not is_instance_valid(_bindings_panel):
+		return
+	for action in _binding_buttons:
+		var button: Button = _binding_buttons[action]
+		var label := button.get_parent().get_child(0) as Label
+		label.text = ACTION_TEXT.get(str(action), {current_language: str(action)}).get(current_language, str(action))
+		if action == _rebinding_action:
+			button.text = "… " + ("НАЖМИТЕ КЛАВИШУ" if current_language == "ru" else "PRESS AN INPUT")
+		else:
+			button.text = get_action_binding_text(action)
+
+	if not _pending_conflicts.is_empty():
+		var names: Array[String] = []
+		for action in _pending_conflicts:
+			names.append(ACTION_TEXT.get(str(action), {current_language: str(action)}).get(current_language, str(action)))
+		_binding_conflict_label.text = (
+			"Уже используется: %s" % ", ".join(names)
+			if current_language == "ru"
+			else "Already used by: %s" % ", ".join(names)
+		)
+
+
+func _event_text(event: InputEvent) -> String:
+	var result := event.as_text()
+	result = result.replace(" (Physical)", "")
+	return result
+
+
+func _short_event_text(event: InputEvent) -> String:
+	if event is InputEventKey:
+		var code: Key = event.physical_keycode if event.physical_keycode != 0 else event.keycode
+		return OS.get_keycode_string(code).to_upper()
+	if event is InputEventMouseButton:
+		var mouse_names := {
+			MOUSE_BUTTON_LEFT: "LMB",
+			MOUSE_BUTTON_RIGHT: "RMB",
+			MOUSE_BUTTON_MIDDLE: "MMB",
+			MOUSE_BUTTON_WHEEL_UP: "MW↑",
+			MOUSE_BUTTON_WHEEL_DOWN: "MW↓",
+		}
+		return mouse_names.get(event.button_index, "M%d" % event.button_index)
+	if event is InputEventJoypadButton:
+		return "J%d" % event.button_index
+	if event is InputEventJoypadMotion:
+		return "J%d%s" % [event.axis, "+" if event.axis_value > 0.0 else "−"]
+	return event.as_text()
+
+
 func _refresh_text() -> void:
 	if not is_instance_valid(_title_label):
 		return
@@ -513,6 +875,13 @@ func _refresh_text() -> void:
 	_screen_label.text = "Режим экрана" if is_russian else "Screen mode"
 	_sfx_label.text = "Громкость звуков" if is_russian else "SFX volume"
 	_music_label.text = "Громкость музыки" if is_russian else "Music volume"
+	_bindings_button.text = "ПЕРЕНАЗНАЧИТЬ УПРАВЛЕНИЕ" if is_russian else "REMAP CONTROLS"
+	_bindings_title.text = "УПРАВЛЕНИЕ" if is_russian else "CONTROLS"
+	_bindings_help.text = "Выберите действие, затем нажмите новый ввод" if is_russian else "Choose an action, then press a new input"
+	_binding_confirm_button.text = "ЗАМЕНИТЬ" if is_russian else "REPLACE"
+	_binding_cancel_button.text = "ОТМЕНА" if is_russian else "CANCEL"
+	_binding_reset_button.text = "СБРОСИТЬ ПО УМОЛЧАНИЮ" if is_russian else "RESET TO DEFAULTS"
+	_binding_back_button.text = "НАЗАД" if is_russian else "BACK"
 	var selected_screen := _screen_option.selected if is_instance_valid(_screen_option) else 0
 	if is_instance_valid(_screen_option):
 		_screen_option.clear()
@@ -523,6 +892,7 @@ func _refresh_text() -> void:
 	set_music_volume(_music_volume)
 	_select_language_option()
 	_select_screen_option()
+	_refresh_binding_rows()
 
 
 func _select_language_option() -> void:

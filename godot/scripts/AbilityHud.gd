@@ -19,6 +19,19 @@ func _ready() -> void:
 	_crossbar_slot = _create_slot(Vector2(0.0, 0.0), LMB_TEXTURE, CROSSBAR_TEXTURE, "crossbar", "КОВЫРЯЛКА")
 	_volley_slot = _create_slot(Vector2(98.0, 0.0), RMB_TEXTURE, null, "wave", "ВОЛНА")
 	_place_slot = _create_slot(Vector2(196.0, 0.0), E_TEXTURE, RESONATOR_TEXTURE, "resonator", "РЕЗОНАТОР")
+	var settings = get_node_or_null("/root/Settings")
+	if is_instance_valid(settings):
+		settings.bindings_changed.connect(_refresh_prompts)
+	_refresh_prompts()
+
+
+func _refresh_prompts() -> void:
+	var settings = get_node_or_null("/root/Settings")
+	if not is_instance_valid(settings) or not is_instance_valid(_crossbar_slot):
+		return
+	_crossbar_slot.set_prompt_text(settings.get_action_short_text(&"crossbar"))
+	_volley_slot.set_prompt_text(settings.get_action_short_text(&"resonator_volley"))
+	_place_slot.set_prompt_text(settings.get_action_short_text(&"place_resonator"))
 
 
 func set_state(
