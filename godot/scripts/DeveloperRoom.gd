@@ -20,6 +20,7 @@ var _simulation_paused := false
 var _speed_index := 2
 var _last_resonance_count := 0
 var _last_pair_types := {}
+var _last_geometry_usec := 0
 
 var _title_label: Label
 var _selected_label: Label
@@ -117,6 +118,7 @@ func _draw_wave(wave: Dictionary) -> void:
 
 
 func _draw_resonances() -> void:
+	var started_usec := Time.get_ticks_usec()
 	_last_resonance_count = 0
 	_last_pair_types.clear()
 	var groups_by_type := {}
@@ -157,9 +159,8 @@ func _draw_resonances() -> void:
 		if first_wave["color_index"] == second_wave["color_index"]:
 			DeveloperResonanceRenderer.draw_same_color(self, resonance_id, groups, ARENA_RECT, phase)
 		else:
-			for group in groups:
-				for point in group["points"]:
-					_draw_resonance_marker(point, group["first"], group["second"], group["resonance"])
+			DeveloperResonanceRenderer.draw_mixed(self, resonance_id, groups, ARENA_RECT, phase)
+	_last_geometry_usec = Time.get_ticks_usec() - started_usec
 
 
 func _draw_resonance_marker(point: Vector2, first: Dictionary, second: Dictionary, resonance: Dictionary) -> void:
@@ -375,7 +376,15 @@ func _update_stats() -> void:
 	if not is_instance_valid(_count_label):
 		return
 	_count_label.text = ("РЕЗОНАТОРЫ %d/%d" if _language == "ru" else "RESONATORS %d/%d") % [_resonators.size(), MAX_RESONATORS]
-	_stats_label.text = ("Волны %d · Узлы %d" if _language == "ru" else "Waves %d · Nodes %d") % [_waves.size(), _last_resonance_count]
+	var active_types: Array[String] = []
+	for resonance_id in _last_pair_types:
+		active_types.append(str(resonance_id).to_upper())
+	active_types.sort()
+	var type_text := ",".join(active_types) if not active_types.is_empty() else "—"
+	_stats_label.text = (
+		("Волны %d · Узлы %d\n%s · %.2f ms" if _language == "ru" else "Waves %d · Nodes %d\n%s · %.2f ms")
+		% [_waves.size(), _last_resonance_count, type_text, float(_last_geometry_usec) / 1000.0]
+	)
 
 
 func _clamp_to_arena(point: Vector2) -> Vector2:

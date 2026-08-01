@@ -22,6 +22,22 @@ static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Ar
 			_draw_guarded_voronoi(canvas, _unique_points(groups, 34), arena, _group_color(groups))
 
 
+static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, arena: Rect2, phase: float) -> void:
+	match resonance_id:
+		"fs":
+			_draw_lissajous_projections(canvas, groups, phase)
+		"sg":
+			_draw_delaunay_circumcircles(canvas, _unique_points(groups, 32), _group_color(groups))
+		"zg":
+			_draw_radial_fourier(canvas, groups, phase)
+		"yz":
+			_draw_branching_bushes(canvas, groups)
+		"gy":
+			_draw_rhombic_grids(canvas, groups, arena)
+		"kg":
+			_draw_inflation_stars(canvas, groups, phase)
+
+
 static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: float) -> void:
 	for group in groups:
 		var points: Array = group["points"]
@@ -54,6 +70,121 @@ static func _draw_delaunay(canvas: CanvasItem, points: Array[Vector2], color: Co
 		canvas.draw_line(points[edge.x], points[edge.y], Color(color, 0.72), 2.0, true)
 	for point in points:
 		canvas.draw_circle(point, 3.2, INK)
+
+
+static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, phase: float) -> void:
+	for group in groups:
+		var points: Array = group["points"]
+		if points.size() < 2:
+			continue
+		var first: Vector2 = points[0]
+		var second: Vector2 = points[1]
+		var color := ResonanceCatalog.resonance_color(0, 1)
+		canvas.draw_line(first, second, Color(color, 0.24), 9.0, true)
+		canvas.draw_line(first, second, Color(color, 0.92), 2.3, true)
+		var ratio := 0.5 + 0.5 * sin(phase * 2.6)
+		canvas.draw_circle(first.lerp(second, ratio), 4.5, INK)
+
+
+static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vector2], color: Color) -> void:
+	for triangle in _delaunay_triangles(points):
+		var circle := _circumcircle(points[triangle.x], points[triangle.y], points[triangle.z])
+		if circle.is_empty():
+			continue
+		var radius := sqrt(float(circle["radius_sq"]))
+		if radius <= 180.0:
+			canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
+	for point in points:
+		canvas.draw_circle(point, 3.0, INK)
+
+
+static func _draw_radial_fourier(canvas: CanvasItem, groups: Array, phase: float) -> void:
+	for group in groups:
+		var first: Dictionary = group["first"]
+		var second: Dictionary = group["second"]
+		var green_wave: Dictionary = first if first["color_index"] == 3 else second
+		var age := minf(float(first["age"]), float(second["age"]))
+		var stages := clampi(int(age / 0.65) + 1, 1, 3)
+		var color := ResonanceCatalog.resonance_color(2, 3)
+		for point_value in group["points"]:
+			var point: Vector2 = point_value
+			var orientation := (point - Vector2(green_wave["origin"])).angle()
+			for stage in range(stages):
+				var scale := 8.0 + stage * 7.5
+				var curve := PackedVector2Array()
+				for index in range(81):
+					var theta := TAU * float(index) / 80.0
+					var radius := scale * (1.0 + 0.20 * cos(5.0 * theta + phase * 0.22) + 0.10 * sin(3.0 * theta))
+					var local := Vector2(cos(theta) * radius, sin(theta) * radius * 0.72)
+					curve.append(point + local.rotated(orientation))
+				canvas.draw_polyline(curve, Color(color.lightened(stage * 0.07), 0.60 + stage * 0.14), 1.8, true)
+
+
+static func _draw_branching_bushes(canvas: CanvasItem, groups: Array) -> void:
+	var color := ResonanceCatalog.resonance_color(3, 4)
+	for group in groups:
+		var first: Dictionary = group["first"]
+		var second: Dictionary = group["second"]
+		var green_wave: Dictionary = first if first["color_index"] == 3 else second
+		var other_wave: Dictionary = second if first["color_index"] == 3 else first
+		var source_axis := Vector2(other_wave["origin"]) - Vector2(green_wave["origin"])
+		for point_value in group["points"]:
+			var point: Vector2 = point_value
+			var side := signf(source_axis.cross(point - Vector2(green_wave["origin"])))
+			var trunk_direction := Vector2.from_angle(source_axis.angle() + side * PI * 0.5)
+			var trunk_end := point + trunk_direction * 42.0
+			canvas.draw_line(point, trunk_end, Color(color, 0.86), 2.2, true)
+			for branch_index in range(5):
+				var ratio := 0.20 + branch_index * 0.16
+				var joint := point.lerp(trunk_end, ratio)
+				var branch_side := -1.0 if branch_index % 2 == 0 else 1.0
+				var direction := trunk_direction.rotated(branch_side * (0.42 + 0.05 * branch_index))
+				var length := 23.0 - branch_index * 1.8
+				var branch_end := joint + direction * length
+				canvas.draw_line(joint, branch_end, Color(color.lightened(0.08), 0.78), 1.7, true)
+				canvas.draw_line(branch_end, branch_end + direction.rotated(branch_side * 0.46) * 10.0, Color(color.lightened(0.18), 0.70), 1.2, true)
+
+
+static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2) -> void:
+	var color := ResonanceCatalog.resonance_color(4, 5)
+	for group in groups:
+		if group["points"].is_empty():
+			continue
+		var anchor: Vector2 = group["points"][0]
+		var first: Dictionary = group["first"]
+		var second: Dictionary = group["second"]
+		var direction_a := Vector2.from_angle(float(first["angle"]) + PI * 0.5)
+		var direction_b := Vector2.from_angle(float(second["angle"]) + PI * 0.5)
+		var normal_a := Vector2(-direction_a.y, direction_a.x)
+		var normal_b := Vector2(-direction_b.y, direction_b.x)
+		for offset_index in range(-6, 7):
+			var offset := float(offset_index) * 24.0
+			var center_a := anchor + normal_a * offset
+			var center_b := anchor + normal_b * offset
+			canvas.draw_line(center_a - direction_a * 175.0, center_a + direction_a * 175.0, Color(color, 0.48), 1.25, true)
+			canvas.draw_line(center_b - direction_b * 175.0, center_b + direction_b * 175.0, Color(color, 0.48), 1.25, true)
+		canvas.draw_circle(anchor, 3.2, INK)
+
+
+static func _draw_inflation_stars(canvas: CanvasItem, groups: Array, phase: float) -> void:
+	var color := ResonanceCatalog.resonance_color(5, 6)
+	const PHI := 1.61803398875
+	for group in groups:
+		var first: Dictionary = group["first"]
+		var second: Dictionary = group["second"]
+		var age := minf(float(first["age"]), float(second["age"]))
+		var stages := clampi(int(age / 0.55) + 1, 1, 3)
+		for point_value in group["points"]:
+			var point: Vector2 = point_value
+			for stage in range(stages):
+				var outer_radius := 7.0 * pow(PHI, stage)
+				var inner_radius := outer_radius * 0.52
+				var star := PackedVector2Array()
+				for vertex in range(11):
+					var angle := -PI * 0.5 + PI * float(vertex) / 5.0 + phase * 0.025
+					var radius := outer_radius if vertex % 2 == 0 else inner_radius
+					star.append(point + Vector2.from_angle(angle) * radius)
+				canvas.draw_polyline(star, Color(color.lightened(stage * 0.08), 0.62 + stage * 0.13), 1.5, true)
 
 
 static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> void:
@@ -195,28 +326,35 @@ static func _clip_to_site_halfplane(polygon: PackedVector2Array, site: Vector2, 
 
 static func _delaunay_edges(points: Array[Vector2]) -> Array[Vector2i]:
 	var edge_map := {}
+	for triangle in _delaunay_triangles(points):
+		for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.x, triangle.z)]:
+			var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
+			edge_map[key] = Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y))
+	var result: Array[Vector2i] = []
+	for edge in edge_map.values():
+		result.append(edge)
+	return result
+
+
+static func _delaunay_triangles(points: Array[Vector2]) -> Array[Vector3i]:
+	var result: Array[Vector3i] = []
 	if points.size() < 3:
-		return []
+		return result
 	for a in range(points.size() - 2):
 		for b in range(a + 1, points.size() - 1):
 			for c in range(b + 1, points.size()):
-				var circle = _circumcircle(points[a], points[b], points[c])
+				var circle := _circumcircle(points[a], points[b], points[c])
 				if circle.is_empty():
 					continue
 				var empty := true
 				for test in range(points.size()):
-					if test in [a, b, c]:
+					if test == a or test == b or test == c:
 						continue
-					if points[test].distance_squared_to(circle["center"]) < circle["radius_sq"] - 1.0:
+					if points[test].distance_squared_to(circle["center"]) < float(circle["radius_sq"]) - 1.0:
 						empty = false
 						break
 				if empty:
-					for edge in [Vector2i(a, b), Vector2i(b, c), Vector2i(a, c)]:
-						var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
-						edge_map[key] = Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y))
-	var result: Array[Vector2i] = []
-	for edge in edge_map.values():
-		result.append(edge)
+					result.append(Vector3i(a, b, c))
 	return result
 
 
