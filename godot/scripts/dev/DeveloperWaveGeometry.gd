@@ -6,8 +6,8 @@ const SPIRAL_MAX_TURNS := 3.0
 const SPIRAL_SHORT_TURNS := 1.5
 const SPIRAL_GROW_TIME := 0.72
 const SPIRAL_PITCH := 11.5
-const SPIRAL_BUILD_ROTATION_PER_TURN_DEG := 25.0
-const SPIRAL_ROTATION_SPEED_DEG := 68.0
+const SPIRAL_OMEGA := TAU * SPIRAL_MAX_TURNS / SPIRAL_GROW_TIME
+const SPIRAL_SHORT_DRAIN_TIME := TAU * SPIRAL_SHORT_TURNS / SPIRAL_OMEGA
 const SPIRAL_SAMPLES_PER_TURN := 96.0
 
 
@@ -91,35 +91,37 @@ static func _spiral_points(wave: Dictionary) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	var age := maxf(float(wave["age"]), 0.0)
 	var mode: String = wave.get("spiral_mode", "short")
-	var travelled_turns := SPIRAL_MAX_TURNS * age / SPIRAL_GROW_TIME
-	var visible_turns := minf(SPIRAL_MAX_TURNS, travelled_turns) if mode == "long" else minf(SPIRAL_SHORT_TURNS, travelled_turns)
-	if visible_turns <= 0.0:
-		return points
-	var first_turn := 0.0 if mode == "long" else maxf(0.0, travelled_turns - SPIRAL_SHORT_TURNS)
 	var chirality := float(wave.get("spiral_chirality", 1.0))
-	var theta_start := TAU * first_turn
-	var theta_span := TAU * visible_turns
+	var live_head := SPIRAL_OMEGA * age
+	var head: float
+	var tail: float
+	var phase_head: float
+	if mode == "long":
+		head = minf(live_head, TAU * SPIRAL_MAX_TURNS)
+		tail = 0.0
+		phase_head = live_head
+	else:
+		var stop_age := float(wave.get("spiral_stop_age", INF))
+		if age <= stop_age:
+			head = live_head
+			tail = maxf(0.0, head - TAU * SPIRAL_SHORT_TURNS)
+		else:
+			head = SPIRAL_OMEGA * stop_age
+			var tail_at_stop := maxf(0.0, head - TAU * SPIRAL_SHORT_TURNS)
+			tail = minf(head, tail_at_stop + SPIRAL_OMEGA * (age - stop_age))
+		phase_head = head
+	var theta_span := head - tail
+	if theta_span <= EPSILON:
+		return points
+	var visible_turns := theta_span / TAU
 	var sample_count := maxi(2, ceili(visible_turns * SPIRAL_SAMPLES_PER_TURN))
-	var rotation := _spiral_spring_rotation(age, chirality)
+	var rotation := float(wave["angle"]) - chirality * phase_head
 	for i in range(sample_count + 1):
-		var local_theta := theta_span * float(i) / float(sample_count)
-		var theta := theta_start + local_theta
-		var radius := SPIRAL_PITCH * local_theta
-		var angle := float(wave["angle"]) + chirality * theta + rotation
+		var theta := tail + theta_span * float(i) / float(sample_count)
+		var radius := SPIRAL_PITCH * theta
+		var angle := chirality * theta + rotation
 		points.append(Vector2(wave["origin"]) + Vector2.from_angle(angle) * radius)
 	return points
-
-
-static func _spiral_spring_rotation(age: float, chirality: float) -> float:
-	var rotation_degrees: float
-	if age <= SPIRAL_GROW_TIME:
-		var growth := clampf(age / SPIRAL_GROW_TIME, 0.0, 1.0)
-		var growing_turns := SPIRAL_MAX_TURNS * growth
-		rotation_degrees = -SPIRAL_BUILD_ROTATION_PER_TURN_DEG * growth * growing_turns
-	else:
-		rotation_degrees = -SPIRAL_BUILD_ROTATION_PER_TURN_DEG * SPIRAL_MAX_TURNS
-		rotation_degrees -= SPIRAL_ROTATION_SPEED_DEG * (age - SPIRAL_GROW_TIME)
-	return deg_to_rad(rotation_degrees) * chirality
 
 
 static func _line_points(wave: Dictionary) -> PackedVector2Array:

@@ -57,7 +57,9 @@ func _run() -> void:
 	var short_spiral := base_spiral.duplicate()
 	short_spiral["spiral_mode"] = "short"
 	var short_points := DeveloperWaveGeometry.front_points(short_spiral)
-	_expect(is_equal_approx(short_points[-1].length(), DeveloperWaveGeometry.SPIRAL_PITCH * TAU * 1.5), "short spiral remains exactly 1.5 turns")
+	_expect(is_equal_approx(short_points[-1].length() - short_points[0].length(), DeveloperWaveGeometry.SPIRAL_PITCH * TAU * 1.5), "short spiral window remains exactly 1.5 turns")
+	_expect(short_points[0].length() > 0.0, "short spiral tail detaches from the center after erasing begins")
+	_expect(absf(short_points[-1].y) < 0.001 and short_points[-1].x > 0.0, "short spiral head stays on its fixed emission ray")
 	var long_spiral := base_spiral.duplicate()
 	long_spiral["spiral_mode"] = "long"
 	var long_points := DeveloperWaveGeometry.front_points(long_spiral)

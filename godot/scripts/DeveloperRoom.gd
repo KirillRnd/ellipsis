@@ -299,6 +299,7 @@ func _spawn_wave(source: DeveloperResonator, spiral_mode: String, persistent: bo
 		"angle": source.front_angle,
 		"spiral_mode": spiral_mode,
 		"spiral_chirality": 1.0 if cos(source.front_angle) >= 0.0 else -1.0,
+		"spiral_stop_age": WAVE_LIFETIME - DeveloperWaveGeometry.SPIRAL_SHORT_DRAIN_TIME if spec["geometry"] == "spiral" and spiral_mode == "short" else INF,
 		"persistent": persistent,
 		"age": 0.0,
 		"extent": 0.0,
