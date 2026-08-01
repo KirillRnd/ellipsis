@@ -43,6 +43,8 @@ var _last_resonance_count := 0
 var _last_pair_types := {}
 var _last_geometry_usec := 0
 var _resonance_birth_ages := {}
+var _global_resonance_states := {}
+var _simulation_age := 0.0
 
 var _title_label: Label
 var _selected_label: Label
@@ -71,6 +73,7 @@ func _process(delta: float) -> void:
 	_track_mouse_cursor()
 	if not _simulation_paused:
 		var scaled_delta: float = delta * float(SPEEDS[_speed_index])
+		_simulation_age += scaled_delta
 		if _cascade_enabled:
 			_cascade_accumulator += scaled_delta
 			while _cascade_accumulator >= CASCADE_PERIOD:
@@ -199,6 +202,7 @@ func _draw_resonances() -> void:
 				"first": first,
 				"second": second,
 				"resonance": resonance,
+				"resonance_key": resonance_key,
 				"effect_age": maxf(0.0, pair_age - float(_resonance_birth_ages[resonance_key])),
 			})
 	for resonance_key in _resonance_birth_ages.keys():
@@ -206,8 +210,26 @@ func _draw_resonances() -> void:
 			_resonance_birth_ages.erase(resonance_key)
 
 	var phase := Time.get_ticks_msec() * 0.001
+	var drawn_global_resonances := {}
 	for resonance_id in groups_by_type:
 		var groups: Array = groups_by_type[resonance_id]
+		if resonance_id in ["gy", "gold_gold"]:
+			var global_state := _global_resonance_states.get(resonance_id, {}) as Dictionary
+			if global_state.is_empty():
+				global_state = {
+					"resonance_id": resonance_id,
+					"birth_time": _simulation_age,
+					"anchor": Vector2(groups[0]["points"][0]),
+					"tile_births": {},
+					"pair_local_positions": {},
+					"pair_sample_counts": {},
+					"scheduled_pairs": {},
+				}
+				_global_resonance_states[resonance_id] = global_state
+			for group in groups:
+				group["global_state"] = global_state
+				group["simulation_age"] = _simulation_age
+			drawn_global_resonances[resonance_id] = true
 		var first_group: Dictionary = groups[0]
 		var first_wave: Dictionary = first_group["first"]
 		var second_wave: Dictionary = first_group["second"]
@@ -215,6 +237,9 @@ func _draw_resonances() -> void:
 			DeveloperResonanceRenderer.draw_same_color(self, resonance_id, groups, ARENA_RECT, phase)
 		else:
 			DeveloperResonanceRenderer.draw_mixed(self, resonance_id, groups, ARENA_RECT, phase)
+	for resonance_id in _global_resonance_states:
+		if not drawn_global_resonances.has(resonance_id):
+			DeveloperResonanceRenderer.draw_persistent_global(self, resonance_id, _global_resonance_states[resonance_id], ARENA_RECT, _simulation_age)
 	_last_geometry_usec = Time.get_ticks_usec() - started_usec
 
 
@@ -368,6 +393,8 @@ func _clear_room() -> void:
 	_resonators.clear()
 	_waves.clear()
 	_resonance_birth_ages.clear()
+	_global_resonance_states.clear()
+	_simulation_age = 0.0
 	_next_volley_index = 1
 	_current_volley_index = 0
 	_update_stats()

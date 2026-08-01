@@ -10,6 +10,10 @@ const YY_LINE_REVEAL_TIME := 0.10
 const YY_PLATEAU_TIME := 0.22
 const YY_FADE_TIME := 0.95
 const YY_CENTER_LENGTH_BOOST := 1.18
+const GY_TILE_DELAY := 0.05
+const GY_TILE_REVEAL_TIME := 0.13
+const GY_REVEAL_MANHATTAN_RADIUS := 2
+const GLOBAL_SEED_LEAD_TIME := 0.10
 const CURVE_DATA = preload("res://scripts/dev/ResonanceCurveData.gd")
 const PENROSE_DATA = preload("res://scripts/dev/PenrosePatchData.gd")
 
@@ -46,6 +50,12 @@ static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, 
 			_draw_rhombic_grids(canvas, groups, arena)
 		"kg":
 			_draw_inflation_stars(canvas, groups, phase)
+
+
+static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, state: Dictionary, arena: Rect2, simulation_age: float) -> void:
+	match resonance_id:
+		"gy":
+			_render_rhombic_grid(canvas, state, arena, simulation_age)
 
 
 static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: float) -> void:
@@ -160,44 +170,112 @@ static func _draw_branching_bushes(canvas: CanvasItem, groups: Array) -> void:
 
 
 static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2) -> void:
-	var points := _unique_points(groups, 40)
-	if points.is_empty():
+	if groups.is_empty() or not groups[0].has("global_state"):
 		return
-	var color := ResonanceCatalog.resonance_color(4, 5)
+	var state: Dictionary = groups[0]["global_state"]
 	var first: Dictionary = groups[0]["first"]
 	var second: Dictionary = groups[0]["second"]
-	var direction_a := Vector2.from_angle(float(first["angle"]) + PI * 0.5)
-	var direction_b := Vector2.from_angle(float(second["angle"]) + PI * 0.5)
-	var normal_a := Vector2.from_angle(float(first["angle"]))
-	var normal_b := Vector2.from_angle(float(second["angle"]))
-	var spacing := ResonanceCatalog.GAME_CASCADE_SPACING
-	var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
-	var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
-	var edge_length := clampf(sqrt(step_a.length() * step_b.length()) / 3.0, 7.0, 36.0)
-	var u := direction_a * edge_length
-	var v := direction_b * edge_length
+	var gold_wave: Dictionary = first if first["color_index"] == 5 else second
+	var yellow_wave: Dictionary = first if first["color_index"] == 4 else second
+	if not state.has("grid_velocity"):
+		var normal_gold := Vector2.from_angle(float(gold_wave["angle"]))
+		var normal_yellow := Vector2.from_angle(float(yellow_wave["angle"]))
+		var direction_gold := Vector2.from_angle(float(gold_wave["angle"]) + PI * 0.5)
+		var direction_yellow := Vector2.from_angle(float(yellow_wave["angle"]) + PI * 0.5)
+		var spacing := ResonanceCatalog.GAME_CASCADE_SPACING
+		var step_gold := _solve_normal_system(normal_gold, normal_yellow, Vector2(spacing, 0.0))
+		var step_yellow := _solve_normal_system(normal_gold, normal_yellow, Vector2(0.0, spacing))
+		var edge_length := sqrt(step_gold.length() * step_yellow.length()) / 3.0
+		state["grid_velocity"] = _solve_normal_system(normal_gold, normal_yellow, Vector2(ResonanceCatalog.GAME_WAVE_SPEED, ResonanceCatalog.GAME_WAVE_SPEED))
+		state["u"] = direction_gold * edge_length
+		state["v"] = direction_yellow * edge_length
+	var simulation_age := float(groups[0]["simulation_age"])
+	var origin := _global_grid_origin(state, simulation_age)
+	var u: Vector2 = state["u"]
+	var v: Vector2 = state["v"]
 	var determinant := u.cross(v)
-	if absf(determinant) < 0.001:
+	if absf(determinant) <= 0.001:
 		return
-	var anchor: Vector2 = points[0] # accepted vertex-anchor correction
-	var tiles := {}
-	for point in points:
-		var local := point - anchor
-		var seed_i := roundi(local.cross(v) / determinant)
-		var seed_j := roundi(u.cross(local) / determinant)
-		for di in range(-2, 3):
-			for dj in range(-2, 3):
+	for group in groups:
+		var pair_key: String = group["resonance_key"]
+		var local := _update_pair_local_position(state, pair_key, group["points"], origin)
+		if bool(state["scheduled_pairs"].get(pair_key, false)):
+			continue
+		state["scheduled_pairs"][pair_key] = true
+		var seed := _nearest_lattice_vertex(local, u, v)
+		var candidates: Array[Dictionary] = []
+		for di in range(-GY_REVEAL_MANHATTAN_RADIUS, GY_REVEAL_MANHATTAN_RADIUS + 1):
+			for dj in range(-GY_REVEAL_MANHATTAN_RADIUS, GY_REVEAL_MANHATTAN_RADIUS + 1):
 				var shell: int = absi(di) + absi(dj)
-				if shell > 2:
+				if shell > GY_REVEAL_MANHATTAN_RADIUS:
 					continue
-				var i := seed_i + di
-				var j := seed_j + dj
-				tiles["%d:%d" % [i, j]] = Vector2i(i, j)
-	for coordinate in tiles.values():
-		var p0 := anchor + float(coordinate.x) * u + float(coordinate.y) * v
+				candidates.append({"coordinate": seed + Vector2i(di, dj), "shell": shell, "angle": atan2(float(dj), float(di)) if di != 0 or dj != 0 else -PI})
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return int(a["shell"]) < int(b["shell"]) or (int(a["shell"]) == int(b["shell"]) and float(a["angle"]) < float(b["angle"]))
+		var pair_birth := simulation_age - float(group.get("effect_age", 0.0))
+		for order in range(candidates.size()):
+			var coordinate: Vector2i = candidates[order]["coordinate"]
+			var tile_key := "%d:%d" % [coordinate.x, coordinate.y]
+			var scheduled := pair_birth + float(order) * GY_TILE_DELAY
+			if coordinate == seed:
+				scheduled = pair_birth - GLOBAL_SEED_LEAD_TIME
+			state["tile_births"][tile_key] = minf(float(state["tile_births"].get(tile_key, INF)), scheduled)
+	_render_rhombic_grid(canvas, state, _arena, simulation_age)
+
+
+static func _render_rhombic_grid(canvas: CanvasItem, state: Dictionary, arena: Rect2, simulation_age: float) -> void:
+	if not state.has("u"):
+		return
+	var origin := _global_grid_origin(state, simulation_age)
+	var u: Vector2 = state["u"]
+	var v: Vector2 = state["v"]
+	var color := ResonanceCatalog.resonance_color(4, 5)
+	for tile_key in state["tile_births"]:
+		var birth := float(state["tile_births"][tile_key])
+		if simulation_age < birth:
+			continue
+		var parts := String(tile_key).split(":")
+		var coordinate := Vector2i(int(parts[0]), int(parts[1]))
+		var p0 := origin + float(coordinate.x) * u + float(coordinate.y) * v
+		var center := p0 + 0.5 * (u + v)
+		if not arena.grow(48.0).has_point(center):
+			continue
+		var alpha := _smoothstep((simulation_age - birth) / GY_TILE_REVEAL_TIME)
 		var tile := PackedVector2Array([p0, p0 + u, p0 + u + v, p0 + v, p0])
-		canvas.draw_polyline(tile, Color(color, 0.68), 1.45, true)
-	canvas.draw_circle(anchor, 3.2, INK)
+		canvas.draw_polyline(tile, Color(color, 0.76 * alpha), 1.65, true)
+
+
+static func _global_grid_origin(state: Dictionary, simulation_age: float) -> Vector2:
+	return Vector2(state["anchor"]) + Vector2(state.get("grid_velocity", Vector2.ZERO)) * (simulation_age - float(state["birth_time"]))
+
+
+static func _update_pair_local_position(state: Dictionary, pair_key: String, points: Array, origin: Vector2) -> Vector2:
+	var sample := Vector2.ZERO
+	for point in points:
+		sample += Vector2(point) - origin
+	sample /= float(maxi(1, points.size()))
+	var count := int(state["pair_sample_counts"].get(pair_key, 0))
+	var previous := Vector2(state["pair_local_positions"].get(pair_key, sample))
+	var averaged := (previous * float(count) + sample) / float(count + 1)
+	state["pair_local_positions"][pair_key] = averaged
+	state["pair_sample_counts"][pair_key] = count + 1
+	return averaged
+
+
+static func _nearest_lattice_vertex(local: Vector2, u: Vector2, v: Vector2) -> Vector2i:
+	var determinant := u.cross(v)
+	var approximate := Vector2(local.cross(v) / determinant, u.cross(local) / determinant)
+	var base := Vector2i(roundi(approximate.x), roundi(approximate.y))
+	var best := base
+	var best_distance := INF
+	for di in range(-1, 2):
+		for dj in range(-1, 2):
+			var candidate := Vector2i(base.x + di, base.y + dj)
+			var distance := local.distance_squared_to(float(candidate.x) * u + float(candidate.y) * v)
+			if distance < best_distance:
+				best_distance = distance
+				best = candidate
+	return best
 
 
 static func _build_local_bush() -> Array[Dictionary]:

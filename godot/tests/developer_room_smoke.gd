@@ -91,6 +91,11 @@ func _run() -> void:
 	var first_line_center := (first_line_points[0] + first_line_points[1]) * 0.5
 	var next_line_center := (next_line_points[0] + next_line_points[1]) * 0.5
 	_expect(is_equal_approx(first_line_center.distance_to(next_line_center), ResonanceCatalog.GAME_CASCADE_SPACING), "straight cascade fronts use the shared circle spacing")
+	var solved_grid_velocity := DeveloperResonanceRenderer._solve_normal_system(Vector2.RIGHT, Vector2.DOWN, Vector2(118.0, 118.0))
+	_expect(solved_grid_velocity.is_equal_approx(Vector2(118.0, 118.0)), "global straight-wave grids solve both normal velocity constraints")
+	var lattice_u := Vector2(12.0, 0.0)
+	var lattice_v := Vector2(4.0, 9.0)
+	_expect(DeveloperResonanceRenderer._nearest_lattice_vertex(2.0 * lattice_u - lattice_v + Vector2(0.2, -0.1), lattice_u, lattice_v) == Vector2i(2, -1), "rhomb grid anchors an intersection to its nearest lattice vertex")
 	var bush_segments := DeveloperResonanceRenderer._build_local_bush()
 	_expect(DeveloperResonanceRenderer.BUSH_INITIAL_COMPLETED_BRANCHES == 1, "branching bush animation starts directly from its second step")
 	for branch_index in range(5):

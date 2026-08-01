@@ -159,6 +159,22 @@ def verify_exact_restorations() -> None:
     require('"volley_index": _current_volley_index' in room, "Every developer wave must retain its shared volley index")
     require("corresponding straight waves share one volley index" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover corresponding Y/Y cascade pairs")
 
+    for gy_contract in (
+        "const GY_TILE_DELAY := 0.05",
+        "const GY_TILE_REVEAL_TIME := 0.13",
+        "const GY_REVEAL_MANHATTAN_RADIUS := 2",
+        "sqrt(step_gold.length() * step_yellow.length()) / 3.0",
+        "_solve_normal_system(normal_gold, normal_yellow, Vector2(ResonanceCatalog.GAME_WAVE_SPEED, ResonanceCatalog.GAME_WAVE_SPEED))",
+        "_nearest_lattice_vertex(local, u, v)",
+        'state["tile_births"][tile_key] = minf',
+    ):
+        require(gy_contract in renderer, f"Missing accepted G/Y global rhomb-grid contract: {gy_contract}")
+    require('"gy":\n\t\t\t_render_rhombic_grid' in renderer, "G/Y must keep drawing one persistent global grid between intersections")
+    require('"global_state": global_state' not in room, "Global state must be shared by reference rather than copied into group literals")
+    require('group["global_state"] = global_state' in room, "All G/Y intersections must reveal one shared global grid")
+    require("global straight-wave grids solve both normal velocity constraints" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover global grid velocity")
+    require("rhomb grid anchors an intersection to its nearest lattice vertex" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover G/Y vertex anchoring")
+
     require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
     for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
         require(coefficient in renderer, f"Missing accepted grid/Voronoi coefficient {coefficient}")
