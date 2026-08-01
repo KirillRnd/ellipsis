@@ -163,7 +163,7 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 	var direction_b := Vector2.from_angle(float(second["angle"]) + PI * 0.5)
 	var normal_a := Vector2.from_angle(float(first["angle"]))
 	var normal_b := Vector2.from_angle(float(second["angle"]))
-	var spacing := 118.0 * 0.235
+	var spacing := 118.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
 	var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
 	var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
 	var edge_length := clampf(sqrt(step_a.length() * step_b.length()) / 3.0, 7.0, 36.0)
@@ -434,7 +434,7 @@ static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2)
 	var second: Dictionary = groups[0]["second"]
 	var normal_a := Vector2.from_angle(float(first["angle"]))
 	var normal_b := Vector2.from_angle(float(second["angle"]))
-	var spacing := 118.0 * 0.22
+	var spacing := 118.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
 	var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
 	var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
 	var typical_step := sqrt(step_a.length() * step_b.length())

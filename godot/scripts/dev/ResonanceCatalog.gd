@@ -1,6 +1,8 @@
 class_name ResonanceCatalog
 extends RefCounted
 
+const GAME_RESONATOR_VOLLEY_INTERVAL := 2.35 * 0.25
+
 const COLORS := [
 	{"id": "violet", "symbol": "Ф", "ru": "Фиолетовый", "en": "Violet", "geometry": "circle", "color": Color("8d4bd6")},
 	{"id": "blue", "symbol": "С", "ru": "Синий", "en": "Blue", "geometry": "circle", "color": Color("3979d2")},

@@ -160,8 +160,21 @@ def verify_developer_presets() -> None:
     require("_spawn_resonator(colors[source_index]" in room, "Preset must place both configured colors")
 
 
+def verify_developer_timing() -> None:
+    main = (GODOT / "scripts" / "Main.gd").read_text(encoding="utf-8")
+    catalog = (GODOT / "scripts" / "dev" / "ResonanceCatalog.gd").read_text(encoding="utf-8")
+    room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
+    renderer = (GODOT / "scripts" / "dev" / "DeveloperResonanceRenderer.gd").read_text(encoding="utf-8")
+    main_interval = re.search(r"const RESONATOR_VOLLEY_INTERVAL := (.+)", main)
+    dev_interval = re.search(r"const GAME_RESONATOR_VOLLEY_INTERVAL := (.+)", catalog)
+    require(main_interval is not None and dev_interval is not None, "Both game and developer volley intervals must be declared")
+    require(main_interval.group(1).strip() == dev_interval.group(1).strip(), "Developer x1 cascade timing must exactly match the main game")
+    require("const CASCADE_PERIOD := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in room, "Developer cascade must use the shared game-rate value")
+    require(renderer.count("118.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL") == 2, "Grid spacing must follow the actual developer cascade cadence")
+
+
 def main() -> int:
-    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations, verify_developer_presets)
+    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations, verify_developer_presets, verify_developer_timing)
     try:
         for check in checks:
             check()
