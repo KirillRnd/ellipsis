@@ -44,6 +44,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	_track_mouse_cursor()
 	if not _simulation_paused:
 		var scaled_delta: float = delta * float(SPEEDS[_speed_index])
 		for wave in _waves:
@@ -56,12 +57,11 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if _settings_open():
 		return
 	if event is InputEventMouseMotion:
-		_cursor_position = _clamp_to_arena(event.position)
-		queue_redraw()
+		_update_cursor_from_pointer(event.position)
 	elif event is InputEventScreenTouch and event.pressed:
 		_cursor_position = _clamp_to_arena(event.position)
 		if ARENA_RECT.has_point(event.position):
@@ -87,6 +87,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		_change_speed(-1)
 	elif event.is_action_pressed("dev_faster"):
 		_change_speed(1)
+
+
+func _track_mouse_cursor() -> void:
+	_update_cursor_from_pointer(get_viewport().get_mouse_position())
+
+
+func _update_cursor_from_pointer(pointer_position: Vector2) -> void:
+	if not ARENA_RECT.has_point(pointer_position):
+		return
+	var next_position := _clamp_to_arena(pointer_position)
+	if _cursor_position.is_equal_approx(next_position):
+		return
+	_cursor_position = next_position
+	queue_redraw()
 
 
 func _draw() -> void:

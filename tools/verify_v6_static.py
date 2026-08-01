@@ -111,6 +111,11 @@ def verify_project() -> None:
     ):
         require((GODOT / relative).is_file(), f"Missing runtime file: {relative}")
 
+    developer_room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
+    require("func _input(event: InputEvent)" in developer_room, "DeveloperRoom must receive GUI-consumed pointer input")
+    require("get_viewport().get_mouse_position()" in developer_room, "DeveloperRoom must track the live mouse position")
+    require("func _unhandled_input" not in developer_room, "DeveloperRoom cursor must not depend on unhandled GUI input")
+
 
 def main() -> int:
     checks = (verify_catalog, verify_bundle, verify_project)
