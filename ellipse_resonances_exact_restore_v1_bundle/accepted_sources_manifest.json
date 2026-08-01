@@ -1,0 +1,73 @@
+{
+  "principle": "Первые 7 резонансов не перерисовываются: вставлен целиком исходный ellipse_resonances_overview_v2.png. Поздние 6 панелей взяты из точных зафиксированных snapshot-файлов.",
+  "original_block": {
+    "overview": "/mnt/data/ellipse_resonances_overview_v2.png",
+    "script": "/mnt/data/ellipse_resonances_all_v2.py",
+    "overview_sha256": "988158b9331c5f99f232a022b28d1f322738b5b3d4345f559b45c8ef8afa41aa",
+    "script_sha256": "173575ce8a3f201ea78c1abe43102a357baf5a44e480492e7432c5a76f8474eb"
+  },
+  "accepted_late_resonances": [
+    {
+      "label": "Ж/З — кусты во всех движущихся пересечениях",
+      "generator": "/mnt/data/yz_resonance_test_v3_colored_flipped.py",
+      "generator_sha256": "82816baf77bea201e72327189c9acaab3cf882b83e818eb7746e14e78529bb97",
+      "snapshot": "/mnt/data/yz_resonance_test_v3_colored_flipped_snapshot.png",
+      "snapshot_sha256": "af531c5feccdc7239204b783650fe85abb8635a34cc67ce3a07ba5883403f924",
+      "gif": "/mnt/data/yz_resonance_test_v3_colored_flipped.gif",
+      "gif_sha256": "fd931f33f89e318f29543b47914f8344226ed089393c7a549772a9533c2e34f7"
+    },
+    {
+      "label": "Ж/Ж — последовательное заполнение сектора A→B",
+      "generator": "/mnt/data/yy_caustic_resonance_A_to_B.py",
+      "generator_sha256": "e0199906c89691763f08be808724203295f6cfd2660ac840b05e32cbe43d476b",
+      "snapshot": "/mnt/data/yy_caustic_resonance_A_to_B_snapshot.png",
+      "snapshot_sha256": "09b4ff290b30095f531013313512b71af89bc8ec9924d76f087fb56c24f8580e",
+      "gif": "/mnt/data/yy_caustic_resonance_A_to_B.gif",
+      "gif_sha256": "04ed22aa250ee4a2324a3cfe8846c9557fb84c990fb290fd280d14781ef72dce"
+    },
+    {
+      "label": "G/G — движущаяся плитка Пенроуза",
+      "generator": "/mnt/data/gg_global_grid_reveal_v3_staggered.py",
+      "generator_sha256": "a4928a7f401824bca1a11069ccd1a18586b7cf25a3760fb33283a01f46a4718a",
+      "snapshot": "/mnt/data/gg_global_grid_reveal_v3_staggered/gg_global_grid_reveal_v3_staggered_snapshot.png",
+      "snapshot_sha256": "5bbb7c17eb8379f7a2b5a2ab084e0ce8c9b09a6b374d88b2b8c0ca98c9aa2720",
+      "gif": "/mnt/data/gg_global_grid_reveal_v3_staggered/gg_global_grid_reveal_v3_staggered.gif",
+      "gif_sha256": "311eb8e1e0bc312e511f99dee726695d11416283c54de1d67dc823612c60b7bf"
+    },
+    {
+      "label": "G/Ж — равномерная ромбическая сетка",
+      "generator": "/mnt/data/gold_yellow_rhomb_grid_v2_vertex_anchor.py",
+      "generator_sha256": "8846adeb1cb61c93607abe2add88807b057db4a5bd596a0c9a6b6e3a1a9312f0",
+      "snapshot": "/mnt/data/gold_yellow_rhomb_grid_v2_vertex_anchor/gold_yellow_rhomb_grid_v2_vertex_anchor_snapshot.png",
+      "snapshot_sha256": "ec918125c1c6761e05a91dd02d1d80f9943713ece38db1fc6858b812f0e2d0ef",
+      "gif": "/mnt/data/gold_yellow_rhomb_grid_v2_vertex_anchor/gold_yellow_rhomb_grid_v2_vertex_anchor.gif",
+      "gif_sha256": "cbac867f07559d5b2a2a1beb1fad29f843b06fe0a9d7e79e49acfdd1e8b19df1"
+    },
+    {
+      "label": "К/К — Вороной с невидимым guard-ring",
+      "generator": "/mnt/data/red_red_voronoi_circles_v4_guarded.py",
+      "generator_sha256": "4cacf3191619ad6c3976bedcc8fd5530228422a148ad79286932e873bc6d27a7",
+      "snapshot": "/mnt/data/red_red_voronoi_circles_v4_guarded/red_red_voronoi_circles_v4_guarded_snapshot.png",
+      "snapshot_sha256": "6ee11621fe5e8d7294284b0195a753836c78acd89e467b181cbd4b98db0fbfab",
+      "gif": "/mnt/data/red_red_voronoi_circles_v4_guarded/red_red_voronoi_circles_v4_guarded.gif",
+      "gif_sha256": "77c2ec1475f01c08859826d5d82bc80847f8bfb1dea370531397141529e5137c"
+    },
+    {
+      "label": "К/G — гирлянда инфляционных звёзд",
+      "generator": "/mnt/data/kg_variant2_inflation_sun_tuned_v2.py",
+      "generator_sha256": "15245666dc4f96e86d22da5a083c770ef1f471edcf5b23ea85e1d1389e4cb84b",
+      "snapshot": "/mnt/data/kg_variant2_inflation_sun_tuned_v2/kg_variant2_inflation_sun_tuned_v2_snapshot.png",
+      "snapshot_sha256": "2ecd585d4d2b3c52fe45f5d68cc9b657420630e28bb3bc36de2dd66342b29beb",
+      "gif": "/mnt/data/kg_variant2_inflation_sun_tuned_v2/kg_variant2_inflation_sun_tuned_v2.gif",
+      "gif_sha256": "a9c204877a02e4185472b77a582d4f1a64b4eff054acaeb438ca65c5defa69d9"
+    }
+  ],
+  "output": {
+    "png": "/mnt/data/ellipse_resonances_exact_restore_v1/ellipse_resonances_exact_restore_v1.png",
+    "sha256": "826272e92b96f482952b920d531d885b599a5e00efcf08534b414865ae818a23",
+    "size": [
+      2048,
+      2061
+    ]
+  }
+}
