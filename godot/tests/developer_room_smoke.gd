@@ -54,6 +54,7 @@ func _run() -> void:
 		_expect(wave["spiral_mode"] == "long" and wave["persistent"], "continuous green wave is a persistent long spiral")
 
 	var base_spiral := {"geometry": "spiral", "origin": Vector2.ZERO, "angle": 0.0, "age": 2.0, "spiral_chirality": 1.0}
+	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_OMEGA * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL, TAU * 2.0), "spiral crosses a fixed point twice per circle cascade period")
 	var short_spiral := base_spiral.duplicate()
 	short_spiral["spiral_mode"] = "short"
 	var short_points := DeveloperWaveGeometry.front_points(short_spiral)

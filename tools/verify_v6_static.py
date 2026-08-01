@@ -179,8 +179,9 @@ def verify_spiral_modes() -> None:
     smoke = (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8")
     require("const SPIRAL_MAX_TURNS := 3.0" in geometry, "Long spiral must stop growing at three turns")
     require("const SPIRAL_SHORT_TURNS := 1.5" in geometry, "Short spiral must remain one and a half turns long")
-    require("const SPIRAL_GROW_TIME := 0.72" in geometry, "Spiral growth timing must match the accepted source")
-    require("const SPIRAL_OMEGA := TAU * SPIRAL_MAX_TURNS / SPIRAL_GROW_TIME" in geometry, "Both spiral modes must share one parametric head speed")
+    require("const SPIRAL_CROSSINGS_PER_CASCADE := 2.0" in geometry, "Spiral frequency must define two fixed-point crossings per cascade")
+    require("const SPIRAL_OMEGA := TAU * SPIRAL_CROSSINGS_PER_CASCADE / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in geometry, "Spiral animation speed must derive from the shared circle cascade period")
+    require("const SPIRAL_GROW_TIME := TAU * SPIRAL_MAX_TURNS / SPIRAL_OMEGA" in geometry, "Long spiral growth time must follow its synchronized angular speed")
     require("head = minf(live_head, TAU * SPIRAL_MAX_TURNS)" in geometry, "Long spiral head must stop at 6 pi")
     require("tail = maxf(0.0, head - TAU * SPIRAL_SHORT_TURNS)" in geometry, "Short spiral must use a sliding 3 pi window")
     require("tail_at_stop + SPIRAL_OMEGA * (age - stop_age)" in geometry, "Stopped short spiral must erase its remaining tail")
@@ -193,6 +194,7 @@ def verify_spiral_modes() -> None:
     require("short spiral tail detaches from the center" in smoke, "Developer smoke test must cover the absolute-theta tail")
     require("short spiral head stays on its fixed emission ray" in smoke, "Developer smoke test must cover alpha = beta - head")
     require("long spiral stops growing at three turns" in smoke, "Developer smoke test must cover long spiral growth cap")
+    require("spiral crosses a fixed point twice per circle cascade period" in smoke, "Developer smoke test must cover spiral-to-circle frequency synchronization")
     require("continuous cascade does not stack long spirals" in smoke, "Developer smoke test must cover held spiral persistence")
 
 
