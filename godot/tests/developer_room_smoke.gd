@@ -54,7 +54,10 @@ func _run() -> void:
 		_expect(wave["spiral_mode"] == "long" and wave["persistent"], "continuous green wave is a persistent long spiral")
 
 	var base_spiral := {"geometry": "spiral", "origin": Vector2.ZERO, "angle": 0.0, "age": 2.0, "spiral_chirality": 1.0}
-	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_OMEGA * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL, TAU * 2.0), "spiral crosses a fixed point twice per circle cascade period")
+	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_OMEGA * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL, TAU), "each spiral crosses a fixed point once per circle cascade period")
+	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_OMEGA * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * 2.0, TAU * 2.0), "two green resonators produce two fixed-point crossings per cascade period")
+	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_PITCH * TAU, ResonanceCatalog.GAME_WAVE_SPEED * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL), "spiral turn spacing equals circle cascade spacing")
+	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_PITCH * DeveloperWaveGeometry.SPIRAL_OMEGA, ResonanceCatalog.GAME_WAVE_SPEED), "spiral head and circle fronts share one radial speed")
 	var short_spiral := base_spiral.duplicate()
 	short_spiral["spiral_mode"] = "short"
 	var short_points := DeveloperWaveGeometry.front_points(short_spiral)

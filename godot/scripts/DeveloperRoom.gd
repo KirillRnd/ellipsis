@@ -3,7 +3,7 @@ extends Control
 const MAIN_MENU_SCENE := "res://scenes/MainMenu.tscn"
 const MAX_RESONATORS := 5
 const MAX_WAVES := 40
-const WAVE_SPEED := 118.0
+const WAVE_SPEED := ResonanceCatalog.GAME_WAVE_SPEED
 const WAVE_LIFETIME := 4.8
 const CASCADE_PERIOD := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
 const ARENA_RECT := Rect2(252.0, 72.0, 996.0, 616.0)

@@ -162,6 +162,7 @@ def verify_developer_presets() -> None:
 
 def verify_developer_timing() -> None:
     main = (GODOT / "scripts" / "Main.gd").read_text(encoding="utf-8")
+    wave = (GODOT / "scripts" / "Wave.gd").read_text(encoding="utf-8")
     catalog = (GODOT / "scripts" / "dev" / "ResonanceCatalog.gd").read_text(encoding="utf-8")
     room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
     renderer = (GODOT / "scripts" / "dev" / "DeveloperResonanceRenderer.gd").read_text(encoding="utf-8")
@@ -169,8 +170,13 @@ def verify_developer_timing() -> None:
     dev_interval = re.search(r"const GAME_RESONATOR_VOLLEY_INTERVAL := (.+)", catalog)
     require(main_interval is not None and dev_interval is not None, "Both game and developer volley intervals must be declared")
     require(main_interval.group(1).strip() == dev_interval.group(1).strip(), "Developer x1 cascade timing must exactly match the main game")
+    main_speed = re.search(r"const SHARED_SPEED := (.+)", wave)
+    dev_speed = re.search(r"const GAME_WAVE_SPEED := (.+)", catalog)
+    require(main_speed is not None and dev_speed is not None, "Both game and developer wave speeds must be declared")
+    require(main_speed.group(1).strip() == dev_speed.group(1).strip(), "Developer wave speed must exactly match the main game")
     require("const CASCADE_PERIOD := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in room, "Developer cascade must use the shared game-rate value")
-    require(renderer.count("118.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL") == 2, "Grid spacing must follow the actual developer cascade cadence")
+    require("const WAVE_SPEED := ResonanceCatalog.GAME_WAVE_SPEED" in room, "Developer waves must use the shared game speed")
+    require(renderer.count("ResonanceCatalog.GAME_WAVE_SPEED * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL") == 2, "Grid spacing must follow the actual developer cascade cadence")
 
 
 def verify_spiral_modes() -> None:
@@ -179,8 +185,10 @@ def verify_spiral_modes() -> None:
     smoke = (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8")
     require("const SPIRAL_MAX_TURNS := 3.0" in geometry, "Long spiral must stop growing at three turns")
     require("const SPIRAL_SHORT_TURNS := 1.5" in geometry, "Short spiral must remain one and a half turns long")
-    require("const SPIRAL_CROSSINGS_PER_CASCADE := 2.0" in geometry, "Spiral frequency must define two fixed-point crossings per cascade")
-    require("const SPIRAL_OMEGA := TAU * SPIRAL_CROSSINGS_PER_CASCADE / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in geometry, "Spiral animation speed must derive from the shared circle cascade period")
+    require("const SPIRAL_TURN_SPACING := ResonanceCatalog.GAME_WAVE_SPEED * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in geometry, "Spiral turn spacing must equal circle cascade spacing")
+    require("const SPIRAL_PITCH := SPIRAL_TURN_SPACING / TAU" in geometry, "Archimedean pitch must derive from the required turn spacing")
+    require("const SPIRAL_POINT_CROSSINGS_PER_SOURCE_PER_CASCADE := 1.0" in geometry, "Each spiral source must cross a fixed point once per cascade")
+    require("const SPIRAL_OMEGA := TAU * SPIRAL_POINT_CROSSINGS_PER_SOURCE_PER_CASCADE / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in geometry, "Spiral animation speed must derive from the shared circle cascade period")
     require("const SPIRAL_GROW_TIME := TAU * SPIRAL_MAX_TURNS / SPIRAL_OMEGA" in geometry, "Long spiral growth time must follow its synchronized angular speed")
     require("head = minf(live_head, TAU * SPIRAL_MAX_TURNS)" in geometry, "Long spiral head must stop at 6 pi")
     require("tail = maxf(0.0, head - TAU * SPIRAL_SHORT_TURNS)" in geometry, "Short spiral must use a sliding 3 pi window")
@@ -196,7 +204,10 @@ def verify_spiral_modes() -> None:
     require("short spiral head stays on its fixed emission ray" in smoke, "Developer smoke test must cover alpha = beta - head")
     require("long spiral stops growing at three turns" in smoke, "Developer smoke test must cover long spiral growth cap")
     require("long spiral rotation does not mirror with resonator direction" in smoke, "Developer smoke test must cover canonical long-spiral rotation direction")
-    require("spiral crosses a fixed point twice per circle cascade period" in smoke, "Developer smoke test must cover spiral-to-circle frequency synchronization")
+    require("each spiral crosses a fixed point once per circle cascade period" in smoke, "Developer smoke test must cover per-source spiral-to-circle frequency synchronization")
+    require("two green resonators produce two fixed-point crossings per cascade period" in smoke, "Developer smoke test must cover the requested two crossings for a resonator pair")
+    require("spiral turn spacing equals circle cascade spacing" in smoke, "Developer smoke test must cover spatial spiral-to-circle synchronization")
+    require("spiral head and circle fronts share one radial speed" in smoke, "Developer smoke test must cover radial speed synchronization")
     require("continuous cascade does not stack long spirals" in smoke, "Developer smoke test must cover held spiral persistence")
 
 
