@@ -2,9 +2,10 @@ extends Control
 
 const MAIN_MENU_SCENE := "res://scenes/MainMenu.tscn"
 const MAX_RESONATORS := 5
-const MAX_WAVES := 24
+const MAX_WAVES := 40
 const WAVE_SPEED := 118.0
 const WAVE_LIFETIME := 4.8
+const CASCADE_PERIOD := 0.235
 const ARENA_RECT := Rect2(252.0, 72.0, 996.0, 616.0)
 const SPEEDS := [0.25, 0.5, 1.0, 2.0]
 
@@ -17,6 +18,8 @@ var _resonators: Array[DeveloperResonator] = []
 var _waves: Array[Dictionary] = []
 var _cursor_position := ARENA_RECT.get_center()
 var _simulation_paused := false
+var _cascade_enabled := false
+var _cascade_accumulator := 0.0
 var _speed_index := 2
 var _last_resonance_count := 0
 var _last_pair_types := {}
@@ -29,6 +32,7 @@ var _stats_label: Label
 var _help_label: Label
 var _pause_button: Button
 var _speed_button: Button
+var _cascade_button: Button
 var _color_buttons: Array[Button] = []
 
 
@@ -47,6 +51,11 @@ func _process(delta: float) -> void:
 	_track_mouse_cursor()
 	if not _simulation_paused:
 		var scaled_delta: float = delta * float(SPEEDS[_speed_index])
+		if _cascade_enabled:
+			_cascade_accumulator += scaled_delta
+			while _cascade_accumulator >= CASCADE_PERIOD:
+				_cascade_accumulator -= CASCADE_PERIOD
+				_fire_volley()
 		for wave in _waves:
 			wave["age"] += scaled_delta
 			wave["extent"] = wave["age"] * WAVE_SPEED
@@ -272,6 +281,12 @@ func _toggle_simulation() -> void:
 	_refresh_text()
 
 
+func _toggle_cascade() -> void:
+	_cascade_enabled = not _cascade_enabled
+	_cascade_accumulator = CASCADE_PERIOD if _cascade_enabled else 0.0
+	_refresh_text()
+
+
 func _change_speed(direction: int) -> void:
 	_speed_index = clampi(_speed_index + direction, 0, SPEEDS.size() - 1)
 	_refresh_text()
@@ -322,21 +337,24 @@ func _build_ui() -> void:
 	_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	side.add_child(_stats_label)
 
-	_pause_button = _button(Vector2(18, 542), Vector2(92, 42), _toggle_simulation)
+	_cascade_button = _button(Vector2(18, 538), Vector2(190, 38), _toggle_cascade)
+	_cascade_button.name = "ContinuousCascadeButton"
+	side.add_child(_cascade_button)
+	_pause_button = _button(Vector2(18, 582), Vector2(92, 38), _toggle_simulation)
 	_pause_button.name = "PauseSimulationButton"
 	side.add_child(_pause_button)
-	_speed_button = _button(Vector2(116, 542), Vector2(92, 42), _change_speed.bind(1))
+	_speed_button = _button(Vector2(116, 582), Vector2(92, 38), _change_speed.bind(1))
 	_speed_button.name = "SimulationSpeedButton"
 	side.add_child(_speed_button)
-	var clear := _button(Vector2(18, 590), Vector2(190, 40), _clear_room)
+	var clear := _button(Vector2(18, 626), Vector2(190, 32), _clear_room)
 	clear.name = "ClearButton"
 	clear.text = "ОЧИСТИТЬ"
 	side.add_child(clear)
-	var settings_button := _button(Vector2(18, 636), Vector2(92, 40), _open_settings)
+	var settings_button := _button(Vector2(18, 664), Vector2(92, 32), _open_settings)
 	settings_button.name = "SettingsButton"
 	settings_button.text = "⚙"
 	side.add_child(settings_button)
-	var back := _button(Vector2(116, 636), Vector2(92, 40), _return_to_menu)
+	var back := _button(Vector2(116, 664), Vector2(92, 32), _return_to_menu)
 	back.name = "BackButton"
 	back.text = "←"
 	side.add_child(back)
@@ -378,6 +396,7 @@ func _refresh_text() -> void:
 		_color_buttons[index].text = "%s  %s" % [color_spec["symbol"], color_spec["ru"] if russian else color_spec["en"]]
 	_pause_button.text = "ПУСК" if _simulation_paused and russian else "RUN" if _simulation_paused else "ПАУЗА" if russian else "PAUSE"
 	_speed_button.text = "×%.2f" % float(SPEEDS[_speed_index])
+	_cascade_button.text = ("КАСКАД: ВКЛ" if _cascade_enabled else "КАСКАД: ВЫКЛ") if russian else ("CASCADE: ON" if _cascade_enabled else "CASCADE: OFF")
 	_help_label.text = (
 		"E — поставить · ПКМ — залп · Q/F — цвет · X — удалить · C — очистить · T — пауза · −/+ — скорость"
 		if russian

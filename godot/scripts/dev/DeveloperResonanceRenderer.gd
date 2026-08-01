@@ -2,6 +2,7 @@ class_name DeveloperResonanceRenderer
 extends RefCounted
 
 const INK := Color(0.96, 0.97, 1.0, 0.92)
+const CURVE_UNIT := 72.0
 
 
 static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Array, arena: Rect2, phase: float) -> void:
@@ -17,9 +18,9 @@ static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Ar
 		"yy":
 			_draw_sector_fans(canvas, groups)
 		"gold_gold":
-			_draw_penrose_pentagrid(canvas, groups, arena, phase)
+			_draw_penrose_tiles(canvas, groups, arena)
 		"kk":
-			_draw_guarded_voronoi(canvas, _unique_points(groups, 34), arena, _group_color(groups))
+			_draw_guarded_voronoi(canvas, _unique_points(groups, 28), groups, _group_color(groups))
 
 
 static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, arena: Rect2, phase: float) -> void:
@@ -27,7 +28,7 @@ static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, 
 		"fs":
 			_draw_lissajous_projections(canvas, groups, phase)
 		"sg":
-			_draw_delaunay_circumcircles(canvas, _unique_points(groups, 32), _group_color(groups))
+			_draw_delaunay_circumcircles(canvas, _unique_points(groups, 32), groups, ResonanceCatalog.resonance_color(1, 2))
 		"zg":
 			_draw_radial_fourier(canvas, groups, phase)
 		"yz":
@@ -86,84 +87,246 @@ static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, phase
 		canvas.draw_circle(first.lerp(second, ratio), 4.5, INK)
 
 
-static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vector2], color: Color) -> void:
+static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
+	var source_distance := 320.0
+	if not groups.is_empty():
+		source_distance = Vector2(groups[0]["first"]["origin"]).distance_to(Vector2(groups[0]["second"]["origin"]))
+	var radius_limit := source_distance * 0.55 # accepted limit 2.2 for sources four units apart
 	for triangle in _delaunay_triangles(points):
 		var circle := _circumcircle(points[triangle.x], points[triangle.y], points[triangle.z])
 		if circle.is_empty():
 			continue
 		var radius := sqrt(float(circle["radius_sq"]))
-		if radius <= 180.0:
+		if radius <= radius_limit:
 			canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
 	for point in points:
 		canvas.draw_circle(point, 3.0, INK)
 
 
 static func _draw_radial_fourier(canvas: CanvasItem, groups: Array, phase: float) -> void:
+	var master := ResonanceCurveData.radial_master()
+	var smooth := ResonanceCurveData.radial_smooth()
+	var scales := [0.58, 0.86, 1.15]
+	var maturities := [0.30, 0.58, 1.00]
 	for group in groups:
 		var first: Dictionary = group["first"]
 		var second: Dictionary = group["second"]
 		var green_wave: Dictionary = first if first["color_index"] == 3 else second
-		var age := minf(float(first["age"]), float(second["age"]))
-		var stages := clampi(int(age / 0.65) + 1, 1, 3)
 		var color := ResonanceCatalog.resonance_color(2, 3)
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
-			var orientation := (point - Vector2(green_wave["origin"])).angle()
+			var spiral_parameter := point.distance_to(Vector2(green_wave["origin"])) / 11.5
+			var stages := clampi(int(spiral_parameter / PI) + 1, 1, 3)
+			var orientation := (point - Vector2(green_wave["origin"])).angle() - PI * 0.5
 			for stage in range(stages):
-				var scale := 8.0 + stage * 7.5
-				var curve := PackedVector2Array()
-				for index in range(81):
-					var theta := TAU * float(index) / 80.0
-					var radius := scale * (1.0 + 0.20 * cos(5.0 * theta + phase * 0.22) + 0.10 * sin(3.0 * theta))
-					var local := Vector2(cos(theta) * radius, sin(theta) * radius * 0.72)
-					curve.append(point + local.rotated(orientation))
-				canvas.draw_polyline(curve, Color(color.lightened(stage * 0.07), 0.60 + stage * 0.14), 1.8, true)
+				var curve := _placed_stage_curve(master, smooth, maturities[stage], point, scales[stage] * CURVE_UNIT, orientation, 1.0)
+				canvas.draw_polyline(curve, Color(color.lightened(stage * 0.07), 0.64 + stage * 0.15), 1.55 + stage * 0.28, true)
 
 
 static func _draw_branching_bushes(canvas: CanvasItem, groups: Array) -> void:
 	var color := ResonanceCatalog.resonance_color(3, 4)
+	var segments := _build_local_bush()
 	for group in groups:
 		var first: Dictionary = group["first"]
 		var second: Dictionary = group["second"]
 		var green_wave: Dictionary = first if first["color_index"] == 3 else second
-		var other_wave: Dictionary = second if first["color_index"] == 3 else first
-		var source_axis := Vector2(other_wave["origin"]) - Vector2(green_wave["origin"])
+		var yellow_wave: Dictionary = first if first["color_index"] == 4 else second
+		var source_axis := Vector2(yellow_wave["origin"]) - Vector2(green_wave["origin"])
+		var rotation := float(yellow_wave["angle"]) # local +Y maps onto the yellow line tangent
+		var age := minf(float(first["age"]), float(second["age"]))
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
-			var side := signf(source_axis.cross(point - Vector2(green_wave["origin"])))
-			var trunk_direction := Vector2.from_angle(source_axis.angle() + side * PI * 0.5)
-			var trunk_end := point + trunk_direction * 42.0
-			canvas.draw_line(point, trunk_end, Color(color, 0.86), 2.2, true)
-			for branch_index in range(5):
-				var ratio := 0.20 + branch_index * 0.16
-				var joint := point.lerp(trunk_end, ratio)
-				var branch_side := -1.0 if branch_index % 2 == 0 else 1.0
-				var direction := trunk_direction.rotated(branch_side * (0.42 + 0.05 * branch_index))
-				var length := 23.0 - branch_index * 1.8
-				var branch_end := joint + direction * length
-				canvas.draw_line(joint, branch_end, Color(color.lightened(0.08), 0.78), 1.7, true)
-				canvas.draw_line(branch_end, branch_end + direction.rotated(branch_side * 0.46) * 10.0, Color(color.lightened(0.18), 0.70), 1.2, true)
+			var side := 1.0 if source_axis.cross(point - Vector2(green_wave["origin"])) >= 0.0 else -1.0
+			for segment in segments:
+				var progress := clampf((age - float(segment["birth"])) / 0.105, 0.0, 1.0)
+				if progress <= 0.0:
+					continue
+				var local_a: Vector2 = segment["start"]
+				var local_b: Vector2 = local_a.lerp(Vector2(segment["end"]), _smoothstep(progress))
+				local_a.y *= side
+				local_b.y *= side
+				var a := point + (local_a * 43.2).rotated(rotation)
+				var b := point + (local_b * 43.2).rotated(rotation)
+				canvas.draw_line(a, b, Color(color, 0.86), 1.8, true)
 
 
 static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2) -> void:
+	var points := _unique_points(groups, 40)
+	if points.is_empty():
+		return
 	var color := ResonanceCatalog.resonance_color(4, 5)
-	for group in groups:
-		if group["points"].is_empty():
-			continue
-		var anchor: Vector2 = group["points"][0]
-		var first: Dictionary = group["first"]
-		var second: Dictionary = group["second"]
-		var direction_a := Vector2.from_angle(float(first["angle"]) + PI * 0.5)
-		var direction_b := Vector2.from_angle(float(second["angle"]) + PI * 0.5)
-		var normal_a := Vector2(-direction_a.y, direction_a.x)
-		var normal_b := Vector2(-direction_b.y, direction_b.x)
-		for offset_index in range(-6, 7):
-			var offset := float(offset_index) * 24.0
-			var center_a := anchor + normal_a * offset
-			var center_b := anchor + normal_b * offset
-			canvas.draw_line(center_a - direction_a * 175.0, center_a + direction_a * 175.0, Color(color, 0.48), 1.25, true)
-			canvas.draw_line(center_b - direction_b * 175.0, center_b + direction_b * 175.0, Color(color, 0.48), 1.25, true)
-		canvas.draw_circle(anchor, 3.2, INK)
+	var first: Dictionary = groups[0]["first"]
+	var second: Dictionary = groups[0]["second"]
+	var direction_a := Vector2.from_angle(float(first["angle"]) + PI * 0.5)
+	var direction_b := Vector2.from_angle(float(second["angle"]) + PI * 0.5)
+	var normal_a := Vector2.from_angle(float(first["angle"]))
+	var normal_b := Vector2.from_angle(float(second["angle"]))
+	var spacing := 118.0 * 0.235
+	var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
+	var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
+	var edge_length := clampf(sqrt(step_a.length() * step_b.length()) / 3.0, 7.0, 36.0)
+	var u := direction_a * edge_length
+	var v := direction_b * edge_length
+	var determinant := u.cross(v)
+	if absf(determinant) < 0.001:
+		return
+	var anchor: Vector2 = points[0] # accepted vertex-anchor correction
+	var tiles := {}
+	for point in points:
+		var local := point - anchor
+		var seed_i := roundi(local.cross(v) / determinant)
+		var seed_j := roundi(u.cross(local) / determinant)
+		for di in range(-2, 3):
+			for dj in range(-2, 3):
+				var shell := abs(di) + abs(dj)
+				if shell > 2:
+					continue
+				var i := seed_i + di
+				var j := seed_j + dj
+				tiles["%d:%d" % [i, j]] = Vector2i(i, j)
+	for coordinate in tiles.values():
+		var p0 := anchor + float(coordinate.x) * u + float(coordinate.y) * v
+		var tile := PackedVector2Array([p0, p0 + u, p0 + u + v, p0 + v, p0])
+		canvas.draw_polyline(tile, Color(color, 0.68), 1.45, true)
+	canvas.draw_circle(anchor, 3.2, INK)
+
+
+static func _build_local_bush() -> Array[Dictionary]:
+	var shoots := {}
+	shoots["M1"] = _build_shoot(Vector2.ZERO, 90.0, Vector2(0.00, 1.00), 6, 0.96, 0.0, 0.70, 1.5, 0)
+	shoots["M2"] = _build_shoot(shoots["M1"]["points"][1], shoots["M1"]["angles"][0], Vector2(-0.32, 0.80), 4, 0.82, 34.0, 0.65, 2.5, 0)
+	shoots["M3"] = _build_shoot(shoots["M1"]["points"][2], shoots["M1"]["angles"][1], Vector2(0.31, 0.79), 4, 0.82, -32.0, 0.65, 2.5, 1)
+	shoots["M4"] = _build_shoot(shoots["M2"]["points"][1], shoots["M2"]["angles"][0], Vector2(-0.56, 0.56), 3, 0.76, 24.0, 0.65, 3.0, 1)
+	shoots["M5"] = _build_shoot(shoots["M3"]["points"][1], shoots["M3"]["angles"][0], Vector2(0.55, 0.62), 3, 0.76, -24.0, 0.65, 3.0, 0)
+	var order := [["M1",0],["M2",0],["M1",1],["M3",0],["M2",1],["M1",2],["M4",0],["M3",1],["M2",2],["M1",3],["M5",0],["M4",1],["M3",2],["M2",3],["M1",4],["M5",1],["M4",2],["M3",3],["M1",5],["M5",2]]
+	var births := {}
+	for index in range(order.size()):
+		births["%s:%d" % [order[index][0], order[index][1]]] = float(index) * 0.072
+	var result: Array[Dictionary] = []
+	for name in ["M1", "M2", "M3", "M4", "M5"]:
+		for index in range(shoots[name]["segments"].size()):
+			var segment: Dictionary = shoots[name]["segments"][index]
+			segment["birth"] = births["%s:%d" % [name, index]]
+			result.append(segment)
+	return result
+
+
+static func _build_shoot(start: Vector2, parent_angle: float, target: Vector2, count: int, ratio: float, split_angle: float, steering: float, alternation: float, phase: int) -> Dictionary:
+	var points: Array[Vector2] = [start]
+	var angles: Array[float] = []
+	var segments: Array[Dictionary] = []
+	var first_length := start.distance_to(target) * (1.0 - ratio) / (1.0 - pow(ratio, count))
+	var angle := parent_angle + split_angle
+	for index in range(count):
+		if index > 0:
+			var desired := rad_to_deg((target - points[-1]).angle())
+			angle += steering * wrapf(desired - angle, -180.0, 180.0) + alternation * (-1.0 if (index + phase) % 2 else 1.0)
+		var length := first_length * pow(ratio, index)
+		var next := points[-1] + Vector2.from_angle(deg_to_rad(angle)) * length
+		if (target - points[-1]).dot(next - points[-1]) <= 0.0:
+			angle = rad_to_deg((target - points[-1]).angle())
+			next = points[-1] + Vector2.from_angle(deg_to_rad(angle)) * length
+		segments.append({"start": points[-1], "end": next})
+		points.append(next)
+		angles.append(angle)
+	return {"points": points, "angles": angles, "segments": segments}
+
+
+static func _solve_normal_system(first: Vector2, second: Vector2, rhs: Vector2) -> Vector2:
+	var determinant := first.cross(second)
+	if absf(determinant) < 0.001:
+		return Vector2.ZERO
+	return Vector2((rhs.x * second.y - first.y * rhs.y) / determinant, (first.x * rhs.y - rhs.x * second.x) / determinant)
+
+
+static func _interpolate_unoriented_angle(first: float, second: float) -> float:
+	var difference := fposmod(second - first + PI * 0.5, PI) - PI * 0.5
+	return first + 0.5 * difference
+
+
+static func _median_nearest_distance(points: Array[Vector2]) -> float:
+	var nearest: Array[float] = []
+	for index in range(points.size()):
+		var distance := INF
+		for other in range(points.size()):
+			if index != other:
+				distance = minf(distance, points[index].distance_to(points[other]))
+		if not is_inf(distance):
+			nearest.append(distance)
+	nearest.sort()
+	if nearest.is_empty():
+		return 0.0
+	return nearest[floori(float(nearest.size()) * 0.5)]
+
+
+static func _build_guard_ring(cluster: Array[Vector2], local_step: float) -> Array[Vector2]:
+	var hull := _convex_hull(cluster)
+	var guards: Array[Vector2] = []
+	var distance := 1.45 * local_step
+	var edge_step := 0.95 * local_step
+	if hull.size() == 1:
+		for index in range(6):
+			guards.append(hull[0] + Vector2.from_angle(TAU * float(index) / 6.0) * distance)
+		return guards
+	for index in range(hull.size()):
+		var previous: Vector2 = hull[(index - 1 + hull.size()) % hull.size()]
+		var current: Vector2 = hull[index]
+		var next: Vector2 = hull[(index + 1) % hull.size()]
+		var incoming := (current - previous).normalized()
+		var outgoing := (next - current).normalized()
+		var normal_in := Vector2(incoming.y, -incoming.x)
+		var normal_out := Vector2(outgoing.y, -outgoing.x)
+		var bisector := (normal_in + normal_out).normalized()
+		if bisector.length_squared() < 0.001:
+			bisector = (current - _average_points(hull)).normalized()
+		guards.append(current + bisector * distance)
+	for index in range(hull.size()):
+		var a: Vector2 = hull[index]
+		var b: Vector2 = hull[(index + 1) % hull.size()]
+		var edge := b - a
+		var inner_count := maxi(0, int(floor(edge.length() / edge_step)) - 1)
+		var outward := Vector2(edge.y, -edge.x).normalized()
+		for inner in range(inner_count):
+			var ratio := float(inner + 1) / float(inner_count + 1)
+			guards.append(a.lerp(b, ratio) + outward * distance)
+	return guards
+
+
+static func _convex_hull(points: Array[Vector2]) -> Array[Vector2]:
+	var sorted := points.duplicate()
+	sorted.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x or (is_equal_approx(a.x, b.x) and a.y < b.y))
+	if sorted.size() <= 2:
+		return sorted
+	var lower: Array[Vector2] = []
+	for point in sorted:
+		while lower.size() >= 2 and (lower[-1] - lower[-2]).cross(point - lower[-1]) <= 0.0001:
+			lower.pop_back()
+		lower.append(point)
+	var upper: Array[Vector2] = []
+	for index in range(sorted.size() - 1, -1, -1):
+		var point: Vector2 = sorted[index]
+		while upper.size() >= 2 and (upper[-1] - upper[-2]).cross(point - upper[-1]) <= 0.0001:
+			upper.pop_back()
+		upper.append(point)
+	lower.pop_back()
+	upper.pop_back()
+	lower.append_array(upper)
+	return lower
+
+
+static func _average_points(points: Array[Vector2]) -> Vector2:
+	var result := Vector2.ZERO
+	for point in points:
+		result += point
+	return result / maxf(float(points.size()), 1.0)
+
+
+static func _point_segment_distance(point: Vector2, a: Vector2, b: Vector2) -> float:
+	var edge := b - a
+	if edge.length_squared() < 0.0001:
+		return point.distance_to(a)
+	var t := clampf((point - a).dot(edge) / edge.length_squared(), 0.0, 1.0)
+	return point.distance_to(a + edge * t)
 
 
 static func _draw_inflation_stars(canvas: CanvasItem, groups: Array, phase: float) -> void:
@@ -208,6 +371,10 @@ static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> v
 
 
 static func _draw_gielis_leaves(canvas: CanvasItem, groups: Array, phase: float) -> void:
+	var master := ResonanceCurveData.gielis_master()
+	var smooth := ResonanceCurveData.gielis_smooth()
+	var scales := [0.72, 1.02, 1.31, 1.60]
+	var maturities := [0.30, 0.56, 0.80, 1.00]
 	for group in groups:
 		var first_wave: Dictionary = group["first"]
 		var second_wave: Dictionary = group["second"]
@@ -217,24 +384,26 @@ static func _draw_gielis_leaves(canvas: CanvasItem, groups: Array, phase: float)
 		var stages := clampi(int(age / 0.5) + 1, 1, 4)
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
-			var side := signf(axis.cross(point - first_wave["origin"]))
+			var side := 1.0 if axis.cross(point - Vector2(first_wave["origin"])) >= 0.0 else -1.0
 			for stage in range(stages):
-				var scale := 9.0 + stage * 7.0
-				var curve := _gielis_curve(point, scale, axis_angle + (PI * 0.5 * side), phase * 0.03)
+				var curve := _placed_stage_curve(master, smooth, maturities[stage], point, scales[stage] * CURVE_UNIT, axis_angle, side)
 				var green := ResonanceCatalog.color_spec(3)["color"] as Color
-				canvas.draw_polyline(curve, Color(green.lightened(0.08 * stage), 0.58 + stage * 0.10), 1.7, true)
+				canvas.draw_polyline(curve, Color(green.lightened(0.08 * stage), 0.62 + stage * 0.11), 1.48 + stage * 0.22, true)
 
 
-static func _gielis_curve(center: Vector2, scale: float, rotation: float, phase: float) -> PackedVector2Array:
+static func _placed_stage_curve(master: PackedVector2Array, smooth: PackedVector2Array, maturity: float, center: Vector2, scale: float, rotation: float, y_sign: float) -> PackedVector2Array:
 	var curve := PackedVector2Array()
-	for index in range(97):
-		var theta := TAU * float(index) / 96.0
-		var term_a := pow(absf(cos(theta)), 1.2)
-		var term_b := pow(absf(sin(theta)), 1.2)
-		var radius := pow(maxf(term_a + term_b, 0.0001), -1.0 / 0.42)
-		var local := Vector2(cos(theta) * radius * 0.58, sin(theta) * radius * 1.25) * scale
-		curve.append(center + local.rotated(rotation + phase))
+	var blend := _smoothstep(maturity)
+	for index in range(master.size()):
+		var local := smooth[index].lerp(master[index], blend)
+		local.y *= y_sign
+		curve.append(center + (local * scale).rotated(rotation))
 	return curve
+
+
+static func _smoothstep(value: float) -> float:
+	var x := clampf(value, 0.0, 1.0)
+	return x * x * (3.0 - 2.0 * x)
 
 
 static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
@@ -255,73 +424,119 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 				canvas.draw_line(point - direction * 130.0, point + direction * 130.0, Color(yellow.lightened(0.24), 0.52), 1.4, true)
 
 
-static func _draw_penrose_pentagrid(canvas: CanvasItem, groups: Array, arena: Rect2, phase: float) -> void:
+static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2) -> void:
 	var points := _unique_points(groups, 28)
 	if points.is_empty():
 		return
-	var center := Vector2.ZERO
-	for point in points:
-		center += point
-	center /= float(points.size())
-	var reveal_radius := 70.0 + 55.0 * minf(_minimum_group_age(groups), 3.0)
+	var first: Dictionary = groups[0]["first"]
+	var second: Dictionary = groups[0]["second"]
+	var normal_a := Vector2.from_angle(float(first["angle"]))
+	var normal_b := Vector2.from_angle(float(second["angle"]))
+	var spacing := 118.0 * 0.22
+	var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
+	var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
+	var typical_step := sqrt(step_a.length() * step_b.length())
+	var tile_edge := clampf(0.42 * typical_step, 7.0, 34.0)
+	var tangent_a := Vector2(-normal_a.y, normal_a.x)
+	var tangent_b := Vector2(-normal_b.y, normal_b.x)
+	var base_angle := _interpolate_unoriented_angle(tangent_a.angle(), tangent_b.angle())
+	var anchor: Vector2 = points[0]
+	var reveal_radius := 1.18 * typical_step
+	var candidates: Array[Dictionary] = []
+	for local_tile in PenrosePatchData.tiles():
+		var world := PackedVector2Array()
+		var center := Vector2.ZERO
+		for local_point in local_tile:
+			var transformed := anchor + (local_point * tile_edge).rotated(base_angle)
+			world.append(transformed)
+			center += transformed
+		center /= 4.0
+		if not arena.grow(40.0).has_point(center):
+			continue
+		var nearest := INF
+		for point in points:
+			nearest = minf(nearest, center.distance_to(point))
+		if nearest <= reveal_radius:
+			candidates.append({"points": world, "distance": nearest})
+	if candidates.is_empty():
+		return
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["distance"]) < float(b["distance"]))
+	var visible_count := clampi(int(_minimum_group_age(groups) / 0.055) + 1, 1, candidates.size())
 	var gold := ResonanceCatalog.color_spec(5)["color"] as Color
-	for family in range(5):
-		var normal := Vector2.from_angle(TAU * float(family) / 5.0 + phase * 0.015)
-		var tangent := Vector2(-normal.y, normal.x)
-		for offset_index in range(-5, 6):
-			var offset := float(offset_index) * 27.0 + sin(family * 1.7) * 8.0
-			var line_center := center + normal * offset
-			var half_length := minf(reveal_radius, 190.0)
-			var a := line_center - tangent * half_length
-			var b := line_center + tangent * half_length
-			if arena.has_point(a) or arena.has_point(b) or arena.has_point(line_center):
-				canvas.draw_line(a, b, Color(gold.lightened(0.14), 0.46), 1.2, true)
+	for index in range(visible_count):
+		var tile: PackedVector2Array = candidates[index]["points"]
+		var closed := tile.duplicate()
+		closed.append(tile[0])
+		canvas.draw_polyline(closed, Color(gold.lightened(0.14), 0.76), 1.65, true)
 
 
-static func _draw_guarded_voronoi(canvas: CanvasItem, points: Array[Vector2], arena: Rect2, color: Color) -> void:
+static func _draw_guarded_voronoi(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
 	if points.size() < 2:
 		return
-	var bounds := arena.grow(-8.0)
-	for site_index in range(points.size()):
-		var polygon := PackedVector2Array([
-			bounds.position,
-			Vector2(bounds.end.x, bounds.position.y),
-			bounds.end,
-			Vector2(bounds.position.x, bounds.end.y),
-		])
-		for other_index in range(points.size()):
-			if other_index == site_index:
-				continue
-			polygon = _clip_to_site_halfplane(polygon, points[site_index], points[other_index])
-			if polygon.is_empty():
-				break
-		if polygon.size() >= 2:
-			var closed := polygon.duplicate()
-			closed.append(polygon[0])
-			canvas.draw_polyline(closed, Color(color.lightened(0.18), 0.62), 1.5, true)
-		canvas.draw_circle(points[site_index], 2.8, INK)
+	var origin_a := Vector2(groups[0]["first"]["origin"])
+	var origin_b := Vector2(groups[0]["second"]["origin"])
+	var axis := (origin_b - origin_a).normalized()
+	var baseline := (origin_a + origin_b) * 0.5
+	var upper: Array[Vector2] = []
+	var lower: Array[Vector2] = []
+	for point in points:
+		if axis.cross(point - baseline) >= 0.0:
+			upper.append(point)
+		else:
+			lower.append(point)
+	for cluster in [upper, lower]:
+		_draw_guarded_cluster(canvas, cluster, origin_a, origin_b, axis, baseline, color)
+	for point in points:
+		canvas.draw_circle(point, 2.8, INK)
 
 
-static func _clip_to_site_halfplane(polygon: PackedVector2Array, site: Vector2, other: Vector2) -> PackedVector2Array:
-	var output := PackedVector2Array()
-	if polygon.is_empty():
-		return output
-	var midpoint := (site + other) * 0.5
-	var normal := other - site
-	for index in range(polygon.size()):
-		var current := polygon[index]
-		var previous := polygon[(index - 1 + polygon.size()) % polygon.size()]
-		var current_inside := (current - midpoint).dot(normal) <= 0.0
-		var previous_inside := (previous - midpoint).dot(normal) <= 0.0
-		if current_inside != previous_inside:
-			var edge := current - previous
-			var denominator := edge.dot(normal)
-			if absf(denominator) > 0.0001:
-				var t := (midpoint - previous).dot(normal) / denominator
-				output.append(previous + edge * t)
-		if current_inside:
-			output.append(current)
-	return output
+static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], origin_a: Vector2, origin_b: Vector2, axis: Vector2, baseline: Vector2, color: Color) -> void:
+	if cluster.size() < 2:
+		return
+	var local_step := _median_nearest_distance(cluster)
+	if local_step < 1.0:
+		local_step = 12.0
+	var guards := _build_guard_ring(cluster, local_step)
+	var all_points: Array[Vector2] = cluster.duplicate()
+	all_points.append_array(guards)
+	var packed := PackedVector2Array(all_points)
+	var indices := Geometry2D.triangulate_delaunay(packed)
+	var triangles: Array[Vector3i] = []
+	var centers: Array[Vector2] = []
+	for offset in range(0, indices.size(), 3):
+		var triangle := Vector3i(indices[offset], indices[offset + 1], indices[offset + 2])
+		var circle := _circumcircle(all_points[triangle.x], all_points[triangle.y], all_points[triangle.z])
+		if circle.is_empty():
+			continue
+		triangles.append(triangle)
+		centers.append(circle["center"])
+	var edge_map := {}
+	for triangle_index in range(triangles.size()):
+		var triangle := triangles[triangle_index]
+		for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.z, triangle.x)]:
+			var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
+			if not edge_map.has(key):
+				edge_map[key] = []
+			edge_map[key].append({"triangle": triangle_index, "edge": edge})
+	var source_distance := origin_a.distance_to(origin_b)
+	for attached in edge_map.values():
+		if attached.size() != 2:
+			continue
+		var edge: Vector2i = attached[0]["edge"]
+		if edge.x >= cluster.size() and edge.y >= cluster.size():
+			continue
+		var a: Vector2 = centers[attached[0]["triangle"]]
+		var b: Vector2 = centers[attached[1]["triangle"]]
+		if a.distance_to(b) > 2.9 * local_step:
+			continue
+		var direction := b - a
+		var midpoint := (a + b) * 0.5
+		if absf(direction.normalized().cross(axis)) < 0.22 and absf((midpoint - baseline).cross(axis)) < source_distance * 0.03515625:
+			continue
+		var clearance := source_distance * 0.109375
+		if _point_segment_distance(origin_a, a, b) < clearance or _point_segment_distance(origin_b, a, b) < clearance:
+			continue
+		canvas.draw_line(a, b, Color(color.lightened(0.18), 0.72), 1.5, true)
 
 
 static func _delaunay_edges(points: Array[Vector2]) -> Array[Vector2i]:
@@ -340,21 +555,9 @@ static func _delaunay_triangles(points: Array[Vector2]) -> Array[Vector3i]:
 	var result: Array[Vector3i] = []
 	if points.size() < 3:
 		return result
-	for a in range(points.size() - 2):
-		for b in range(a + 1, points.size() - 1):
-			for c in range(b + 1, points.size()):
-				var circle := _circumcircle(points[a], points[b], points[c])
-				if circle.is_empty():
-					continue
-				var empty := true
-				for test in range(points.size()):
-					if test == a or test == b or test == c:
-						continue
-					if points[test].distance_squared_to(circle["center"]) < float(circle["radius_sq"]) - 1.0:
-						empty = false
-						break
-				if empty:
-					result.append(Vector3i(a, b, c))
+	var indices := Geometry2D.triangulate_delaunay(PackedVector2Array(points))
+	for offset in range(0, indices.size(), 3):
+		result.append(Vector3i(indices[offset], indices[offset + 1], indices[offset + 2]))
 	return result
 
 

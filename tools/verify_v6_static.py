@@ -117,8 +117,34 @@ def verify_project() -> None:
     require("func _unhandled_input" not in developer_room, "DeveloperRoom cursor must not depend on unhandled GUI input")
 
 
+def verify_exact_restorations() -> None:
+    renderer = (GODOT / "scripts" / "dev" / "DeveloperResonanceRenderer.gd").read_text(encoding="utf-8")
+    room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
+    curve_data = (GODOT / "scripts" / "dev" / "ResonanceCurveData.gd").read_text(encoding="utf-8")
+    penrose_data = (GODOT / "scripts" / "dev" / "PenrosePatchData.gd").read_text(encoding="utf-8")
+
+    require("ContinuousCascadeButton" in room, "Developer room needs a toggleable continuous cascade")
+    fire_volley = room.split("func _fire_volley()", 1)[1].split("\n\nfunc ", 1)[0]
+    require(fire_volley.count('_waves.append({') == 1, "Manual volley must remain a single front per resonator")
+    require("CASCADE_COUNT" not in room, "Manual volley must not be expanded into a cascade")
+
+    require(curve_data.count("Vector2(") == 1920, "Expected four complete accepted 480-point contour tables")
+    require("_RADIAL_FOURIER_B64" in (ROOT / "tools" / "generate_resonance_curve_data.py").read_text(encoding="utf-8"), "Radial curve must come from the accepted payload")
+    for coefficient in ("0.58", "0.86", "1.15", "0.30", "1.02", "1.31", "1.60", "0.56", "0.80"):
+        require(coefficient in renderer, f"Missing accepted staged-curve coefficient {coefficient}")
+
+    for bush_coefficient in ("0.96", "0.82", "0.76", "34.0", "-32.0", "24.0", "-24.0", "0.072", "0.105"):
+        require(bush_coefficient in renderer, f"Missing accepted Z/Y bush coefficient {bush_coefficient}")
+    require('yellow_wave["angle"]' in renderer, "Z/Y bushes must align to the yellow wave tangent")
+
+    require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
+    for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
+        require(coefficient in renderer, f"Missing accepted grid/Voronoi coefficient {coefficient}")
+    require("Geometry2D.triangulate_delaunay" in renderer, "K/K must use guarded Delaunay dual segments")
+
+
 def main() -> int:
-    checks = (verify_catalog, verify_bundle, verify_project)
+    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations)
     try:
         for check in checks:
             check()
