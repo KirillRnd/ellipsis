@@ -119,6 +119,7 @@ func _draw_wave(wave: Dictionary) -> void:
 func _draw_resonances() -> void:
 	_last_resonance_count = 0
 	_last_pair_types.clear()
+	var groups_by_type := {}
 	for first_index in range(_waves.size()):
 		var first := _waves[first_index]
 		for second_index in range(first_index + 1, _waves.size()):
@@ -128,12 +129,37 @@ func _draw_resonances() -> void:
 			var resonance := ResonanceCatalog.resonance_spec(first["color_index"], second["color_index"])
 			if resonance.is_empty():
 				continue
+			var visible_points: Array[Vector2] = []
 			for point in DeveloperWaveGeometry.intersections(first, second):
 				if not ARENA_RECT.grow(-3.0).has_point(point):
 					continue
 				_last_resonance_count += 1
 				_last_pair_types[resonance["id"]] = true
-				_draw_resonance_marker(point, first, second, resonance)
+				visible_points.append(point)
+			if visible_points.is_empty():
+				continue
+			var resonance_id: String = resonance["id"]
+			if not groups_by_type.has(resonance_id):
+				groups_by_type[resonance_id] = []
+			groups_by_type[resonance_id].append({
+				"points": visible_points,
+				"first": first,
+				"second": second,
+				"resonance": resonance,
+			})
+
+	var phase := Time.get_ticks_msec() * 0.001
+	for resonance_id in groups_by_type:
+		var groups: Array = groups_by_type[resonance_id]
+		var first_group: Dictionary = groups[0]
+		var first_wave: Dictionary = first_group["first"]
+		var second_wave: Dictionary = first_group["second"]
+		if first_wave["color_index"] == second_wave["color_index"]:
+			DeveloperResonanceRenderer.draw_same_color(self, resonance_id, groups, ARENA_RECT, phase)
+		else:
+			for group in groups:
+				for point in group["points"]:
+					_draw_resonance_marker(point, group["first"], group["second"], group["resonance"])
 
 
 func _draw_resonance_marker(point: Vector2, first: Dictionary, second: Dictionary, resonance: Dictionary) -> void:
