@@ -3,7 +3,7 @@ extends RefCounted
 
 const INK := Color(0.96, 0.97, 1.0, 0.92)
 const CURVE_UNIT := 72.0
-const BUSH_INITIAL_COMPLETED_BRANCHES := 2
+const BUSH_INITIAL_COMPLETED_BRANCHES := 1
 const CURVE_DATA = preload("res://scripts/dev/ResonanceCurveData.gd")
 const PENROSE_DATA = preload("res://scripts/dev/PenrosePatchData.gd")
 

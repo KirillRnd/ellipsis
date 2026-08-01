@@ -86,7 +86,7 @@ func _run() -> void:
 	var next_line_center := (next_line_points[0] + next_line_points[1]) * 0.5
 	_expect(is_equal_approx(first_line_center.distance_to(next_line_center), ResonanceCatalog.GAME_CASCADE_SPACING), "straight cascade fronts use the shared circle spacing")
 	var bush_segments := DeveloperResonanceRenderer._build_local_bush()
-	_expect(DeveloperResonanceRenderer.BUSH_INITIAL_COMPLETED_BRANCHES == 2, "branching bush animation starts directly from its third step")
+	_expect(DeveloperResonanceRenderer.BUSH_INITIAL_COMPLETED_BRANCHES == 1, "branching bush animation starts directly from its second step")
 	for branch_index in range(5):
 		var branch_segments: Array[Dictionary] = []
 		for segment in bush_segments:
