@@ -174,9 +174,10 @@ def verify_developer_timing() -> None:
     dev_speed = re.search(r"const GAME_WAVE_SPEED := (.+)", catalog)
     require(main_speed is not None and dev_speed is not None, "Both game and developer wave speeds must be declared")
     require(main_speed.group(1).strip() == dev_speed.group(1).strip(), "Developer wave speed must exactly match the main game")
+    require("const GAME_CASCADE_SPACING := GAME_WAVE_SPEED * GAME_RESONATOR_VOLLEY_INTERVAL" in catalog, "Cascade spacing must derive from the shared speed and period")
     require("const CASCADE_PERIOD := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in room, "Developer cascade must use the shared game-rate value")
     require("const WAVE_SPEED := ResonanceCatalog.GAME_WAVE_SPEED" in room, "Developer waves must use the shared game speed")
-    require(renderer.count("ResonanceCatalog.GAME_WAVE_SPEED * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL") == 2, "Grid spacing must follow the actual developer cascade cadence")
+    require(renderer.count("ResonanceCatalog.GAME_CASCADE_SPACING") == 2, "Straight-wave resonance grids must use the shared cascade spacing")
 
 
 def verify_spiral_modes() -> None:
@@ -185,7 +186,7 @@ def verify_spiral_modes() -> None:
     smoke = (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8")
     require("const SPIRAL_MAX_TURNS := 3.0" in geometry, "Long spiral must stop growing at three turns")
     require("const SPIRAL_SHORT_TURNS := 1.5" in geometry, "Short spiral must remain one and a half turns long")
-    require("const SPIRAL_TURN_SPACING := ResonanceCatalog.GAME_WAVE_SPEED * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in geometry, "Spiral turn spacing must equal circle cascade spacing")
+    require("const SPIRAL_TURN_SPACING := ResonanceCatalog.GAME_CASCADE_SPACING" in geometry, "Spiral turn spacing must equal circle cascade spacing")
     require("const SPIRAL_PITCH := SPIRAL_TURN_SPACING / TAU" in geometry, "Archimedean pitch must derive from the required turn spacing")
     require("const SPIRAL_POINT_CROSSINGS_PER_SOURCE_PER_CASCADE := 1.0" in geometry, "Each spiral source must cross a fixed point once per cascade")
     require("const SPIRAL_OMEGA := TAU * SPIRAL_POINT_CROSSINGS_PER_SOURCE_PER_CASCADE / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in geometry, "Spiral animation speed must derive from the shared circle cascade period")
@@ -209,6 +210,8 @@ def verify_spiral_modes() -> None:
     require("spiral turn spacing equals circle cascade spacing" in smoke, "Developer smoke test must cover spatial spiral-to-circle synchronization")
     require("spiral head and circle fronts share one radial speed" in smoke, "Developer smoke test must cover radial speed synchronization")
     require("continuous cascade does not stack long spirals" in smoke, "Developer smoke test must cover held spiral persistence")
+    require("each straight resonator emits one line per cascade step" in smoke, "Developer smoke test must cover both straight resonator colors")
+    require("straight cascade fronts use the shared circle spacing" in smoke, "Developer smoke test must cover straight-wave cascade spacing")
 
 
 def main() -> int:

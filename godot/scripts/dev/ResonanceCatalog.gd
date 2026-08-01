@@ -3,6 +3,7 @@ extends RefCounted
 
 const GAME_RESONATOR_VOLLEY_INTERVAL := 2.35 * 0.25
 const GAME_WAVE_SPEED := 118.0
+const GAME_CASCADE_SPACING := GAME_WAVE_SPEED * GAME_RESONATOR_VOLLEY_INTERVAL
 
 const COLORS := [
 	{"id": "violet", "symbol": "Ф", "ru": "Фиолетовый", "en": "Violet", "geometry": "circle", "color": Color("8d4bd6")},

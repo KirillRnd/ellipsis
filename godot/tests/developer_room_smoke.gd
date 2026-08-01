@@ -52,6 +52,12 @@ func _run() -> void:
 	_expect(room._waves.size() == 2, "continuous cascade does not stack long spirals")
 	for wave in room._waves:
 		_expect(wave["spiral_mode"] == "long" and wave["persistent"], "continuous green wave is a persistent long spiral")
+	for preset_index in [8, 10]: # Zh/Zh and G/G
+		room._clear_room()
+		room._load_preset(preset_index)
+		room._fire_cascade_step()
+		room._fire_cascade_step()
+		_expect(room._waves.size() == 4, "each straight resonator emits one line per cascade step")
 
 	var base_spiral := {"geometry": "spiral", "origin": Vector2.ZERO, "angle": 0.0, "age": 2.0, "spiral_chirality": 1.0}
 	_expect(is_equal_approx(DeveloperWaveGeometry.SPIRAL_OMEGA * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL, TAU), "each spiral crosses a fixed point once per circle cascade period")
@@ -71,6 +77,14 @@ func _run() -> void:
 	var mirrored_long_spiral := long_spiral.duplicate()
 	mirrored_long_spiral["spiral_chirality"] = -1.0
 	_expect(DeveloperWaveGeometry.front_points(mirrored_long_spiral) == long_points, "long spiral rotation does not mirror with resonator direction")
+	var first_line := {"geometry": "line", "origin": Vector2.ZERO, "angle": 0.0, "extent": 0.0}
+	var next_line := first_line.duplicate()
+	next_line["extent"] = ResonanceCatalog.GAME_CASCADE_SPACING
+	var first_line_points := DeveloperWaveGeometry.front_points(first_line)
+	var next_line_points := DeveloperWaveGeometry.front_points(next_line)
+	var first_line_center := (first_line_points[0] + first_line_points[1]) * 0.5
+	var next_line_center := (next_line_points[0] + next_line_points[1]) * 0.5
+	_expect(is_equal_approx(first_line_center.distance_to(next_line_center), ResonanceCatalog.GAME_CASCADE_SPACING), "straight cascade fronts use the shared circle spacing")
 	room.queue_free()
 	await process_frame
 	_finish()
