@@ -3,6 +3,7 @@ extends RefCounted
 
 const INK := Color(0.96, 0.97, 1.0, 0.92)
 const CURVE_UNIT := 72.0
+const BUSH_INITIAL_COMPLETED_BRANCHES := 2
 const CURVE_DATA = preload("res://scripts/dev/ResonanceCurveData.gd")
 const PENROSE_DATA = preload("res://scripts/dev/PenrosePatchData.gd")
 
@@ -135,7 +136,7 @@ static func _draw_branching_bushes(canvas: CanvasItem, groups: Array) -> void:
 		var yellow_wave: Dictionary = first if first["color_index"] == 4 else second
 		var source_axis := Vector2(yellow_wave["origin"]) - Vector2(green_wave["origin"])
 		var rotation := float(yellow_wave["angle"]) + PI # turn the complete bush 180 degrees along the yellow line
-		var age := float(group.get("effect_age", 0.0))
+		var age := float(group.get("effect_age", 0.0)) + float(BUSH_INITIAL_COMPLETED_BRANCHES) * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
 			var side := 1.0 if source_axis.cross(point - Vector2(green_wave["origin"])) >= 0.0 else -1.0
