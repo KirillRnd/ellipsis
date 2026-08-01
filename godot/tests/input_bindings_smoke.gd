@@ -16,7 +16,7 @@ func _run() -> void:
 		return
 
 	var q_event := InputEventKey.new()
-	q_event.keycode = KEY_Q
+	q_event.keycode = KEY_K
 	q_event.pressed = true
 	settings._begin_rebind(&"dash")
 	_expect(settings._try_capture_binding_event(q_event), "keyboard input is captured")

@@ -1,48 +1,373 @@
 extends Control
 
 const MAIN_MENU_SCENE := "res://scenes/MainMenu.tscn"
+const MAX_RESONATORS := 5
+const MAX_WAVES := 24
+const WAVE_SPEED := 118.0
+const WAVE_LIFETIME := 4.8
+const ARENA_RECT := Rect2(252.0, 72.0, 996.0, 616.0)
+const SPEEDS := [0.25, 0.5, 1.0, 2.0]
 
 var _settings
+var _language := "ru"
+var _selected_color := 0
+var _next_source_id := 1
+var _next_wave_id := 1
+var _resonators: Array[DeveloperResonator] = []
+var _waves: Array[Dictionary] = []
+var _cursor_position := ARENA_RECT.get_center()
+var _simulation_paused := false
+var _speed_index := 2
+var _last_resonance_count := 0
+var _last_pair_types := {}
+
+var _title_label: Label
+var _selected_label: Label
+var _count_label: Label
+var _stats_label: Label
+var _help_label: Label
+var _pause_button: Button
+var _speed_button: Button
+var _color_buttons: Array[Button] = []
 
 
 func _ready() -> void:
 	_settings = get_node_or_null("/root/Settings")
 	if is_instance_valid(_settings):
 		_settings.set_menu_button_visible(false)
+		_language = _settings.current_language
+		_settings.language_changed.connect(_on_language_changed)
+	_build_ui()
+	_refresh_text()
+	queue_redraw()
 
-	var background := ColorRect.new()
-	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	background.color = Color(0.018, 0.022, 0.030)
-	add_child(background)
 
-	var title := Label.new()
-	title.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	title.position = Vector2(-300.0, 90.0)
-	title.size = Vector2(600.0, 60.0)
-	title.text = "КОМНАТА РАЗРАБОТЧИКА"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 32)
-	add_child(title)
+func _process(delta: float) -> void:
+	if not _simulation_paused:
+		var scaled_delta: float = delta * float(SPEEDS[_speed_index])
+		for wave in _waves:
+			wave["age"] += scaled_delta
+			wave["extent"] = wave["age"] * WAVE_SPEED
+		for index in range(_waves.size() - 1, -1, -1):
+			if _waves[index]["age"] >= WAVE_LIFETIME:
+				_waves.remove_at(index)
+	_update_stats()
+	queue_redraw()
 
-	var note := Label.new()
-	note.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	note.position = Vector2(-350.0, -30.0)
-	note.size = Vector2(700.0, 60.0)
-	note.text = "Полигон Резонаторов готовится"
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	note.add_theme_font_size_override("font_size", 22)
-	add_child(note)
 
-	var back := Button.new()
+func _unhandled_input(event: InputEvent) -> void:
+	if _settings_open():
+		return
+	if event is InputEventMouseMotion:
+		_cursor_position = _clamp_to_arena(event.position)
+		queue_redraw()
+	elif event is InputEventScreenTouch and event.pressed:
+		_cursor_position = _clamp_to_arena(event.position)
+		if ARENA_RECT.has_point(event.position):
+			_place_resonator(_cursor_position)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("place_resonator"):
+		_place_resonator(_cursor_position)
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("resonator_volley"):
+		_fire_volley()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("dev_color_previous"):
+		_select_color(wrapi(_selected_color - 1, 0, ResonanceCatalog.COLORS.size()))
+	elif event.is_action_pressed("dev_color_next"):
+		_select_color(wrapi(_selected_color + 1, 0, ResonanceCatalog.COLORS.size()))
+	elif event.is_action_pressed("dev_remove_last"):
+		_remove_last_resonator()
+	elif event.is_action_pressed("dev_clear"):
+		_clear_room()
+	elif event.is_action_pressed("dev_toggle_simulation"):
+		_toggle_simulation()
+	elif event.is_action_pressed("dev_slower"):
+		_change_speed(-1)
+	elif event.is_action_pressed("dev_faster"):
+		_change_speed(1)
+
+
+func _draw() -> void:
+	draw_rect(Rect2(Vector2.ZERO, size), Color(0.010, 0.014, 0.021), true)
+	draw_rect(ARENA_RECT, Color(0.020, 0.027, 0.038), true)
+	draw_rect(ARENA_RECT, Color(0.42, 0.50, 0.61, 0.82), false, 2.0)
+	_draw_grid()
+	for wave in _waves:
+		_draw_wave(wave)
+	_draw_resonances()
+	_draw_cursor()
+
+
+func _draw_grid() -> void:
+	for x in range(int(ARENA_RECT.position.x) + 32, int(ARENA_RECT.end.x), 32):
+		draw_line(Vector2(x, ARENA_RECT.position.y), Vector2(x, ARENA_RECT.end.y), Color(0.30, 0.36, 0.44, 0.08), 1.0)
+	for y in range(int(ARENA_RECT.position.y) + 32, int(ARENA_RECT.end.y), 32):
+		draw_line(Vector2(ARENA_RECT.position.x, y), Vector2(ARENA_RECT.end.x, y), Color(0.30, 0.36, 0.44, 0.08), 1.0)
+
+
+func _draw_wave(wave: Dictionary) -> void:
+	var color: Color = ResonanceCatalog.color_spec(wave["color_index"])["color"]
+	var points := DeveloperWaveGeometry.front_points(wave)
+	if points.size() < 2:
+		return
+	draw_polyline(points, Color(color, 0.14), 9.0, true)
+	draw_polyline(points, Color(color, 0.78), 3.0, true)
+	draw_polyline(points, color.lightened(0.34), 1.0, true)
+
+
+func _draw_resonances() -> void:
+	_last_resonance_count = 0
+	_last_pair_types.clear()
+	for first_index in range(_waves.size()):
+		var first := _waves[first_index]
+		for second_index in range(first_index + 1, _waves.size()):
+			var second := _waves[second_index]
+			if not ResonanceCatalog.can_resonate(first["color_index"], second["color_index"]):
+				continue
+			var resonance := ResonanceCatalog.resonance_spec(first["color_index"], second["color_index"])
+			if resonance.is_empty():
+				continue
+			for point in DeveloperWaveGeometry.intersections(first, second):
+				if not ARENA_RECT.grow(-3.0).has_point(point):
+					continue
+				_last_resonance_count += 1
+				_last_pair_types[resonance["id"]] = true
+				_draw_resonance_marker(point, first, second, resonance)
+
+
+func _draw_resonance_marker(point: Vector2, first: Dictionary, second: Dictionary, resonance: Dictionary) -> void:
+	var color := ResonanceCatalog.resonance_color(first["color_index"], second["color_index"])
+	var phase := Time.get_ticks_msec() * 0.004 + float(first["id"] + second["id"])
+	var radius := 10.0 + sin(phase) * 2.0
+	draw_circle(point, radius + 8.0, Color(color, 0.12))
+	draw_circle(point, radius, Color(color, 0.44))
+	draw_circle(point, 3.5, Color(0.97, 0.97, 1.0, 0.98))
+	draw_line(point - Vector2(15, 0), point + Vector2(15, 0), Color(color, 0.82), 1.5, true)
+	draw_line(point - Vector2(0, 15), point + Vector2(0, 15), Color(color, 0.82), 1.5, true)
+	draw_string(ThemeDB.fallback_font, point + Vector2(-26, -18), resonance["id"].to_upper(), HORIZONTAL_ALIGNMENT_CENTER, 52.0, 11, Color(color, 0.94))
+
+
+func _draw_cursor() -> void:
+	var color: Color = ResonanceCatalog.color_spec(_selected_color)["color"]
+	draw_circle(_cursor_position, 14.0, Color(color, 0.08))
+	draw_arc(_cursor_position, 14.0, 0.0, TAU, 32, Color(color, 0.88), 2.0, true)
+	draw_line(_cursor_position - Vector2(20, 0), _cursor_position + Vector2(20, 0), Color(color, 0.62), 1.0)
+	draw_line(_cursor_position - Vector2(0, 20), _cursor_position + Vector2(0, 20), Color(color, 0.62), 1.0)
+
+
+func _place_resonator(position: Vector2) -> void:
+	if not ARENA_RECT.grow(-32.0).has_point(position):
+		return
+	if _resonators.size() >= MAX_RESONATORS:
+		var oldest: DeveloperResonator = _resonators.pop_front()
+		_remove_waves_for_source(oldest.sequence_id)
+		oldest.queue_free()
+	var source := DeveloperResonator.new()
+	source.position = position
+	var angle := (position - ARENA_RECT.get_center()).angle()
+	if position.distance_to(ARENA_RECT.get_center()) < 24.0:
+		angle = float(_next_source_id) * 0.91
+	source.configure(_selected_color, _next_source_id, angle)
+	_next_source_id += 1
+	add_child(source)
+	move_child(source, 0)
+	_resonators.append(source)
+	_update_stats()
+
+
+func _fire_volley() -> void:
+	for source in _resonators:
+		source.trigger()
+		var spec := ResonanceCatalog.color_spec(source.color_index)
+		_waves.append({
+			"id": _next_wave_id,
+			"source_id": source.sequence_id,
+			"color_index": source.color_index,
+			"geometry": spec["geometry"],
+			"origin": source.position,
+			"angle": source.front_angle,
+			"age": 0.0,
+			"extent": 0.0,
+		})
+		_next_wave_id += 1
+	while _waves.size() > MAX_WAVES:
+		_waves.pop_front()
+
+
+func _remove_last_resonator() -> void:
+	if _resonators.is_empty():
+		return
+	var source: DeveloperResonator = _resonators.pop_back()
+	_remove_waves_for_source(source.sequence_id)
+	source.queue_free()
+	_update_stats()
+
+
+func _remove_waves_for_source(source_id: int) -> void:
+	for index in range(_waves.size() - 1, -1, -1):
+		if _waves[index]["source_id"] == source_id:
+			_waves.remove_at(index)
+
+
+func _clear_room() -> void:
+	for source in _resonators:
+		source.queue_free()
+	_resonators.clear()
+	_waves.clear()
+	_update_stats()
+
+
+func _select_color(index: int) -> void:
+	_selected_color = clampi(index, 0, ResonanceCatalog.COLORS.size() - 1)
+	for button_index in range(_color_buttons.size()):
+		_color_buttons[button_index].button_pressed = button_index == _selected_color
+	_refresh_text()
+	queue_redraw()
+
+
+func _toggle_simulation() -> void:
+	_simulation_paused = not _simulation_paused
+	_refresh_text()
+
+
+func _change_speed(direction: int) -> void:
+	_speed_index = clampi(_speed_index + direction, 0, SPEEDS.size() - 1)
+	_refresh_text()
+
+
+func _build_ui() -> void:
+	var side := Panel.new()
+	side.name = "DeveloperPanel"
+	side.position = Vector2(12, 12)
+	side.size = Vector2(226, 696)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.022, 0.028, 0.039, 0.98)
+	panel_style.border_color = Color(0.40, 0.47, 0.58, 0.92)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(9)
+	side.add_theme_stylebox_override("panel", panel_style)
+	add_child(side)
+
+	_title_label = _label(Vector2(14, 12), Vector2(198, 52), 19)
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	side.add_child(_title_label)
+	_selected_label = _label(Vector2(14, 62), Vector2(198, 48), 16)
+	_selected_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	side.add_child(_selected_label)
+
+	for index in range(ResonanceCatalog.COLORS.size()):
+		var spec := ResonanceCatalog.color_spec(index)
+		var button := Button.new()
+		button.name = "%sColorButton" % spec["id"]
+		button.position = Vector2(18, 114 + index * 48)
+		button.size = Vector2(190, 42)
+		button.toggle_mode = true
+		button.add_theme_font_size_override("font_size", 16)
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(spec["color"], 0.20)
+		style.border_color = Color(spec["color"], 0.82)
+		style.set_border_width_all(1)
+		style.set_corner_radius_all(5)
+		button.add_theme_stylebox_override("normal", style)
+		button.pressed.connect(_select_color.bind(index))
+		side.add_child(button)
+		_color_buttons.append(button)
+
+	_count_label = _label(Vector2(14, 456), Vector2(198, 30), 16)
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	side.add_child(_count_label)
+	_stats_label = _label(Vector2(14, 486), Vector2(198, 48), 14)
+	_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	side.add_child(_stats_label)
+
+	_pause_button = _button(Vector2(18, 542), Vector2(92, 42), _toggle_simulation)
+	_pause_button.name = "PauseSimulationButton"
+	side.add_child(_pause_button)
+	_speed_button = _button(Vector2(116, 542), Vector2(92, 42), _change_speed.bind(1))
+	_speed_button.name = "SimulationSpeedButton"
+	side.add_child(_speed_button)
+	var clear := _button(Vector2(18, 590), Vector2(190, 40), _clear_room)
+	clear.name = "ClearButton"
+	clear.text = "ОЧИСТИТЬ"
+	side.add_child(clear)
+	var settings_button := _button(Vector2(18, 636), Vector2(92, 40), _open_settings)
+	settings_button.name = "SettingsButton"
+	settings_button.text = "⚙"
+	side.add_child(settings_button)
+	var back := _button(Vector2(116, 636), Vector2(92, 40), _return_to_menu)
 	back.name = "BackButton"
-	back.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	back.position = Vector2(-160.0, -110.0)
-	back.size = Vector2(320.0, 56.0)
-	back.text = "В ГЛАВНОЕ МЕНЮ"
-	back.add_theme_font_size_override("font_size", 20)
-	back.pressed.connect(_return_to_menu)
-	add_child(back)
-	back.grab_focus()
+	back.text = "←"
+	side.add_child(back)
+
+	_help_label = _label(Vector2(270, 18), Vector2(960, 42), 15)
+	_help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(_help_label)
+	_select_color(0)
+
+
+func _label(position: Vector2, label_size: Vector2, font_size: int) -> Label:
+	var label := Label.new()
+	label.position = position
+	label.size = label_size
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", font_size)
+	return label
+
+
+func _button(position: Vector2, button_size: Vector2, callback: Callable) -> Button:
+	var button := Button.new()
+	button.position = position
+	button.size = button_size
+	button.add_theme_font_size_override("font_size", 15)
+	button.pressed.connect(callback)
+	return button
+
+
+func _refresh_text() -> void:
+	if not is_instance_valid(_title_label):
+		return
+	var russian := _language == "ru"
+	var spec := ResonanceCatalog.color_spec(_selected_color)
+	_title_label.text = "КОМНАТА\nРАЗРАБОТЧИКА" if russian else "DEVELOPER\nROOM"
+	_selected_label.text = "%s · %s" % [spec["ru"] if russian else spec["en"], spec["geometry"]]
+	for index in range(_color_buttons.size()):
+		var color_spec := ResonanceCatalog.color_spec(index)
+		_color_buttons[index].text = "%s  %s" % [color_spec["symbol"], color_spec["ru"] if russian else color_spec["en"]]
+	_pause_button.text = "ПУСК" if _simulation_paused and russian else "RUN" if _simulation_paused else "ПАУЗА" if russian else "PAUSE"
+	_speed_button.text = "×%.2f" % float(SPEEDS[_speed_index])
+	_help_label.text = (
+		"E — поставить · ПКМ — залп · Q/F — цвет · X — удалить · C — очистить · T — пауза · −/+ — скорость"
+		if russian
+		else "E — place · RMB — volley · Q/F — color · X — remove · C — clear · T — pause · −/+ — speed"
+	)
+	_update_stats()
+
+
+func _update_stats() -> void:
+	if not is_instance_valid(_count_label):
+		return
+	_count_label.text = ("РЕЗОНАТОРЫ %d/%d" if _language == "ru" else "RESONATORS %d/%d") % [_resonators.size(), MAX_RESONATORS]
+	_stats_label.text = ("Волны %d · Узлы %d" if _language == "ru" else "Waves %d · Nodes %d") % [_waves.size(), _last_resonance_count]
+
+
+func _clamp_to_arena(point: Vector2) -> Vector2:
+	return Vector2(clampf(point.x, ARENA_RECT.position.x, ARENA_RECT.end.x), clampf(point.y, ARENA_RECT.position.y, ARENA_RECT.end.y))
+
+
+func _settings_open() -> bool:
+	return is_instance_valid(_settings) and _settings.is_open()
+
+
+func _open_settings() -> void:
+	if is_instance_valid(_settings):
+		_settings.open_settings()
+
+
+func _on_language_changed(language: String) -> void:
+	_language = language
+	_refresh_text()
 
 
 func _return_to_menu() -> void:

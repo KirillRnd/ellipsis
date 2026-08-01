@@ -108,6 +108,13 @@ const REBINDABLE_ACTIONS: Array[StringName] = [
 	&"cursor_up",
 	&"cursor_down",
 	&"toggle_pause_menu",
+	&"dev_color_previous",
+	&"dev_color_next",
+	&"dev_remove_last",
+	&"dev_clear",
+	&"dev_toggle_simulation",
+	&"dev_slower",
+	&"dev_faster",
 ]
 const ACTION_TEXT := {
 	"move_left": {"ru": "Движение влево", "en": "Move left"},
@@ -123,6 +130,13 @@ const ACTION_TEXT := {
 	"cursor_up": {"ru": "Курсор вверх", "en": "Cursor up"},
 	"cursor_down": {"ru": "Курсор вниз", "en": "Cursor down"},
 	"toggle_pause_menu": {"ru": "Меню / пауза", "en": "Menu / pause"},
+	"dev_color_previous": {"ru": "Предыдущий цвет", "en": "Previous color"},
+	"dev_color_next": {"ru": "Следующий цвет", "en": "Next color"},
+	"dev_remove_last": {"ru": "Удалить последний", "en": "Remove last"},
+	"dev_clear": {"ru": "Очистить полигон", "en": "Clear test room"},
+	"dev_toggle_simulation": {"ru": "Пауза симуляции", "en": "Pause simulation"},
+	"dev_slower": {"ru": "Замедлить симуляцию", "en": "Slower simulation"},
+	"dev_faster": {"ru": "Ускорить симуляцию", "en": "Faster simulation"},
 }
 
 var current_language := DEFAULT_LANGUAGE
