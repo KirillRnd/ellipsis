@@ -134,7 +134,7 @@ static func _draw_branching_bushes(canvas: CanvasItem, groups: Array) -> void:
 		var green_wave: Dictionary = first if first["color_index"] == 3 else second
 		var yellow_wave: Dictionary = first if first["color_index"] == 4 else second
 		var source_axis := Vector2(yellow_wave["origin"]) - Vector2(green_wave["origin"])
-		var rotation := float(yellow_wave["angle"]) # local +Y maps onto the yellow line tangent
+		var rotation := float(yellow_wave["angle"]) + PI # turn the complete bush 180 degrees along the yellow line
 		var age := minf(float(first["age"]), float(second["age"]))
 		for point_value in group["points"]:
 			var point: Vector2 = point_value

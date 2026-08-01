@@ -135,7 +135,7 @@ def verify_exact_restorations() -> None:
 
     for bush_coefficient in ("0.96", "0.82", "0.76", "34.0", "-32.0", "24.0", "-24.0", "0.072", "0.105"):
         require(bush_coefficient in renderer, f"Missing accepted Z/Y bush coefficient {bush_coefficient}")
-    require('yellow_wave["angle"]' in renderer, "Z/Y bushes must align to the yellow wave tangent")
+    require('var rotation := float(yellow_wave["angle"]) + PI' in renderer, "Z/Y bushes must be rotated 180 degrees along the yellow wave")
 
     require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
     for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
