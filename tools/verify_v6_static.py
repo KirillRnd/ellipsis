@@ -176,8 +176,21 @@ def verify_exact_restorations() -> None:
     require("rhomb grid anchors an intersection to its nearest lattice vertex" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover G/Y vertex anchoring")
 
     require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
-    for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
+    for coefficient in ("1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
         require(coefficient in renderer, f"Missing accepted grid/Voronoi coefficient {coefficient}")
+    for gg_contract in (
+        "const GG_TILE_EDGE_SCALE := 0.42",
+        "const GG_REVEAL_RADIUS_SCALE := 1.18",
+        "const GG_TILE_DELAY := 0.055",
+        "const GG_TILE_REVEAL_TIME := 0.13",
+        "GG_TILE_EDGE_SCALE * typical_step",
+        "GG_REVEAL_RADIUS_SCALE * float(state[\"typical_step\"])",
+        "_interpolate_unoriented_angle(tangent_a.angle(), tangent_b.angle())",
+        'state["tile_births"][tile_index] = minf',
+    ):
+        require(gg_contract in renderer, f"Missing accepted G/G global Penrose contract: {gg_contract}")
+    require('"gold_gold":\n\t\t\t_render_penrose_grid' in renderer, "G/G must keep drawing one persistent global Penrose grid between intersections")
+    require("Penrose reveal uses transformed global tile centers" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover global Penrose tile transforms")
     require("Geometry2D.triangulate_delaunay" in renderer, "K/K must use guarded Delaunay dual segments")
     require('preload("res://scripts/dev/ResonanceCurveData.gd")' in renderer, "Curve tables must be loaded explicitly without the editor class cache")
     require('preload("res://scripts/dev/PenrosePatchData.gd")' in renderer, "Penrose tables must be loaded explicitly without the editor class cache")

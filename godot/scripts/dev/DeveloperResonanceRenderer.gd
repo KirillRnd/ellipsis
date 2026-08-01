@@ -14,6 +14,10 @@ const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
 const GY_REVEAL_MANHATTAN_RADIUS := 2
 const GLOBAL_SEED_LEAD_TIME := 0.10
+const GG_TILE_EDGE_SCALE := 0.42
+const GG_REVEAL_RADIUS_SCALE := 1.18
+const GG_TILE_DELAY := 0.055
+const GG_TILE_REVEAL_TIME := 0.13
 const CURVE_DATA = preload("res://scripts/dev/ResonanceCurveData.gd")
 const PENROSE_DATA = preload("res://scripts/dev/PenrosePatchData.gd")
 
@@ -56,6 +60,8 @@ static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, sta
 	match resonance_id:
 		"gy":
 			_render_rhombic_grid(canvas, state, arena, simulation_age)
+		"gold_gold":
+			_render_penrose_grid(canvas, state, arena, simulation_age)
 
 
 static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: float) -> void:
@@ -529,49 +535,99 @@ static func _resonance_parent_half_length(wave: Dictionary) -> float:
 
 
 static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2) -> void:
-	var points := _unique_points(groups, 28)
-	if points.is_empty():
+	if groups.is_empty() or not groups[0].has("global_state"):
 		return
+	var state: Dictionary = groups[0]["global_state"]
 	var first: Dictionary = groups[0]["first"]
 	var second: Dictionary = groups[0]["second"]
-	var normal_a := Vector2.from_angle(float(first["angle"]))
-	var normal_b := Vector2.from_angle(float(second["angle"]))
-	var spacing := ResonanceCatalog.GAME_CASCADE_SPACING
-	var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
-	var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
-	var typical_step := sqrt(step_a.length() * step_b.length())
-	var tile_edge := clampf(0.42 * typical_step, 7.0, 34.0)
-	var tangent_a := Vector2(-normal_a.y, normal_a.x)
-	var tangent_b := Vector2(-normal_b.y, normal_b.x)
-	var base_angle := _interpolate_unoriented_angle(tangent_a.angle(), tangent_b.angle())
-	var anchor: Vector2 = points[0]
-	var reveal_radius := 1.18 * typical_step
-	var candidates: Array[Dictionary] = []
-	for local_tile in PENROSE_DATA.tiles():
+	if not state.has("grid_velocity"):
+		var normal_a := Vector2.from_angle(float(first["angle"]))
+		var normal_b := Vector2.from_angle(float(second["angle"]))
+		var spacing := ResonanceCatalog.GAME_CASCADE_SPACING
+		var step_a := _solve_normal_system(normal_a, normal_b, Vector2(spacing, 0.0))
+		var step_b := _solve_normal_system(normal_a, normal_b, Vector2(0.0, spacing))
+		var typical_step := sqrt(step_a.length() * step_b.length())
+		var tangent_a := Vector2(-normal_a.y, normal_a.x)
+		var tangent_b := Vector2(-normal_b.y, normal_b.x)
+		state["grid_velocity"] = _solve_normal_system(normal_a, normal_b, Vector2(ResonanceCatalog.GAME_WAVE_SPEED, ResonanceCatalog.GAME_WAVE_SPEED))
+		state["typical_step"] = typical_step
+		state["tile_edge"] = GG_TILE_EDGE_SCALE * typical_step
+		state["base_angle"] = _interpolate_unoriented_angle(tangent_a.angle(), tangent_b.angle())
+	var simulation_age := float(groups[0]["simulation_age"])
+	var origin := _global_grid_origin(state, simulation_age)
+	var tile_edge := float(state["tile_edge"])
+	var base_angle := float(state["base_angle"])
+	var reveal_radius := GG_REVEAL_RADIUS_SCALE * float(state["typical_step"])
+	var local_tiles := PENROSE_DATA.tiles()
+	for group in groups:
+		var pair_key: String = group["resonance_key"]
+		var local := _update_pair_local_position(state, pair_key, group["points"], origin)
+		if bool(state["scheduled_pairs"].get(pair_key, false)):
+			continue
+		state["scheduled_pairs"][pair_key] = true
+		var candidates: Array[Dictionary] = []
+		var nearest_index := -1
+		var nearest_distance := INF
+		for tile_index in range(local_tiles.size()):
+			var center := _penrose_tile_center(local_tiles[tile_index], tile_edge, base_angle)
+			var distance := center.distance_to(local)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				nearest_index = tile_index
+			if distance <= reveal_radius:
+				var offset := center - local
+				candidates.append({"index": tile_index, "distance": distance, "angle": offset.angle()})
+		var nearest_included := false
+		for candidate in candidates:
+			if int(candidate["index"]) == nearest_index:
+				nearest_included = true
+				break
+		if nearest_index >= 0 and not nearest_included:
+			var nearest_center := _penrose_tile_center(local_tiles[nearest_index], tile_edge, base_angle)
+			candidates.append({"index": nearest_index, "distance": nearest_distance, "angle": (nearest_center - local).angle()})
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return float(a["distance"]) < float(b["distance"]) or (is_equal_approx(float(a["distance"]), float(b["distance"])) and float(a["angle"]) < float(b["angle"])))
+		var pair_birth := simulation_age - float(group.get("effect_age", 0.0))
+		for order in range(candidates.size()):
+			var tile_index := int(candidates[order]["index"])
+			var scheduled := pair_birth + float(order) * GG_TILE_DELAY
+			if tile_index == nearest_index:
+				scheduled = pair_birth - GLOBAL_SEED_LEAD_TIME
+			state["tile_births"][tile_index] = minf(float(state["tile_births"].get(tile_index, INF)), scheduled)
+	_render_penrose_grid(canvas, state, arena, simulation_age)
+
+
+static func _render_penrose_grid(canvas: CanvasItem, state: Dictionary, arena: Rect2, simulation_age: float) -> void:
+	if not state.has("tile_edge"):
+		return
+	var origin := _global_grid_origin(state, simulation_age)
+	var tile_edge := float(state["tile_edge"])
+	var base_angle := float(state["base_angle"])
+	var local_tiles := PENROSE_DATA.tiles()
+	var gold := ResonanceCatalog.color_spec(5)["color"] as Color
+	for tile_index in state["tile_births"]:
+		var birth := float(state["tile_births"][tile_index])
+		if simulation_age < birth:
+			continue
 		var world := PackedVector2Array()
 		var center := Vector2.ZERO
-		for local_point in local_tile:
-			var transformed: Vector2 = anchor + (Vector2(local_point) * tile_edge).rotated(base_angle)
+		for local_point in local_tiles[int(tile_index)]:
+			var transformed := origin + (Vector2(local_point) * tile_edge).rotated(base_angle)
 			world.append(transformed)
 			center += transformed
 		center /= 4.0
-		if not arena.grow(40.0).has_point(center):
+		if not arena.grow(48.0).has_point(center):
 			continue
-		var nearest := INF
-		for point in points:
-			nearest = minf(nearest, center.distance_to(point))
-		if nearest <= reveal_radius:
-			candidates.append({"points": world, "distance": nearest})
-	if candidates.is_empty():
-		return
-	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["distance"]) < float(b["distance"]))
-	var visible_count := clampi(int(_minimum_group_age(groups) / 0.055) + 1, 1, candidates.size())
-	var gold := ResonanceCatalog.color_spec(5)["color"] as Color
-	for index in range(visible_count):
-		var tile: PackedVector2Array = candidates[index]["points"]
-		var closed := tile.duplicate()
-		closed.append(tile[0])
-		canvas.draw_polyline(closed, Color(gold.lightened(0.14), 0.76), 1.65, true)
+		var alpha := _smoothstep((simulation_age - birth) / GG_TILE_REVEAL_TIME)
+		world.append(world[0])
+		canvas.draw_polyline(world, Color(gold.lightened(0.14), 0.82 * alpha), 1.75, true)
+
+
+static func _penrose_tile_center(local_tile: PackedVector2Array, tile_edge: float, base_angle: float) -> Vector2:
+	var center := Vector2.ZERO
+	for local_point in local_tile:
+		center += (Vector2(local_point) * tile_edge).rotated(base_angle)
+	return center / float(local_tile.size())
 
 
 static func _draw_guarded_voronoi(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:

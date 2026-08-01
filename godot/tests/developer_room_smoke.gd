@@ -96,6 +96,8 @@ func _run() -> void:
 	var lattice_u := Vector2(12.0, 0.0)
 	var lattice_v := Vector2(4.0, 9.0)
 	_expect(DeveloperResonanceRenderer._nearest_lattice_vertex(2.0 * lattice_u - lattice_v + Vector2(0.2, -0.1), lattice_u, lattice_v) == Vector2i(2, -1), "rhomb grid anchors an intersection to its nearest lattice vertex")
+	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
+	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var bush_segments := DeveloperResonanceRenderer._build_local_bush()
 	_expect(DeveloperResonanceRenderer.BUSH_INITIAL_COMPLETED_BRANCHES == 1, "branching bush animation starts directly from its second step")
 	for branch_index in range(5):
