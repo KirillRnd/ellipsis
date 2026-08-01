@@ -8,6 +8,21 @@ const WAVE_LIFETIME := 4.8
 const CASCADE_PERIOD := 0.235
 const ARENA_RECT := Rect2(252.0, 72.0, 996.0, 616.0)
 const SPEEDS := [0.25, 0.5, 1.0, 2.0]
+const PRESETS := [
+	{"pair": Vector2i(0, 0), "positions": [Vector2(0.30, 0.55), Vector2(0.70, 0.55)], "angles": [0.0, PI]},
+	{"pair": Vector2i(0, 1), "positions": [Vector2(0.30, 0.55), Vector2(0.70, 0.55)], "angles": [0.0, PI]},
+	{"pair": Vector2i(1, 1), "positions": [Vector2(0.30, 0.55), Vector2(0.70, 0.55)], "angles": [0.0, PI]},
+	{"pair": Vector2i(1, 2), "positions": [Vector2(0.30, 0.55), Vector2(0.70, 0.55)], "angles": [0.0, PI]},
+	{"pair": Vector2i(2, 2), "positions": [Vector2(0.30, 0.55), Vector2(0.70, 0.55)], "angles": [0.0, PI]},
+	{"pair": Vector2i(2, 3), "positions": [Vector2(0.70, 0.48), Vector2(0.32, 0.58)], "angles": [PI, -0.20]},
+	{"pair": Vector2i(3, 3), "positions": [Vector2(0.32, 0.62), Vector2(0.68, 0.62)], "angles": [-0.12, PI + 0.12]},
+	{"pair": Vector2i(3, 4), "positions": [Vector2(0.66, 0.52), Vector2(0.28, 0.52)], "angles": [PI, 0.0]},
+	{"pair": Vector2i(4, 4), "positions": [Vector2(0.30, 0.72), Vector2(0.70, 0.72)], "angles": [-0.959931, -2.181662]},
+	{"pair": Vector2i(4, 5), "positions": [Vector2(0.28, 0.72), Vector2(0.72, 0.72)], "angles": [-1.047198, -2.094395]},
+	{"pair": Vector2i(5, 5), "positions": [Vector2(0.28, 0.68), Vector2(0.72, 0.68)], "angles": [-0.488692, -2.059489]},
+	{"pair": Vector2i(5, 6), "positions": [Vector2(0.30, 0.66), Vector2(0.70, 0.50)], "angles": [-0.610865, 0.0]},
+	{"pair": Vector2i(6, 6), "positions": [Vector2(0.30, 0.55), Vector2(0.70, 0.55)], "angles": [0.0, PI]},
+]
 
 var _settings
 var _language := "ru"
@@ -20,6 +35,7 @@ var _cursor_position := ARENA_RECT.get_center()
 var _simulation_paused := false
 var _cascade_enabled := false
 var _cascade_accumulator := 0.0
+var _selected_preset := -1
 var _speed_index := 2
 var _last_resonance_count := 0
 var _last_pair_types := {}
@@ -33,6 +49,7 @@ var _help_label: Label
 var _pause_button: Button
 var _speed_button: Button
 var _cascade_button: Button
+var _preset_menu: MenuButton
 var _color_buttons: Array[Button] = []
 
 
@@ -209,21 +226,47 @@ func _draw_cursor() -> void:
 func _place_resonator(position: Vector2) -> void:
 	if not ARENA_RECT.grow(-32.0).has_point(position):
 		return
+	_selected_preset = -1
 	if _resonators.size() >= MAX_RESONATORS:
 		var oldest: DeveloperResonator = _resonators.pop_front()
 		_remove_waves_for_source(oldest.sequence_id)
 		oldest.queue_free()
-	var source := DeveloperResonator.new()
-	source.position = position
 	var angle := (position - ARENA_RECT.get_center()).angle()
 	if position.distance_to(ARENA_RECT.get_center()) < 24.0:
 		angle = float(_next_source_id) * 0.91
-	source.configure(_selected_color, _next_source_id, angle)
+	_spawn_resonator(_selected_color, position, angle)
+	_refresh_preset_menu()
+
+
+func _spawn_resonator(color_index: int, position: Vector2, angle: float) -> void:
+	var source := DeveloperResonator.new()
+	source.position = position
+	source.configure(color_index, _next_source_id, angle)
 	_next_source_id += 1
 	add_child(source)
 	move_child(source, 0)
 	_resonators.append(source)
 	_update_stats()
+
+
+func _load_preset(index: int) -> void:
+	if index < 0 or index >= PRESETS.size():
+		return
+	_clear_room()
+	_selected_preset = index
+	var preset: Dictionary = PRESETS[index]
+	var pair: Vector2i = preset["pair"]
+	var colors := [pair.x, pair.y]
+	for source_index in range(2):
+		var normalized: Vector2 = preset["positions"][source_index]
+		var position := ARENA_RECT.position + normalized * ARENA_RECT.size
+		_spawn_resonator(colors[source_index], position, float(preset["angles"][source_index]))
+	_selected_color = pair.y
+	for button_index in range(_color_buttons.size()):
+		_color_buttons[button_index].button_pressed = button_index == _selected_color
+	_cascade_accumulator = CASCADE_PERIOD if _cascade_enabled else 0.0
+	_refresh_text()
+	queue_redraw()
 
 
 func _fire_volley() -> void:
@@ -359,7 +402,14 @@ func _build_ui() -> void:
 	back.text = "←"
 	side.add_child(back)
 
-	_help_label = _label(Vector2(270, 18), Vector2(960, 42), 15)
+	_preset_menu = MenuButton.new()
+	_preset_menu.name = "ResonancePresetMenu"
+	_preset_menu.position = Vector2(260, 18)
+	_preset_menu.size = Vector2(190, 42)
+	_preset_menu.add_theme_font_size_override("font_size", 14)
+	_preset_menu.get_popup().id_pressed.connect(_load_preset)
+	add_child(_preset_menu)
+	_help_label = _label(Vector2(458, 18), Vector2(772, 42), 14)
 	_help_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_help_label)
 	_select_color(0)
@@ -397,12 +447,33 @@ func _refresh_text() -> void:
 	_pause_button.text = "ПУСК" if _simulation_paused and russian else "RUN" if _simulation_paused else "ПАУЗА" if russian else "PAUSE"
 	_speed_button.text = "×%.2f" % float(SPEEDS[_speed_index])
 	_cascade_button.text = ("КАСКАД: ВКЛ" if _cascade_enabled else "КАСКАД: ВЫКЛ") if russian else ("CASCADE: ON" if _cascade_enabled else "CASCADE: OFF")
+	_refresh_preset_menu()
 	_help_label.text = (
 		"E — поставить · ПКМ — залп · Q/F — цвет · X — удалить · C — очистить · T — пауза · −/+ — скорость"
 		if russian
 		else "E — place · RMB — volley · Q/F — color · X — remove · C — clear · T — pause · −/+ — speed"
 	)
 	_update_stats()
+
+
+func _refresh_preset_menu() -> void:
+	if not is_instance_valid(_preset_menu):
+		return
+	var popup := _preset_menu.get_popup()
+	popup.clear()
+	for index in range(PRESETS.size()):
+		popup.add_item(_preset_label(index), index)
+	_preset_menu.text = _preset_label(_selected_preset) if _selected_preset >= 0 else ("ПРЕСЕТЫ (13)" if _language == "ru" else "PRESETS (13)")
+
+
+func _preset_label(index: int) -> String:
+	var preset: Dictionary = PRESETS[index]
+	var pair: Vector2i = preset["pair"]
+	var first := ResonanceCatalog.color_spec(pair.x)
+	var second := ResonanceCatalog.color_spec(pair.y)
+	var resonance := ResonanceCatalog.resonance_spec(pair.x, pair.y)
+	var name: String = resonance["ru"] if _language == "ru" else resonance["en"]
+	return "%s/%s · %s" % [first["symbol"], second["symbol"], name]
 
 
 func _update_stats() -> void:

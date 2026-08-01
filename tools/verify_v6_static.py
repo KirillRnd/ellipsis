@@ -143,8 +143,21 @@ def verify_exact_restorations() -> None:
     require("Geometry2D.triangulate_delaunay" in renderer, "K/K must use guarded Delaunay dual segments")
 
 
+def verify_developer_presets() -> None:
+    room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
+    preset_block = room.split("const PRESETS := [", 1)[1].split("\n]", 1)[0]
+    pairs = re.findall(r'"pair": Vector2i\((\d), (\d)\)', preset_block)
+    expected = [tuple(key.split(":")) for key in EXPECTED_PAIRS]
+    require(pairs == expected, f"Preset menu must contain all 13 resonance pairs in order: {pairs}")
+    require(preset_block.count('"positions":') == 13, "Every preset needs two configured positions")
+    require(preset_block.count('"angles":') == 13, "Every preset needs two configured wave angles")
+    require('name = "ResonancePresetMenu"' in room, "Developer room needs a visible preset menu")
+    require("func _load_preset(index: int)" in room, "Preset selection must rebuild the sandbox")
+    require("_spawn_resonator(colors[source_index]" in room, "Preset must place both configured colors")
+
+
 def main() -> int:
-    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations)
+    checks = (verify_catalog, verify_bundle, verify_project, verify_exact_restorations, verify_developer_presets)
     try:
         for check in checks:
             check()
