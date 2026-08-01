@@ -85,6 +85,19 @@ func _run() -> void:
 	var first_line_center := (first_line_points[0] + first_line_points[1]) * 0.5
 	var next_line_center := (next_line_points[0] + next_line_points[1]) * 0.5
 	_expect(is_equal_approx(first_line_center.distance_to(next_line_center), ResonanceCatalog.GAME_CASCADE_SPACING), "straight cascade fronts use the shared circle spacing")
+	var bush_segments := DeveloperResonanceRenderer._build_local_bush()
+	for branch_index in range(5):
+		var branch_segments: Array[Dictionary] = []
+		for segment in bush_segments:
+			if int(segment["branch_index"]) == branch_index:
+				branch_segments.append(segment)
+		_expect(not branch_segments.is_empty(), "branching bush contains all five sequential branches")
+		if branch_segments.is_empty():
+			continue
+		var branch_start: float = branch_segments[0]["birth"]
+		var branch_end: float = branch_segments[-1]["birth"] + branch_segments[-1]["growth_duration"]
+		_expect(is_equal_approx(branch_start, float(branch_index) * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL), "each bush branch starts after the previous cascade period")
+		_expect(is_equal_approx(branch_end, float(branch_index + 1) * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL), "each bush branch grows for exactly one cascade period")
 	room.queue_free()
 	await process_frame
 	_finish()

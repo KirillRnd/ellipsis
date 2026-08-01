@@ -40,6 +40,7 @@ var _speed_index := 2
 var _last_resonance_count := 0
 var _last_pair_types := {}
 var _last_geometry_usec := 0
+var _resonance_birth_ages := {}
 
 var _title_label: Label
 var _selected_label: Label
@@ -162,6 +163,7 @@ func _draw_resonances() -> void:
 	_last_resonance_count = 0
 	_last_pair_types.clear()
 	var groups_by_type := {}
+	var active_resonance_keys := {}
 	for first_index in range(_waves.size()):
 		var first := _waves[first_index]
 		for second_index in range(first_index + 1, _waves.size()):
@@ -181,6 +183,11 @@ func _draw_resonances() -> void:
 			if visible_points.is_empty():
 				continue
 			var resonance_id: String = resonance["id"]
+			var resonance_key := "%s:%d:%d" % [resonance_id, first["id"], second["id"]]
+			var pair_age := minf(float(first["age"]), float(second["age"]))
+			if not _resonance_birth_ages.has(resonance_key):
+				_resonance_birth_ages[resonance_key] = pair_age
+			active_resonance_keys[resonance_key] = true
 			if not groups_by_type.has(resonance_id):
 				groups_by_type[resonance_id] = []
 			groups_by_type[resonance_id].append({
@@ -188,7 +195,11 @@ func _draw_resonances() -> void:
 				"first": first,
 				"second": second,
 				"resonance": resonance,
+				"effect_age": maxf(0.0, pair_age - float(_resonance_birth_ages[resonance_key])),
 			})
+	for resonance_key in _resonance_birth_ages.keys():
+		if not active_resonance_keys.has(resonance_key):
+			_resonance_birth_ages.erase(resonance_key)
 
 	var phase := Time.get_ticks_msec() * 0.001
 	for resonance_id in groups_by_type:
@@ -347,6 +358,7 @@ func _clear_room() -> void:
 		source.queue_free()
 	_resonators.clear()
 	_waves.clear()
+	_resonance_birth_ages.clear()
 	_update_stats()
 
 

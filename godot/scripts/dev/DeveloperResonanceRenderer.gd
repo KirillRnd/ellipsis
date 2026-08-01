@@ -135,12 +135,12 @@ static func _draw_branching_bushes(canvas: CanvasItem, groups: Array) -> void:
 		var yellow_wave: Dictionary = first if first["color_index"] == 4 else second
 		var source_axis := Vector2(yellow_wave["origin"]) - Vector2(green_wave["origin"])
 		var rotation := float(yellow_wave["angle"]) + PI # turn the complete bush 180 degrees along the yellow line
-		var age := minf(float(first["age"]), float(second["age"]))
+		var age := float(group.get("effect_age", 0.0))
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
 			var side := 1.0 if source_axis.cross(point - Vector2(green_wave["origin"])) >= 0.0 else -1.0
 			for segment in segments:
-				var progress := clampf((age - float(segment["birth"])) / 0.105, 0.0, 1.0)
+				var progress := clampf((age - float(segment["birth"])) / float(segment["growth_duration"]), 0.0, 1.0)
 				if progress <= 0.0:
 					continue
 				var local_a: Vector2 = segment["start"]
@@ -200,15 +200,17 @@ static func _build_local_bush() -> Array[Dictionary]:
 	shoots["M3"] = _build_shoot(shoots["M1"]["points"][2], shoots["M1"]["angles"][1], Vector2(0.31, 0.79), 4, 0.82, -32.0, 0.65, 2.5, 1)
 	shoots["M4"] = _build_shoot(shoots["M2"]["points"][1], shoots["M2"]["angles"][0], Vector2(-0.56, 0.56), 3, 0.76, 24.0, 0.65, 3.0, 1)
 	shoots["M5"] = _build_shoot(shoots["M3"]["points"][1], shoots["M3"]["angles"][0], Vector2(0.55, 0.62), 3, 0.76, -24.0, 0.65, 3.0, 0)
-	var order := [["M1",0],["M2",0],["M1",1],["M3",0],["M2",1],["M1",2],["M4",0],["M3",1],["M2",2],["M1",3],["M5",0],["M4",1],["M3",2],["M2",3],["M1",4],["M5",1],["M4",2],["M3",3],["M1",5],["M5",2]]
-	var births := {}
-	for index in range(order.size()):
-		births["%s:%d" % [order[index][0], order[index][1]]] = float(index) * 0.072
 	var result: Array[Dictionary] = []
-	for name in ["M1", "M2", "M3", "M4", "M5"]:
-		for index in range(shoots[name]["segments"].size()):
+	var branch_names := ["M1", "M2", "M3", "M4", "M5"]
+	for branch_index in range(branch_names.size()):
+		var name: String = branch_names[branch_index]
+		var branch_segments: Array = shoots[name]["segments"]
+		var segment_duration := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL / float(branch_segments.size())
+		for index in range(branch_segments.size()):
 			var segment: Dictionary = shoots[name]["segments"][index]
-			segment["birth"] = births["%s:%d" % [name, index]]
+			segment["birth"] = (float(branch_index) * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL) + float(index) * segment_duration
+			segment["growth_duration"] = segment_duration
+			segment["branch_index"] = branch_index
 			result.append(segment)
 	return result
 

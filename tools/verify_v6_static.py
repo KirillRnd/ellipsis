@@ -133,9 +133,16 @@ def verify_exact_restorations() -> None:
     for coefficient in ("0.58", "0.86", "1.15", "0.30", "1.02", "1.31", "1.60", "0.56", "0.80"):
         require(coefficient in renderer, f"Missing accepted staged-curve coefficient {coefficient}")
 
-    for bush_coefficient in ("0.96", "0.82", "0.76", "34.0", "-32.0", "24.0", "-24.0", "0.072", "0.105"):
+    for bush_coefficient in ("0.96", "0.82", "0.76", "34.0", "-32.0", "24.0", "-24.0"):
         require(bush_coefficient in renderer, f"Missing accepted Z/Y bush coefficient {bush_coefficient}")
     require('var rotation := float(yellow_wave["angle"]) + PI' in renderer, "Z/Y bushes must be rotated 180 degrees along the yellow wave")
+    require('var branch_names := ["M1", "M2", "M3", "M4", "M5"]' in renderer, "Z/Y must retain all five source branches")
+    require("ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL / float(branch_segments.size())" in renderer, "Each Z/Y branch must divide one cascade period among its segments")
+    require('float(segment["growth_duration"])' in renderer, "Z/Y segment animation must use its cascade-derived duration")
+    require('var age := float(group.get("effect_age", 0.0))' in renderer, "Z/Y growth must start when its resonance first becomes visible")
+    require('"effect_age": maxf(0.0, pair_age - float(_resonance_birth_ages[resonance_key]))' in room, "Developer room must track resonance-local effect age")
+    require("_resonance_birth_ages.clear()" in room, "Clearing the room must clear resonance growth clocks")
+    require("each bush branch grows for exactly one cascade period" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover sequential Z/Y branch timing")
 
     require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
     for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
