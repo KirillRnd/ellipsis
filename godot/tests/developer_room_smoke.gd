@@ -65,6 +65,9 @@ func _run() -> void:
 	long_spiral["spiral_mode"] = "long"
 	var long_points := DeveloperWaveGeometry.front_points(long_spiral)
 	_expect(is_equal_approx(long_points[-1].length(), DeveloperWaveGeometry.SPIRAL_PITCH * TAU * 3.0), "long spiral stops growing at three turns")
+	var mirrored_long_spiral := long_spiral.duplicate()
+	mirrored_long_spiral["spiral_chirality"] = -1.0
+	_expect(DeveloperWaveGeometry.front_points(mirrored_long_spiral) == long_points, "long spiral rotation does not mirror with resonator direction")
 	room.queue_free()
 	await process_frame
 	_finish()

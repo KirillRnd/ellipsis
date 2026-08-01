@@ -185,6 +185,7 @@ def verify_spiral_modes() -> None:
     require("head = minf(live_head, TAU * SPIRAL_MAX_TURNS)" in geometry, "Long spiral head must stop at 6 pi")
     require("tail = maxf(0.0, head - TAU * SPIRAL_SHORT_TURNS)" in geometry, "Short spiral must use a sliding 3 pi window")
     require("tail_at_stop + SPIRAL_OMEGA * (age - stop_age)" in geometry, "Stopped short spiral must erase its remaining tail")
+    require('var chirality := 1.0 if mode == "long" else float(wave.get("spiral_chirality", 1.0))' in geometry, "Long spiral must use the source rotation direction instead of mirrored resonator chirality")
     require('rotation := float(wave["angle"]) - chirality * phase_head' in geometry, "Rotation must exactly compensate head parameter motion")
     require("var radius := SPIRAL_PITCH * theta" in geometry, "Short spiral radius must use absolute theta")
     require('_spawn_wave(source, "long", true)' in room, "Held cascade must maintain a persistent long spiral")
@@ -194,6 +195,7 @@ def verify_spiral_modes() -> None:
     require("short spiral tail detaches from the center" in smoke, "Developer smoke test must cover the absolute-theta tail")
     require("short spiral head stays on its fixed emission ray" in smoke, "Developer smoke test must cover alpha = beta - head")
     require("long spiral stops growing at three turns" in smoke, "Developer smoke test must cover long spiral growth cap")
+    require("long spiral rotation does not mirror with resonator direction" in smoke, "Developer smoke test must cover canonical long-spiral rotation direction")
     require("spiral crosses a fixed point twice per circle cascade period" in smoke, "Developer smoke test must cover spiral-to-circle frequency synchronization")
     require("continuous cascade does not stack long spirals" in smoke, "Developer smoke test must cover held spiral persistence")
 

@@ -92,7 +92,7 @@ static func _spiral_points(wave: Dictionary) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	var age := maxf(float(wave["age"]), 0.0)
 	var mode: String = wave.get("spiral_mode", "short")
-	var chirality := float(wave.get("spiral_chirality", 1.0))
+	var chirality := 1.0 if mode == "long" else float(wave.get("spiral_chirality", 1.0))
 	var live_head := SPIRAL_OMEGA * age
 	var head: float
 	var tail: float
