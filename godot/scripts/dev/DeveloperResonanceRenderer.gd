@@ -3,6 +3,8 @@ extends RefCounted
 
 const INK := Color(0.96, 0.97, 1.0, 0.92)
 const CURVE_UNIT := 72.0
+const CURVE_DATA = preload("res://scripts/dev/ResonanceCurveData.gd")
+const PENROSE_DATA = preload("res://scripts/dev/PenrosePatchData.gd")
 
 
 static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Array, arena: Rect2, phase: float) -> void:
@@ -104,8 +106,8 @@ static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vecto
 
 
 static func _draw_radial_fourier(canvas: CanvasItem, groups: Array, phase: float) -> void:
-	var master := ResonanceCurveData.radial_master()
-	var smooth := ResonanceCurveData.radial_smooth()
+	var master: PackedVector2Array = CURVE_DATA.radial_master()
+	var smooth: PackedVector2Array = CURVE_DATA.radial_smooth()
 	var scales := [0.58, 0.86, 1.15]
 	var maturities := [0.30, 0.58, 1.00]
 	for group in groups:
@@ -178,7 +180,7 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 		var seed_j := roundi(u.cross(local) / determinant)
 		for di in range(-2, 3):
 			for dj in range(-2, 3):
-				var shell := abs(di) + abs(dj)
+				var shell: int = absi(di) + absi(dj)
 				if shell > 2:
 					continue
 				var i := seed_i + di
@@ -371,8 +373,8 @@ static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> v
 
 
 static func _draw_gielis_leaves(canvas: CanvasItem, groups: Array, phase: float) -> void:
-	var master := ResonanceCurveData.gielis_master()
-	var smooth := ResonanceCurveData.gielis_smooth()
+	var master: PackedVector2Array = CURVE_DATA.gielis_master()
+	var smooth: PackedVector2Array = CURVE_DATA.gielis_smooth()
 	var scales := [0.72, 1.02, 1.31, 1.60]
 	var maturities := [0.30, 0.56, 0.80, 1.00]
 	for group in groups:
@@ -443,11 +445,11 @@ static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2)
 	var anchor: Vector2 = points[0]
 	var reveal_radius := 1.18 * typical_step
 	var candidates: Array[Dictionary] = []
-	for local_tile in PenrosePatchData.tiles():
+	for local_tile in PENROSE_DATA.tiles():
 		var world := PackedVector2Array()
 		var center := Vector2.ZERO
 		for local_point in local_tile:
-			var transformed := anchor + (local_point * tile_edge).rotated(base_angle)
+			var transformed: Vector2 = anchor + (Vector2(local_point) * tile_edge).rotated(base_angle)
 			world.append(transformed)
 			center += transformed
 		center /= 4.0

@@ -141,6 +141,10 @@ def verify_exact_restorations() -> None:
     for coefficient in ("0.42 * typical_step", "1.18 * typical_step", "/ 0.055", "1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
         require(coefficient in renderer, f"Missing accepted grid/Voronoi coefficient {coefficient}")
     require("Geometry2D.triangulate_delaunay" in renderer, "K/K must use guarded Delaunay dual segments")
+    require('preload("res://scripts/dev/ResonanceCurveData.gd")' in renderer, "Curve tables must be loaded explicitly without the editor class cache")
+    require('preload("res://scripts/dev/PenrosePatchData.gd")' in renderer, "Penrose tables must be loaded explicitly without the editor class cache")
+    require(renderer.count("ResonanceCurveData.") == 1, "Renderer must only mention the curve class name inside its preload path")
+    require(renderer.count("PenrosePatchData.") == 1, "Renderer must only mention the Penrose class name inside its preload path")
 
 
 def verify_developer_presets() -> None:
