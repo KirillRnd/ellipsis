@@ -104,6 +104,7 @@ var _tree_was_paused := false
 var _time_scale_before_pause := 1.0
 var _is_open := false
 var _resume_tween: Tween
+var _menu_button_enabled := true
 
 var _menu_button: Button
 var _modal_root: Control
@@ -193,6 +194,12 @@ func open_settings() -> void:
 	_close_button.grab_focus()
 
 
+func set_menu_button_visible(enabled: bool) -> void:
+	_menu_button_enabled = enabled
+	if is_instance_valid(_menu_button) and not _is_open:
+		_menu_button.visible = enabled
+
+
 func close_settings() -> void:
 	if not _is_open:
 		return
@@ -201,7 +208,7 @@ func close_settings() -> void:
 	_screen_option.collapse()
 	_close_button.release_focus()
 	_modal_root.visible = false
-	_menu_button.visible = true
+	_menu_button.visible = _menu_button_enabled
 	if _tree_was_paused:
 		get_tree().paused = true
 		return

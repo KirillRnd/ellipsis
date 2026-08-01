@@ -125,6 +125,7 @@ var _pending_encounter_index := -1
 
 func _ready() -> void:
 	if is_instance_valid(_settings):
+		_settings.set_menu_button_visible(true)
 		_language = _settings.current_language
 		_settings.language_changed.connect(_on_settings_language_changed)
 	wave_manager.player = player
