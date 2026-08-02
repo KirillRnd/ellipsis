@@ -87,7 +87,7 @@ static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, sta
 
 static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	var points := _unique_points(groups)
-	for edge in _proximity_graph_edges(points, groups, "mst"):
+	for edge in _minimum_spanning_graph_edges(points, groups):
 		var first: Vector2 = edge["first"]
 		var second: Vector2 = edge["second"]
 		var center := (first + second) * 0.5
@@ -158,7 +158,7 @@ static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vecto
 
 static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	var points := _unique_points(groups)
-	for edge in _proximity_graph_edges(points, groups, "gabriel"):
+	for edge in _minimum_spanning_graph_edges(points, groups):
 		var first: Vector2 = edge["first"]
 		var second: Vector2 = edge["second"]
 		var axis := second - first
@@ -187,7 +187,7 @@ static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, _phas
 		canvas.draw_circle(second, 3.0, Color(INK, 0.76))
 
 
-static func _proximity_graph_edges(points: Array[Vector2], groups: Array, graph_kind: String) -> Array[Dictionary]:
+static func _minimum_spanning_graph_edges(points: Array[Vector2], groups: Array) -> Array[Dictionary]:
 	var point_ages := _unique_point_effect_ages(points, groups)
 	var result: Array[Dictionary] = []
 	if points.size() == 2:
@@ -230,18 +230,8 @@ static func _proximity_graph_edges(points: Array[Vector2], groups: Array, graph_
 			var edge: Vector2i = edge_data["edge"]
 			var first := cluster[edge.x]
 			var second := cluster[edge.y]
-			var tolerance := maxf(1.0, local_step * DELAUNAY_COCIRCULAR_TOLERANCE)
-			var accepted := true
-			if graph_kind == "rng":
-				accepted = _is_relative_neighborhood_edge(first, second, cluster, tolerance)
-			elif graph_kind == "gabriel":
-				accepted = _is_gabriel_edge(first, second, cluster, tolerance)
-			if not accepted:
-				continue
 			result.append(_make_proximity_edge(first, second, point_ages, groups))
-	if graph_kind == "mst":
-		return _minimum_spanning_forest(result, points)
-	return result
+	return _minimum_spanning_forest(result, points)
 
 
 static func _minimum_spanning_forest(edges: Array[Dictionary], points: Array[Vector2]) -> Array[Dictionary]:
@@ -289,27 +279,6 @@ static func _make_proximity_edge(first: Vector2, second: Vector2, point_ages: Di
 		"age": minf(float(point_ages.get(first, 0.0)), float(point_ages.get(second, 0.0))),
 		"seed": mini(first_seed, second_seed) * 97 + maxi(first_seed, second_seed) * 53,
 	}
-
-
-static func _is_gabriel_edge(first: Vector2, second: Vector2, points: Array[Vector2], tolerance: float = 0.0) -> bool:
-	var center := (first + second) * 0.5
-	var radius := first.distance_to(second) * 0.5
-	for point in points:
-		if point.is_equal_approx(first) or point.is_equal_approx(second):
-			continue
-		if point.distance_to(center) < radius - tolerance:
-			return false
-	return true
-
-
-static func _is_relative_neighborhood_edge(first: Vector2, second: Vector2, points: Array[Vector2], tolerance: float = 0.0) -> bool:
-	var distance := first.distance_to(second)
-	for point in points:
-		if point.is_equal_approx(first) or point.is_equal_approx(second):
-			continue
-		if maxf(point.distance_to(first), point.distance_to(second)) < distance - tolerance:
-			return false
-	return true
 
 
 static func _point_lissajous_seed(point: Vector2, groups: Array) -> int:

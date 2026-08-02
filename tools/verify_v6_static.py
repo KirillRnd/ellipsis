@@ -229,11 +229,8 @@ def verify_exact_restorations() -> None:
         "_lissajous_fast_coordinate(ratio, clock, precession)",
         "_draw_lissajous_trail",
         "_draw_lissajous_projection_trail",
-        "_proximity_graph_edges(points, groups, \"mst\")",
-        "_proximity_graph_edges(points, groups, \"gabriel\")",
+        "_minimum_spanning_graph_edges(points, groups)",
         "_minimum_spanning_forest",
-        "_is_relative_neighborhood_edge",
-        "_is_gabriel_edge",
     ):
         require(lissajous_contract in renderer, f"Missing enhanced F/F and F/S Lissajous contract: {lissajous_contract}")
     require("phase * 1.9" not in renderer and "phase * 2.6" not in renderer, "F/F and F/S must not use unrelated animation clocks")
@@ -241,10 +238,8 @@ def verify_exact_restorations() -> None:
     require("Lissajous phase precession completes one turn per eight cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock slow Lissajous precession")
     require("F/S projection uses the fast coordinate of the shared Lissajous oscillator" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the F/F to F/S projection relationship")
     require("Lissajous mode and phase are stable under source ordering" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock stable Lissajous pair identity")
-    require("F/F relative-neighborhood graph is the stricter pairwise stage before F/S" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the RNG-to-Gabriel progression")
-    require("F/S Gabriel graph rejects an edge containing another active node in its diametral disk" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the Gabriel empty-disk criterion")
-    require("F/F minimum spanning tree connects each cloud without cyclic Lissajous edges" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the acyclic F/F minimum spanning tree")
-    require("F/F Kruskal selection prefers shorter Delaunay edges" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock minimum-weight F/F edge selection")
+    require("F/F and F/S minimum spanning tree connects each cloud without cyclic resonance edges" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the acyclic F/F and F/S minimum spanning trees")
+    require("F/F and F/S Kruskal selection prefers shorter Delaunay edges" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock minimum-weight F/F and F/S edge selection")
 
     for delaunay_contract in (
         "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",
