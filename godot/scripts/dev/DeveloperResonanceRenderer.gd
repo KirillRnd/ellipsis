@@ -44,7 +44,7 @@ static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Ar
 		"gold_gold":
 			_draw_penrose_tiles(canvas, groups, arena)
 		"kk":
-			_draw_guarded_voronoi(canvas, _unique_points(groups, 28), groups, _group_color(groups))
+			_draw_guarded_voronoi(canvas, _unique_points(groups), groups, _group_color(groups))
 
 
 static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, arena: Rect2, phase: float) -> void:
@@ -122,8 +122,12 @@ static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vecto
 				edge_map[key] = edge_data
 		for edge_data in edge_map.values():
 			var attached: Array = edge_data["triangles"]
-			if attached.size() == 2 and _circumcircles_are_equivalent(circles[int(attached[0])], circles[int(attached[1])], local_step):
-				continue
+			if attached.size() == 2:
+				var first_triangle_index := int(attached[0])
+				var second_triangle_index := int(attached[1])
+				if _triangle_uses_only_real_points(triangles[first_triangle_index], cluster.size()) and _triangle_uses_only_real_points(triangles[second_triangle_index], cluster.size()):
+					if _circumcircles_are_equivalent(circles[first_triangle_index], circles[second_triangle_index], local_step):
+						continue
 			var edge: Vector2i = edge_data["edge"]
 			canvas.draw_line(cluster[edge.x], cluster[edge.y], Color(color, 0.72), 2.0, true)
 	for point in points:
@@ -810,8 +814,9 @@ static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], o
 			continue
 		var first_triangle_index := int(attached[0]["triangle"])
 		var second_triangle_index := int(attached[1]["triangle"])
-		if _circumcircles_are_equivalent(circles[first_triangle_index], circles[second_triangle_index], local_step):
-			continue
+		if _triangle_uses_only_real_points(triangles[first_triangle_index], cluster.size()) and _triangle_uses_only_real_points(triangles[second_triangle_index], cluster.size()):
+			if _circumcircles_are_equivalent(circles[first_triangle_index], circles[second_triangle_index], local_step):
+				continue
 		var a: Vector2 = centers[first_triangle_index]
 		var b: Vector2 = centers[second_triangle_index]
 		if a.distance_to(b) > 2.9 * local_step:
@@ -871,7 +876,11 @@ static func _circumcircles_are_equivalent(first: Dictionary, second: Dictionary,
 	return center_distance <= tolerance and radius_difference <= tolerance
 
 
-static func _unique_points(groups: Array, limit: int = 40) -> Array[Vector2]:
+static func _triangle_uses_only_real_points(triangle: Vector3i, real_point_count: int) -> bool:
+	return triangle.x < real_point_count and triangle.y < real_point_count and triangle.z < real_point_count
+
+
+static func _unique_points(groups: Array) -> Array[Vector2]:
 	var result: Array[Vector2] = []
 	for group in groups:
 		for point_value in group["points"]:
@@ -883,8 +892,6 @@ static func _unique_points(groups: Array, limit: int = 40) -> Array[Vector2]:
 					break
 			if not duplicate:
 				result.append(point)
-				if result.size() >= limit:
-					return result
 	return result
 
 

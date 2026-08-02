@@ -128,6 +128,13 @@ func _run() -> void:
 	_expect(delaunay_clouds.size() == 2 and delaunay_clouds[0].size() == 3 and delaunay_clouds[1].size() == 3, "blue Delaunay stages split intersections into the same upper and lower clouds as red Voronoi")
 	var guarded_stages := DeveloperResonanceRenderer._guarded_delaunay_stages(delaunay_points, delaunay_groups)
 	_expect(guarded_stages.size() == 2, "blue edges and circumcircles share the guarded Delaunay stage")
+	var many_delaunay_points: Array[Vector2] = []
+	for point_index in range(65):
+		many_delaunay_points.append(Vector2(float(point_index) * 8.0, 0.0))
+	var complete_delaunay_points := DeveloperResonanceRenderer._unique_points([{"points": many_delaunay_points}])
+	_expect(complete_delaunay_points.size() == 65, "Delaunay resonances retain every active unique intersection beyond the old display cap")
+	_expect(DeveloperResonanceRenderer._triangle_uses_only_real_points(Vector3i(0, 1, 2), 3), "cocircular stabilization recognizes an entirely real Delaunay triangle")
+	_expect(not DeveloperResonanceRenderer._triangle_uses_only_real_points(Vector3i(0, 1, 3), 3), "cocircular stabilization preserves triangles touching the guard ring")
 	var reference_circle := {"center": Vector2.ZERO, "radius_sq": 100.0}
 	var equivalent_circle := {"center": Vector2(0.4, -0.3), "radius_sq": 102.01}
 	var distinct_circle := {"center": Vector2(5.0, 0.0), "radius_sq": 100.0}

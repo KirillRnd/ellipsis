@@ -225,6 +225,7 @@ def verify_exact_restorations() -> None:
         "_guarded_delaunay_stages(points, groups)",
         "_split_intersection_clouds(points, groups)",
         "_circumcircles_are_equivalent",
+        "_triangle_uses_only_real_points",
         "if edge.x >= cluster.size() or edge.y >= cluster.size()",
         "if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size()",
     ):
@@ -232,6 +233,10 @@ def verify_exact_restorations() -> None:
     require("blue edges and circumcircles share the guarded Delaunay stage" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the shared blue Delaunay pipeline")
     require("near-cocircular Delaunay alternatives share one stable visual primitive" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover cocircular Delaunay stabilization")
     require(renderer.count("_circumcircles_are_equivalent") == 4, "S/S, S/G, and K/K must all share the cocircular stabilization predicate")
+    require("static func _unique_points(groups: Array)" in renderer, "Delaunay resonances must collect all active unique intersections without a display cap")
+    require("_unique_points(groups," not in renderer, "S/S, S/G, and K/K must not truncate active intersections at call sites")
+    require("Delaunay resonances retain every active unique intersection beyond the old display cap" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover more than forty active Delaunay intersections")
+    require("cocircular stabilization preserves triangles touching the guard ring" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must protect guard-ring boundary connections")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
