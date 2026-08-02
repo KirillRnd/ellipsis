@@ -284,6 +284,10 @@ def verify_developer_timing() -> None:
     require("const CASCADE_PERIOD := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in room, "Developer cascade must use the shared game-rate value")
     require("const WAVE_SPEED := ResonanceCatalog.GAME_WAVE_SPEED" in room, "Developer waves must use the shared game speed")
     require(renderer.count("ResonanceCatalog.GAME_CASCADE_SPACING") == 2, "Straight-wave resonance grids must use the shared cascade spacing")
+    require("_fire_cascade_step(_cascade_accumulator)" in room, "Developer cascade must preserve sub-frame launch timing")
+    require('"age": initial_age' in room and '"extent": initial_age * WAVE_SPEED' in room, "New cascade waves must start at their exact sub-frame age and position")
+    require(room.index('for wave in _waves:') < room.index('if _cascade_enabled:'), "Existing waves must advance before sub-frame cascade waves are spawned")
+    require("cascade waves preserve their exact sub-frame launch age" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover frame-rate-independent cascade spacing")
 
 
 def verify_spiral_modes() -> None:
@@ -303,7 +307,7 @@ def verify_spiral_modes() -> None:
     require('var chirality := 1.0 if mode == "long" else float(wave.get("spiral_chirality", 1.0))' in geometry, "Long spiral must use the source rotation direction instead of mirrored resonator chirality")
     require('rotation := float(wave["angle"]) - chirality * phase_head' in geometry, "Rotation must exactly compensate head parameter motion")
     require("var radius := SPIRAL_PITCH * theta" in geometry, "Short spiral radius must use absolute theta")
-    require('_spawn_wave(source, "long", true)' in room, "Held cascade must maintain a persistent long spiral")
+    require('_spawn_wave(source, "long", true, initial_age)' in room, "Held cascade must maintain a persistent long spiral with exact sub-frame timing")
     require("if not _has_long_spiral(source.sequence_id)" in room, "Cascade must not stack long spirals")
     require('wave.get("spiral_mode", "") == "long"' in room, "Persistent long spiral must be tracked per resonator")
     require("short spiral window remains exactly 1.5 turns" in smoke, "Developer smoke test must cover short spiral length")

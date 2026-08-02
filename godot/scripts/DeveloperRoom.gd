@@ -74,14 +74,14 @@ func _process(delta: float) -> void:
 	if not _simulation_paused:
 		var scaled_delta: float = delta * float(SPEEDS[_speed_index])
 		_simulation_age += scaled_delta
+		for wave in _waves:
+			wave["age"] += scaled_delta
+			wave["extent"] = wave["age"] * WAVE_SPEED
 		if _cascade_enabled:
 			_cascade_accumulator += scaled_delta
 			while _cascade_accumulator >= CASCADE_PERIOD:
 				_cascade_accumulator -= CASCADE_PERIOD
-				_fire_cascade_step()
-		for wave in _waves:
-			wave["age"] += scaled_delta
-			wave["extent"] = wave["age"] * WAVE_SPEED
+				_fire_cascade_step(_cascade_accumulator)
 		for index in range(_waves.size() - 1, -1, -1):
 			if not bool(_waves[index].get("persistent", false)) and _waves[index]["age"] >= WAVE_LIFETIME:
 				_waves.remove_at(index)
@@ -316,7 +316,7 @@ func _fire_volley() -> void:
 	_trim_waves()
 
 
-func _fire_cascade_step() -> void:
+func _fire_cascade_step(initial_age: float = 0.0) -> void:
 	_current_volley_index = _next_volley_index
 	_next_volley_index += 1
 	for source in _resonators:
@@ -324,13 +324,13 @@ func _fire_cascade_step() -> void:
 		var spec := ResonanceCatalog.color_spec(source.color_index)
 		if spec["geometry"] == "spiral":
 			if not _has_long_spiral(source.sequence_id):
-				_spawn_wave(source, "long", true)
+				_spawn_wave(source, "long", true, initial_age)
 		else:
-			_spawn_wave(source, "short", false)
+			_spawn_wave(source, "short", false, initial_age)
 	_trim_waves()
 
 
-func _spawn_wave(source: DeveloperResonator, spiral_mode: String, persistent: bool) -> void:
+func _spawn_wave(source: DeveloperResonator, spiral_mode: String, persistent: bool, initial_age: float = 0.0) -> void:
 	var spec := ResonanceCatalog.color_spec(source.color_index)
 	_waves.append({
 		"id": _next_wave_id,
@@ -344,8 +344,8 @@ func _spawn_wave(source: DeveloperResonator, spiral_mode: String, persistent: bo
 		"spiral_chirality": 1.0 if cos(source.front_angle) >= 0.0 else -1.0,
 		"spiral_stop_age": WAVE_LIFETIME - DeveloperWaveGeometry.SPIRAL_SHORT_DRAIN_TIME if spec["geometry"] == "spiral" and spiral_mode == "short" else INF,
 		"persistent": persistent,
-		"age": 0.0,
-		"extent": 0.0,
+		"age": initial_age,
+		"extent": initial_age * WAVE_SPEED,
 	})
 	_next_wave_id += 1
 
