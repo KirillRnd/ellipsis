@@ -131,6 +131,15 @@ func _run() -> void:
 	_expect(is_equal_approx(DeveloperResonanceRenderer._lissajous_precession(lissajous_period * 8.0, lissajous_group) - DeveloperResonanceRenderer._lissajous_precession(0.0, lissajous_group), TAU), "Lissajous phase precession completes one turn per eight cascade periods")
 	_expect(is_equal_approx(DeveloperResonanceRenderer._lissajous_fast_coordinate(Vector2i(2, 1), PI * 0.25, 0.0), 1.0), "F/S projection uses the fast coordinate of the shared Lissajous oscillator")
 	_expect(DeveloperResonanceRenderer._lissajous_position(Vector2.ZERO, Vector2.RIGHT, Vector2.DOWN, 4.0, 10.0, Vector2i(2, 1), PI * 0.5, 0.0).is_equal_approx(Vector2(10.0, 0.0)), "base 2-to-1 Lissajous geometry retains its node-aligned slow extremum")
+	var proximity_first := Vector2(-10.0, 0.0)
+	var proximity_second := Vector2(10.0, 0.0)
+	var lune_only_point := Vector2(0.0, 12.0)
+	var diameter_point := Vector2(0.0, 5.0)
+	var lune_points: Array[Vector2] = [proximity_first, proximity_second, lune_only_point]
+	var diameter_points: Array[Vector2] = [proximity_first, proximity_second, diameter_point]
+	_expect(DeveloperResonanceRenderer._is_gabriel_edge(proximity_first, proximity_second, lune_points), "F/S Gabriel graph keeps an edge whose open diametral disk is empty")
+	_expect(not DeveloperResonanceRenderer._is_relative_neighborhood_edge(proximity_first, proximity_second, lune_points), "F/F relative-neighborhood graph is the stricter pairwise stage before F/S")
+	_expect(not DeveloperResonanceRenderer._is_gabriel_edge(proximity_first, proximity_second, diameter_points), "F/S Gabriel graph rejects an edge containing another active node in its diametral disk")
 	var delaunay_groups := [{"first": {"origin": Vector2(-10.0, 0.0)}, "second": {"origin": Vector2(10.0, 0.0)}}]
 	var delaunay_points: Array[Vector2] = [Vector2(-4.0, -4.0), Vector2(0.0, -6.0), Vector2(4.0, -4.0), Vector2(-4.0, 4.0), Vector2(0.0, 6.0), Vector2(4.0, 4.0)]
 	var delaunay_clouds := DeveloperResonanceRenderer._split_intersection_clouds(delaunay_points, delaunay_groups)

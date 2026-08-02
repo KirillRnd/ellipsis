@@ -86,12 +86,10 @@ static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, sta
 
 
 static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, _phase: float) -> void:
-	for group in groups:
-		var points: Array = group["points"]
-		if points.size() < 2:
-			continue
-		var first: Vector2 = points[0]
-		var second: Vector2 = points[1]
+	var points := _unique_points(groups)
+	for edge in _proximity_graph_edges(points, groups, "rng"):
+		var first: Vector2 = edge["first"]
+		var second: Vector2 = edge["second"]
 		var center := (first + second) * 0.5
 		var axis := second - first
 		var distance := axis.length()
@@ -99,13 +97,14 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, _phase: fl
 			continue
 		axis /= distance
 		var perpendicular := Vector2(-axis.y, axis.x)
-		var longitudinal := minf(42.0, distance * 0.28)
-		var transverse := distance * 0.5
-		var ratio := _lissajous_ratio(group)
-		var age := float(group.get("effect_age", 0.0))
+		var longitudinal := minf(30.0, distance * 0.18)
+		var transverse := distance * 0.44
+		var seed := int(edge["seed"])
+		var ratio := _lissajous_ratio_from_seed(seed)
+		var age := float(edge["age"])
 		var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
-		var clock := _lissajous_clock(age, group)
-		var precession := _lissajous_precession(age, group)
+		var clock := _lissajous_clock_from_seed(age, seed)
+		var precession := _lissajous_precession_from_seed(age, seed)
 		var color := ResonanceCatalog.resonance_color(0, 0)
 		if reveal >= 1.0:
 			var curve := _lissajous_curve(center, axis, perpendicular, longitudinal, transverse, ratio, precession)
@@ -158,23 +157,22 @@ static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vecto
 
 
 static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, _phase: float) -> void:
-	for group in groups:
-		var points: Array = group["points"]
-		if points.size() < 2:
-			continue
-		var first: Vector2 = points[0]
-		var second: Vector2 = points[1]
+	var points := _unique_points(groups)
+	for edge in _proximity_graph_edges(points, groups, "gabriel"):
+		var first: Vector2 = edge["first"]
+		var second: Vector2 = edge["second"]
 		var axis := second - first
 		var distance := axis.length()
 		if distance < 2.0:
 			continue
 		axis /= distance
 		var center := (first + second) * 0.5
-		var ratio := _lissajous_ratio(group)
-		var age := float(group.get("effect_age", 0.0))
+		var seed := int(edge["seed"])
+		var ratio := _lissajous_ratio_from_seed(seed)
+		var age := float(edge["age"])
 		var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
-		var clock := _lissajous_clock(age, group)
-		var precession := _lissajous_precession(age, group)
+		var clock := _lissajous_clock_from_seed(age, seed)
+		var precession := _lissajous_precession_from_seed(age, seed)
 		var coordinate := _lissajous_fast_coordinate(ratio, clock, precession)
 		var half_length := distance * 0.5 * reveal
 		var color := ResonanceCatalog.resonance_color(0, 1)
@@ -189,6 +187,103 @@ static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, _phas
 		canvas.draw_circle(second, 3.0, Color(INK, 0.76))
 
 
+static func _proximity_graph_edges(points: Array[Vector2], groups: Array, graph_kind: String) -> Array[Dictionary]:
+	var point_ages := _unique_point_effect_ages(points, groups)
+	var result: Array[Dictionary] = []
+	if points.size() == 2:
+		result.append(_make_proximity_edge(points[0], points[1], point_ages, groups))
+		return result
+	for cluster_value in _split_intersection_clouds(points, groups):
+		var sparse_cluster: Array[Vector2] = cluster_value
+		if sparse_cluster.size() == 2:
+			result.append(_make_proximity_edge(sparse_cluster[0], sparse_cluster[1], point_ages, groups))
+	for stage in _guarded_delaunay_stages(points, groups):
+		var cluster: Array[Vector2] = stage["points"]
+		var all_points: Array[Vector2] = stage["all_points"]
+		var triangles: Array[Vector3i] = stage["triangles"]
+		var local_step := float(stage["local_step"])
+		var circles: Array[Dictionary] = []
+		for triangle in triangles:
+			circles.append(_circumcircle(all_points[triangle.x], all_points[triangle.y], all_points[triangle.z]))
+		var edge_map := {}
+		for triangle_index in range(triangles.size()):
+			var triangle := triangles[triangle_index]
+			for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.x, triangle.z)]:
+				if edge.x >= cluster.size() or edge.y >= cluster.size():
+					continue
+				var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
+				if not edge_map.has(key):
+					edge_map[key] = {"edge": Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y)), "triangles": []}
+				var edge_data: Dictionary = edge_map[key]
+				var attached_triangles: Array = edge_data["triangles"]
+				attached_triangles.append(triangle_index)
+				edge_data["triangles"] = attached_triangles
+				edge_map[key] = edge_data
+		for edge_data in edge_map.values():
+			var attached: Array = edge_data["triangles"]
+			if attached.size() == 2:
+				var first_triangle_index := int(attached[0])
+				var second_triangle_index := int(attached[1])
+				if _triangle_uses_only_real_points(triangles[first_triangle_index], cluster.size()) and _triangle_uses_only_real_points(triangles[second_triangle_index], cluster.size()):
+					if _circumcircles_are_equivalent(circles[first_triangle_index], circles[second_triangle_index], local_step):
+						continue
+			var edge: Vector2i = edge_data["edge"]
+			var first := cluster[edge.x]
+			var second := cluster[edge.y]
+			var tolerance := maxf(1.0, local_step * DELAUNAY_COCIRCULAR_TOLERANCE)
+			var accepted := _is_relative_neighborhood_edge(first, second, cluster, tolerance) if graph_kind == "rng" else _is_gabriel_edge(first, second, cluster, tolerance)
+			if not accepted:
+				continue
+			result.append(_make_proximity_edge(first, second, point_ages, groups))
+	return result
+
+
+static func _make_proximity_edge(first: Vector2, second: Vector2, point_ages: Dictionary, groups: Array) -> Dictionary:
+	var first_seed := _point_lissajous_seed(first, groups)
+	var second_seed := _point_lissajous_seed(second, groups)
+	return {
+		"first": first,
+		"second": second,
+		"age": minf(float(point_ages.get(first, 0.0)), float(point_ages.get(second, 0.0))),
+		"seed": mini(first_seed, second_seed) * 97 + maxi(first_seed, second_seed) * 53,
+	}
+
+
+static func _is_gabriel_edge(first: Vector2, second: Vector2, points: Array[Vector2], tolerance: float = 0.0) -> bool:
+	var center := (first + second) * 0.5
+	var radius := first.distance_to(second) * 0.5
+	for point in points:
+		if point.is_equal_approx(first) or point.is_equal_approx(second):
+			continue
+		if point.distance_to(center) < radius - tolerance:
+			return false
+	return true
+
+
+static func _is_relative_neighborhood_edge(first: Vector2, second: Vector2, points: Array[Vector2], tolerance: float = 0.0) -> bool:
+	var distance := first.distance_to(second)
+	for point in points:
+		if point.is_equal_approx(first) or point.is_equal_approx(second):
+			continue
+		if maxf(point.distance_to(first), point.distance_to(second)) < distance - tolerance:
+			return false
+	return true
+
+
+static func _point_lissajous_seed(point: Vector2, groups: Array) -> int:
+	var seed := 0
+	var found := false
+	for group in groups:
+		for point_value in group["points"]:
+			if point.distance_squared_to(Vector2(point_value)) >= 16.0:
+				continue
+			var candidate := _lissajous_seed(group)
+			if not found or candidate < seed:
+				seed = candidate
+				found = true
+	return seed
+
+
 static func _lissajous_seed(group: Dictionary) -> int:
 	var first: Dictionary = group["first"]
 	var second: Dictionary = group["second"]
@@ -200,20 +295,36 @@ static func _lissajous_seed(group: Dictionary) -> int:
 
 
 static func _lissajous_ratio(group: Dictionary) -> Vector2i:
-	return Vector2i(LISSAJOUS_RATIOS[_lissajous_seed(group) % LISSAJOUS_RATIOS.size()])
+	return _lissajous_ratio_from_seed(_lissajous_seed(group))
+
+
+static func _lissajous_ratio_from_seed(seed: int) -> Vector2i:
+	return Vector2i(LISSAJOUS_RATIOS[posmod(seed, LISSAJOUS_RATIOS.size())])
 
 
 static func _lissajous_phase_offset(group: Dictionary) -> float:
-	return TAU * float((_lissajous_seed(group) * 73) % 360) / 360.0
+	return _lissajous_phase_offset_from_seed(_lissajous_seed(group))
+
+
+static func _lissajous_phase_offset_from_seed(seed: int) -> float:
+	return TAU * float(posmod(seed * 73, 360)) / 360.0
 
 
 static func _lissajous_clock(age: float, group: Dictionary) -> float:
-	return TAU * age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL + _lissajous_phase_offset(group)
+	return _lissajous_clock_from_seed(age, _lissajous_seed(group))
+
+
+static func _lissajous_clock_from_seed(age: float, seed: int) -> float:
+	return TAU * age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL + _lissajous_phase_offset_from_seed(seed)
 
 
 static func _lissajous_precession(age: float, group: Dictionary) -> float:
+	return _lissajous_precession_from_seed(age, _lissajous_seed(group))
+
+
+static func _lissajous_precession_from_seed(age: float, seed: int) -> float:
 	var period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * LISSAJOUS_PRECESSION_PERIODS
-	return TAU * age / period + _lissajous_phase_offset(group) * 0.5
+	return TAU * age / period + _lissajous_phase_offset_from_seed(seed) * 0.5
 
 
 static func _lissajous_fast_coordinate(ratio: Vector2i, t: float, precession: float) -> float:

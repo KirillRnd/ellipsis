@@ -223,12 +223,16 @@ def verify_exact_restorations() -> None:
         "const LISSAJOUS_RATIOS := [Vector2i(2, 1), Vector2i(2, 1), Vector2i(3, 2), Vector2i(4, 3)]",
         "const LISSAJOUS_PRECESSION_PERIODS := 8.0",
         "const LISSAJOUS_TRAIL_FRACTION := 0.18",
-        "_lissajous_ratio(group)",
-        "_lissajous_clock(age, group)",
-        "_lissajous_precession(age, group)",
+        "static func _lissajous_ratio(group: Dictionary)",
+        "static func _lissajous_clock(age: float, group: Dictionary)",
+        "static func _lissajous_precession(age: float, group: Dictionary)",
         "_lissajous_fast_coordinate(ratio, clock, precession)",
         "_draw_lissajous_trail",
         "_draw_lissajous_projection_trail",
+        "_proximity_graph_edges(points, groups, \"rng\")",
+        "_proximity_graph_edges(points, groups, \"gabriel\")",
+        "_is_relative_neighborhood_edge",
+        "_is_gabriel_edge",
     ):
         require(lissajous_contract in renderer, f"Missing enhanced F/F and F/S Lissajous contract: {lissajous_contract}")
     require("phase * 1.9" not in renderer and "phase * 2.6" not in renderer, "F/F and F/S must not use unrelated animation clocks")
@@ -236,6 +240,8 @@ def verify_exact_restorations() -> None:
     require("Lissajous phase precession completes one turn per eight cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock slow Lissajous precession")
     require("F/S projection uses the fast coordinate of the shared Lissajous oscillator" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the F/F to F/S projection relationship")
     require("Lissajous mode and phase are stable under source ordering" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock stable Lissajous pair identity")
+    require("F/F relative-neighborhood graph is the stricter pairwise stage before F/S" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the RNG-to-Gabriel progression")
+    require("F/S Gabriel graph rejects an edge containing another active node in its diametral disk" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the Gabriel empty-disk criterion")
 
     for delaunay_contract in (
         "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",
@@ -250,7 +256,7 @@ def verify_exact_restorations() -> None:
         require(delaunay_contract in renderer, f"Missing shared S/S and S/G guarded-Delaunay contract: {delaunay_contract}")
     require("blue edges and circumcircles share the guarded Delaunay stage" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the shared blue Delaunay pipeline")
     require("near-cocircular Delaunay alternatives share one stable visual primitive" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover cocircular Delaunay stabilization")
-    require(renderer.count("_circumcircles_are_equivalent") == 4, "S/S, S/G, and K/K must all share the cocircular stabilization predicate")
+    require(renderer.count("_circumcircles_are_equivalent") == 5, "F/F, F/S, S/S, S/G, and K/K must share the cocircular stabilization predicate")
     require("static func _unique_points(groups: Array)" in renderer, "Delaunay resonances must collect all active unique intersections without a display cap")
     require("_unique_points(groups," not in renderer, "S/S, S/G, and K/K must not truncate active intersections at call sites")
     require("Delaunay resonances retain every active unique intersection beyond the old display cap" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover more than forty active Delaunay intersections")
