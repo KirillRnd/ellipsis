@@ -13,6 +13,9 @@ const YY_CYCLE_TIME := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * YY_CYCL
 const YY_FADE_TIME := YY_CYCLE_TIME - YY_PLATEAU_TIME
 const YY_CENTER_LENGTH_BOOST := 1.18
 const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
+const GOLDEN_RATIO := 1.61803398875
+const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
+const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
 const GY_REVEAL_MANHATTAN_RADIUS := 2
@@ -443,7 +446,6 @@ static func _point_segment_distance(point: Vector2, a: Vector2, b: Vector2) -> f
 
 static func _draw_inflation_stars(canvas: CanvasItem, groups: Array, phase: float) -> void:
 	var color := ResonanceCatalog.resonance_color(5, 6)
-	const PHI := 1.61803398875
 	for group in groups:
 		var first: Dictionary = group["first"]
 		var second: Dictionary = group["second"]
@@ -452,7 +454,7 @@ static func _draw_inflation_stars(canvas: CanvasItem, groups: Array, phase: floa
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
 			for stage in range(stages):
-				var outer_radius := 7.0 * pow(PHI, stage)
+				var outer_radius := KG_BASE_OUTER_RADIUS * pow(GOLDEN_RATIO, stage)
 				var inner_radius := outer_radius * 0.52
 				var star := PackedVector2Array()
 				for vertex in range(11):

@@ -120,6 +120,8 @@ func _run() -> void:
 	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_CYCLE_TIME, 2.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL), "yellow fan pulse cycle lasts exactly two cascade periods")
 	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_PLATEAU_TIME + DeveloperResonanceRenderer.YY_FADE_TIME, DeveloperResonanceRenderer.YY_CYCLE_TIME), "yellow fan appearance and fade exactly fill its pulse cycle")
 	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_PARENT_HALF_LENGTH, 0.88 * (24.0 + 92.0 * DeveloperResonanceRenderer.YY_PLATEAU_TIME)), "all yellow fan rows use the accepted bottom-row size")
+	var kg_final_diameter := 2.0 * DeveloperResonanceRenderer.KG_BASE_OUTER_RADIUS * pow(DeveloperResonanceRenderer.GOLDEN_RATIO, 2.0)
+	_expect(is_equal_approx(kg_final_diameter, ResonanceCatalog.GAME_CASCADE_SPACING * DeveloperResonanceRenderer.KG_FINAL_DIAMETER_TO_CASCADE_SPACING), "final gold-red stars nearly touch across one cascade step")
 	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
 	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var near_penrose_tiles: Dictionary = DeveloperResonanceRenderer.INFINITE_PENROSE.tiles_around(Vector2.ZERO, 3.0)

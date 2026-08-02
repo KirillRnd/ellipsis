@@ -211,6 +211,14 @@ def verify_exact_restorations() -> None:
     require("all yellow fan rows use the accepted bottom-row size" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock one common Y/Y fan size")
     require("_resonance_parent_half_length" not in renderer, "Y/Y fan size must not grow with parent-wave age")
 
+    for kg_contract in (
+        "const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92",
+        "const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING",
+        "KG_BASE_OUTER_RADIUS * pow(GOLDEN_RATIO, stage)",
+    ):
+        require(kg_contract in renderer, f"Missing accepted K/G star-spacing contract: {kg_contract}")
+    require("final gold-red stars nearly touch across one cascade step" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock K/G final-star spacing")
+
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
         "const GY_TILE_REVEAL_TIME := 0.13",
@@ -293,7 +301,7 @@ def verify_developer_timing() -> None:
     require("const GAME_CASCADE_SPACING := GAME_WAVE_SPEED * GAME_RESONATOR_VOLLEY_INTERVAL" in catalog, "Cascade spacing must derive from the shared speed and period")
     require("const CASCADE_PERIOD := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL" in room, "Developer cascade must use the shared game-rate value")
     require("const WAVE_SPEED := ResonanceCatalog.GAME_WAVE_SPEED" in room, "Developer waves must use the shared game speed")
-    require(renderer.count("ResonanceCatalog.GAME_CASCADE_SPACING") == 2, "Straight-wave resonance grids must use the shared cascade spacing")
+    require(renderer.count("ResonanceCatalog.GAME_CASCADE_SPACING") >= 3, "Straight-wave grids and K/G star spacing must use the shared cascade spacing")
     require("_fire_cascade_step(_cascade_accumulator)" in room, "Developer cascade must preserve sub-frame launch timing")
     require('"age": initial_age' in room and '"extent": initial_age * WAVE_SPEED' in room, "New cascade waves must start at their exact sub-frame age and position")
     require(room.index('for wave in _waves:') < room.index('if _cascade_enabled:'), "Existing waves must advance before sub-frame cascade waves are spawned")
