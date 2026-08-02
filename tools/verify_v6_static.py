@@ -228,14 +228,13 @@ def verify_exact_restorations() -> None:
         "static func _lissajous_clock(age: float, group: Dictionary)",
         "static func _lissajous_precession(age: float, group: Dictionary)",
         "_lissajous_fast_coordinate(ratio, clock, precession)",
-        "_draw_lissajous_trail",
         "_draw_lissajous_projection_trail",
         "_minimum_spanning_graph_edges(points, groups)",
         "_minimum_spanning_forest",
     ):
         require(lissajous_contract in renderer, f"Missing enhanced F/F and F/S Lissajous contract: {lissajous_contract}")
     require("phase * 1.9" not in renderer and "phase * 2.6" not in renderer, "F/F and F/S must not use unrelated animation clocks")
-    require("Lissajous runner completes one parameter cycle per two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock Lissajous cadence")
+    require("Lissajous projection parameter completes one cycle per two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock Lissajous cadence")
     require("Lissajous phase precession completes one turn per eight cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock slow Lissajous precession")
     require("F/S projection uses the fast coordinate of the shared Lissajous oscillator" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the F/F to F/S projection relationship")
     require("Lissajous mode and phase are stable under source ordering" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock stable Lissajous pair identity")

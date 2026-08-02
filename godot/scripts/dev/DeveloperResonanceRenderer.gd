@@ -18,8 +18,6 @@ const LISSAJOUS_CYCLE_PERIODS := 2.0
 const LISSAJOUS_PRECESSION_PERIODS := 8.0
 const LISSAJOUS_TRAIL_FRACTION := 0.18
 const LISSAJOUS_CURVE_SEGMENTS := 192
-const LISSAJOUS_TRAIL_SEGMENTS := 48
-const LISSAJOUS_TRAIL_CHUNKS := 8
 const LISSAJOUS_PROJECTION_TRAIL_SAMPLES := 12
 const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
@@ -104,18 +102,11 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, _phase: fl
 		var ratio := _lissajous_ratio_from_seed(seed)
 		var age := float(edge["age"])
 		var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
-		var clock := _lissajous_clock_from_seed(age, seed)
 		var precession := _lissajous_precession_from_seed(age, seed)
 		var color := ResonanceCatalog.resonance_color(0, 0)
-		if reveal >= 1.0:
-			var curve := _lissajous_curve(center, axis, perpendicular, longitudinal, transverse, ratio, precession)
-			canvas.draw_polyline(curve, Color(color, 0.20), 8.0, true)
-			canvas.draw_polyline(curve, Color(color, 0.62), 1.8, true)
-		var trail_span := TAU * reveal if reveal < 1.0 else TAU * LISSAJOUS_TRAIL_FRACTION
-		_draw_lissajous_trail(canvas, center, axis, perpendicular, longitudinal, transverse, ratio, precession, clock, trail_span, color)
-		var runner := _lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, clock, precession)
-		canvas.draw_circle(runner, 7.0, Color(color.lightened(0.25), 0.24))
-		canvas.draw_circle(runner, 4.0, INK)
+		var curve := _lissajous_curve(center, axis, perpendicular, longitudinal, transverse, ratio, precession)
+		canvas.draw_polyline(curve, Color(color, 0.20 * reveal), 8.0, true)
+		canvas.draw_polyline(curve, Color(color, 0.62 * reveal), 1.8, true)
 		canvas.draw_circle(first, 3.2, Color(INK, 0.82))
 		canvas.draw_circle(second, 3.2, Color(INK, 0.82))
 
@@ -356,22 +347,6 @@ static func _lissajous_curve(center: Vector2, axis: Vector2, perpendicular: Vect
 		var t := TAU * float(index) / float(LISSAJOUS_CURVE_SEGMENTS)
 		curve.append(_lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, t, precession))
 	return curve
-
-
-static func _draw_lissajous_trail(canvas: CanvasItem, center: Vector2, axis: Vector2, perpendicular: Vector2, longitudinal: float, transverse: float, ratio: Vector2i, precession: float, clock: float, span: float, color: Color) -> void:
-	if span <= 0.0:
-		return
-	for chunk in range(LISSAJOUS_TRAIL_CHUNKS):
-		var curve := PackedVector2Array()
-		var first_sample := int(floor(float(chunk) * float(LISSAJOUS_TRAIL_SEGMENTS) / float(LISSAJOUS_TRAIL_CHUNKS)))
-		var last_sample := int(ceil(float(chunk + 1) * float(LISSAJOUS_TRAIL_SEGMENTS) / float(LISSAJOUS_TRAIL_CHUNKS)))
-		for sample in range(first_sample, last_sample + 1):
-			var progress := float(sample) / float(LISSAJOUS_TRAIL_SEGMENTS)
-			var t := clock - span + span * progress
-			curve.append(_lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, t, precession))
-		var brightness := float(chunk + 1) / float(LISSAJOUS_TRAIL_CHUNKS)
-		canvas.draw_polyline(curve, Color(color, 0.08 + 0.24 * brightness), 6.0, true)
-		canvas.draw_polyline(curve, Color(color.lightened(0.18), 0.22 + 0.68 * brightness), 1.8 + brightness, true)
 
 
 static func _draw_lissajous_projection_trail(canvas: CanvasItem, center: Vector2, axis: Vector2, half_length: float, ratio: Vector2i, clock: float, precession: float, reveal: float, color: Color) -> void:
