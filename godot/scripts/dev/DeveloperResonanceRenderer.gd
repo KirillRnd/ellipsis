@@ -33,7 +33,7 @@ static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Ar
 		"ff":
 			_draw_lissajous_groups(canvas, groups, phase)
 		"ss":
-			_draw_delaunay(canvas, _unique_points(groups), _group_color(groups))
+			_draw_guarded_delaunay_edges(canvas, _unique_points(groups), groups, _group_color(groups))
 		"gg":
 			_draw_rosettes(canvas, groups, phase)
 		"zz":
@@ -51,7 +51,7 @@ static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, 
 		"fs":
 			_draw_lissajous_projections(canvas, groups, phase)
 		"sg":
-			_draw_delaunay_circumcircles(canvas, _unique_points(groups, 32), groups, ResonanceCatalog.resonance_color(1, 2))
+			_draw_delaunay_circumcircles(canvas, _unique_points(groups), groups, ResonanceCatalog.resonance_color(1, 2))
 		"zg":
 			_draw_radial_fourier(canvas, groups, phase)
 		"yz":
@@ -96,10 +96,18 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: flo
 		canvas.draw_circle(runner, 4.0, INK)
 
 
-static func _draw_delaunay(canvas: CanvasItem, points: Array[Vector2], color: Color) -> void:
-	var edges := _delaunay_edges(points)
-	for edge in edges:
-		canvas.draw_line(points[edge.x], points[edge.y], Color(color, 0.72), 2.0, true)
+static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
+	for stage in _guarded_delaunay_stages(points, groups):
+		var cluster: Array[Vector2] = stage["points"]
+		var edge_map := {}
+		for triangle in stage["triangles"]:
+			for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.x, triangle.z)]:
+				if edge.x >= cluster.size() or edge.y >= cluster.size():
+					continue
+				var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
+				edge_map[key] = Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y))
+		for edge in edge_map.values():
+			canvas.draw_line(cluster[edge.x], cluster[edge.y], Color(color, 0.72), 2.0, true)
 	for point in points:
 		canvas.draw_circle(point, 3.2, INK)
 
@@ -123,13 +131,17 @@ static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vecto
 	if not groups.is_empty():
 		source_distance = Vector2(groups[0]["first"]["origin"]).distance_to(Vector2(groups[0]["second"]["origin"]))
 	var radius_limit := source_distance * 0.55 # accepted limit 2.2 for sources four units apart
-	for triangle in _delaunay_triangles(points):
-		var circle := _circumcircle(points[triangle.x], points[triangle.y], points[triangle.z])
-		if circle.is_empty():
-			continue
-		var radius := sqrt(float(circle["radius_sq"]))
-		if radius <= radius_limit:
-			canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
+	for stage in _guarded_delaunay_stages(points, groups):
+		var cluster: Array[Vector2] = stage["points"]
+		for triangle in stage["triangles"]:
+			if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size():
+				continue
+			var circle := _circumcircle(cluster[triangle.x], cluster[triangle.y], cluster[triangle.z])
+			if circle.is_empty():
+				continue
+			var radius := sqrt(float(circle["radius_sq"]))
+			if radius <= radius_limit:
+				canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
 	for point in points:
 		canvas.draw_circle(point, 3.0, INK)
 
@@ -405,6 +417,41 @@ static func _build_guard_ring(cluster: Array[Vector2], local_step: float) -> Arr
 			var ratio := float(inner + 1) / float(inner_count + 1)
 			guards.append(a.lerp(b, ratio) + outward * distance)
 	return guards
+
+
+static func _guarded_delaunay_stages(points: Array[Vector2], groups: Array) -> Array[Dictionary]:
+	var stages: Array[Dictionary] = []
+	for cluster_value in _split_intersection_clouds(points, groups):
+		var cluster: Array[Vector2] = cluster_value
+		if cluster.size() < 3:
+			continue
+		var local_step := _median_nearest_distance(cluster)
+		if local_step < 1.0:
+			local_step = 12.0
+		var all_points: Array[Vector2] = cluster.duplicate()
+		all_points.append_array(_build_guard_ring(cluster, local_step))
+		stages.append({
+			"points": cluster,
+			"triangles": _delaunay_triangles(all_points),
+		})
+	return stages
+
+
+static func _split_intersection_clouds(points: Array[Vector2], groups: Array) -> Array:
+	if groups.is_empty():
+		return [points]
+	var origin_a := Vector2(groups[0]["first"]["origin"])
+	var origin_b := Vector2(groups[0]["second"]["origin"])
+	var axis := (origin_b - origin_a).normalized()
+	var baseline := (origin_a + origin_b) * 0.5
+	var upper: Array[Vector2] = []
+	var lower: Array[Vector2] = []
+	for point in points:
+		if axis.cross(point - baseline) >= 0.0:
+			upper.append(point)
+		else:
+			lower.append(point)
+	return [upper, lower]
 
 
 static func _convex_hull(points: Array[Vector2]) -> Array[Vector2]:

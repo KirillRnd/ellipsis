@@ -219,6 +219,16 @@ def verify_exact_restorations() -> None:
         require(kg_contract in renderer, f"Missing accepted K/G star-spacing contract: {kg_contract}")
     require("final gold-red stars nearly touch across one cascade step" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock K/G final-star spacing")
 
+    for delaunay_contract in (
+        "_draw_guarded_delaunay_edges(canvas, _unique_points(groups), groups",
+        "_guarded_delaunay_stages(points, groups)",
+        "_split_intersection_clouds(points, groups)",
+        "if edge.x >= cluster.size() or edge.y >= cluster.size()",
+        "if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size()",
+    ):
+        require(delaunay_contract in renderer, f"Missing shared S/S and S/G guarded-Delaunay contract: {delaunay_contract}")
+    require("blue edges and circumcircles share the guarded Delaunay stage" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the shared blue Delaunay pipeline")
+
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
         "const GY_TILE_REVEAL_TIME := 0.13",

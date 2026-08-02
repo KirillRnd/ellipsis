@@ -122,6 +122,12 @@ func _run() -> void:
 	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_PARENT_HALF_LENGTH, 0.88 * (24.0 + 92.0 * DeveloperResonanceRenderer.YY_PLATEAU_TIME)), "all yellow fan rows use the accepted bottom-row size")
 	var kg_final_diameter := 2.0 * DeveloperResonanceRenderer.KG_BASE_OUTER_RADIUS * pow(DeveloperResonanceRenderer.GOLDEN_RATIO, 2.0)
 	_expect(is_equal_approx(kg_final_diameter, ResonanceCatalog.GAME_CASCADE_SPACING * DeveloperResonanceRenderer.KG_FINAL_DIAMETER_TO_CASCADE_SPACING), "final gold-red stars nearly touch across one cascade step")
+	var delaunay_groups := [{"first": {"origin": Vector2(-10.0, 0.0)}, "second": {"origin": Vector2(10.0, 0.0)}}]
+	var delaunay_points: Array[Vector2] = [Vector2(-4.0, -4.0), Vector2(0.0, -6.0), Vector2(4.0, -4.0), Vector2(-4.0, 4.0), Vector2(0.0, 6.0), Vector2(4.0, 4.0)]
+	var delaunay_clouds := DeveloperResonanceRenderer._split_intersection_clouds(delaunay_points, delaunay_groups)
+	_expect(delaunay_clouds.size() == 2 and delaunay_clouds[0].size() == 3 and delaunay_clouds[1].size() == 3, "blue Delaunay stages split intersections into the same upper and lower clouds as red Voronoi")
+	var guarded_stages := DeveloperResonanceRenderer._guarded_delaunay_stages(delaunay_points, delaunay_groups)
+	_expect(guarded_stages.size() == 2, "blue edges and circumcircles share the guarded Delaunay stage")
 	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
 	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var near_penrose_tiles: Dictionary = DeveloperResonanceRenderer.INFINITE_PENROSE.tiles_around(Vector2.ZERO, 3.0)
