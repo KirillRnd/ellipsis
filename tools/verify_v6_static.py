@@ -145,6 +145,7 @@ def verify_project() -> None:
         "assets/ui/main_menu/Ellipsis.png",
         "scripts/MainMenu.gd",
         "scripts/DeveloperRoom.gd",
+        "scripts/dev/InfinitePenroseGrid.gd",
     ):
         require((GODOT / relative).is_file(), f"Missing runtime file: {relative}")
 
@@ -158,10 +159,11 @@ def verify_exact_restorations() -> None:
     renderer = (GODOT / "scripts" / "dev" / "DeveloperResonanceRenderer.gd").read_text(encoding="utf-8")
     room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
     curve_data = (GODOT / "scripts" / "dev" / "ResonanceCurveData.gd").read_text(encoding="utf-8")
-    penrose_data = (GODOT / "scripts" / "dev" / "PenrosePatchData.gd").read_text(encoding="utf-8")
+    infinite_penrose = (GODOT / "scripts" / "dev" / "InfinitePenroseGrid.gd").read_text(encoding="utf-8")
 
     require_balanced_delimiters(renderer, "DeveloperResonanceRenderer.gd")
     require_balanced_delimiters(room, "DeveloperRoom.gd")
+    require_balanced_delimiters(infinite_penrose, "InfinitePenroseGrid.gd")
 
     require("ContinuousCascadeButton" in room, "Developer room needs a toggleable continuous cascade")
     fire_volley = room.split("func _fire_volley()", 1)[1].split("\n\nfunc ", 1)[0]
@@ -217,7 +219,6 @@ def verify_exact_restorations() -> None:
     require("rhomb grid anchors an intersection to its nearest lattice vertex" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover G/Y vertex anchoring")
     require("repeated rhomb cascades land exactly three grid edges apart" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover stable G/Y alignment across repeated cascades")
 
-    require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
     for coefficient in ("1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
         require(coefficient in renderer, f"Missing accepted grid/Voronoi coefficient {coefficient}")
     for gg_contract in (
@@ -228,16 +229,28 @@ def verify_exact_restorations() -> None:
         "GG_TILE_EDGE_SCALE * typical_step",
         "GG_REVEAL_RADIUS_SCALE * float(state[\"typical_step\"])",
         "_interpolate_unoriented_angle(tangent_a.angle(), tangent_b.angle())",
-        'state["tile_births"][tile_index] = minf',
+        'state["tile_births"][tile_key] = minf',
     ):
         require(gg_contract in renderer, f"Missing accepted G/G global Penrose contract: {gg_contract}")
     require('"gold_gold":\n\t\t\t_render_penrose_grid' in renderer, "G/G must keep drawing one persistent global Penrose grid between intersections")
     require("Penrose reveal uses transformed global tile centers" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover global Penrose tile transforms")
+    for infinite_contract in (
+        "const PHASES := [0.17, 0.43, 0.69, 0.11, 0.57]",
+        "const DUAL_SCALE := 2.5",
+        "var pentagrid_center := (center + ORIGIN_SHIFT) / DUAL_SCALE",
+        "for first_family in range(5)",
+        "for second_family in range(first_family + 1, 5)",
+        "base_address.append(ceili(",
+        'tiles["|".join(vertex_keys)] = points',
+    ):
+        require(infinite_contract in infinite_penrose, f"Missing infinite de Bruijn pentagrid contract: {infinite_contract}")
+    require("INFINITE_PENROSE.tiles_around(local_center, visible_radius + 8.0)" in renderer, "G/G must stream a moving window of the infinite pentagrid")
+    require("Penrose pentagrid generates tiles around arbitrarily distant visible regions" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover conditionally infinite G/G generation")
     require("Geometry2D.triangulate_delaunay" in renderer, "K/K must use guarded Delaunay dual segments")
     require('preload("res://scripts/dev/ResonanceCurveData.gd")' in renderer, "Curve tables must be loaded explicitly without the editor class cache")
-    require('preload("res://scripts/dev/PenrosePatchData.gd")' in renderer, "Penrose tables must be loaded explicitly without the editor class cache")
+    require('preload("res://scripts/dev/InfinitePenroseGrid.gd")' in renderer, "Infinite Penrose generator must be loaded explicitly without the editor class cache")
     require(renderer.count("ResonanceCurveData.") == 1, "Renderer must only mention the curve class name inside its preload path")
-    require(renderer.count("PenrosePatchData.") == 1, "Renderer must only mention the Penrose class name inside its preload path")
+    require(renderer.count("InfinitePenroseGrid.") == 1, "Renderer must only mention the infinite Penrose class name inside its preload path")
 
 
 def verify_developer_presets() -> None:

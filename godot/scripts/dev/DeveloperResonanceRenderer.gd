@@ -19,7 +19,7 @@ const GG_REVEAL_RADIUS_SCALE := 1.18
 const GG_TILE_DELAY := 0.055
 const GG_TILE_REVEAL_TIME := 0.13
 const CURVE_DATA = preload("res://scripts/dev/ResonanceCurveData.gd")
-const PENROSE_DATA = preload("res://scripts/dev/PenrosePatchData.gd")
+const INFINITE_PENROSE = preload("res://scripts/dev/InfinitePenroseGrid.gd")
 
 
 static func draw_same_color(canvas: CanvasItem, resonance_id: String, groups: Array, arena: Rect2, phase: float) -> void:
@@ -556,7 +556,8 @@ static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2)
 	var tile_edge := float(state["tile_edge"])
 	var base_angle := float(state["base_angle"])
 	var reveal_radius := GG_REVEAL_RADIUS_SCALE * float(state["typical_step"])
-	var local_tiles := PENROSE_DATA.tiles()
+	_ensure_infinite_penrose_tiles(state, arena, origin)
+	var local_tiles: Dictionary = state["penrose_tiles"]
 	for group in groups:
 		var pair_key: String = group["resonance_key"]
 		var local := _update_pair_local_position(state, pair_key, group["points"], origin)
@@ -564,34 +565,34 @@ static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2)
 			continue
 		state["scheduled_pairs"][pair_key] = true
 		var candidates: Array[Dictionary] = []
-		var nearest_index := -1
+		var nearest_key := ""
 		var nearest_distance := INF
-		for tile_index in range(local_tiles.size()):
-			var center := _penrose_tile_center(local_tiles[tile_index], tile_edge, base_angle)
+		for tile_key in local_tiles:
+			var center := _penrose_tile_center(local_tiles[tile_key], tile_edge, base_angle)
 			var distance := center.distance_to(local)
 			if distance < nearest_distance:
 				nearest_distance = distance
-				nearest_index = tile_index
+				nearest_key = tile_key
 			if distance <= reveal_radius:
 				var offset := center - local
-				candidates.append({"index": tile_index, "distance": distance, "angle": offset.angle()})
+				candidates.append({"key": tile_key, "distance": distance, "angle": offset.angle()})
 		var nearest_included := false
 		for candidate in candidates:
-			if int(candidate["index"]) == nearest_index:
+			if String(candidate["key"]) == nearest_key:
 				nearest_included = true
 				break
-		if nearest_index >= 0 and not nearest_included:
-			var nearest_center := _penrose_tile_center(local_tiles[nearest_index], tile_edge, base_angle)
-			candidates.append({"index": nearest_index, "distance": nearest_distance, "angle": (nearest_center - local).angle()})
+		if not nearest_key.is_empty() and not nearest_included:
+			var nearest_center := _penrose_tile_center(local_tiles[nearest_key], tile_edge, base_angle)
+			candidates.append({"key": nearest_key, "distance": nearest_distance, "angle": (nearest_center - local).angle()})
 		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return float(a["distance"]) < float(b["distance"]) or (is_equal_approx(float(a["distance"]), float(b["distance"])) and float(a["angle"]) < float(b["angle"])))
 		var pair_birth := simulation_age - float(group.get("effect_age", 0.0))
 		for order in range(candidates.size()):
-			var tile_index := int(candidates[order]["index"])
+			var tile_key := String(candidates[order]["key"])
 			var scheduled := pair_birth + float(order) * GG_TILE_DELAY
-			if tile_index == nearest_index:
+			if tile_key == nearest_key:
 				scheduled = pair_birth - GLOBAL_SEED_LEAD_TIME
-			state["tile_births"][tile_index] = minf(float(state["tile_births"].get(tile_index, INF)), scheduled)
+			state["tile_births"][tile_key] = minf(float(state["tile_births"].get(tile_key, INF)), scheduled)
 	_render_penrose_grid(canvas, state, arena, simulation_age)
 
 
@@ -601,15 +602,18 @@ static func _render_penrose_grid(canvas: CanvasItem, state: Dictionary, arena: R
 	var origin := _global_grid_origin(state, simulation_age)
 	var tile_edge := float(state["tile_edge"])
 	var base_angle := float(state["base_angle"])
-	var local_tiles := PENROSE_DATA.tiles()
+	_ensure_infinite_penrose_tiles(state, arena, origin)
+	var local_tiles: Dictionary = state["penrose_tiles"]
 	var gold := ResonanceCatalog.color_spec(5)["color"] as Color
-	for tile_index in state["tile_births"]:
-		var birth := float(state["tile_births"][tile_index])
+	for tile_key in state["tile_births"]:
+		if not local_tiles.has(tile_key):
+			continue
+		var birth := float(state["tile_births"][tile_key])
 		if simulation_age < birth:
 			continue
 		var world := PackedVector2Array()
 		var center := Vector2.ZERO
-		for local_point in local_tiles[int(tile_index)]:
+		for local_point in local_tiles[tile_key]:
 			var transformed := origin + (Vector2(local_point) * tile_edge).rotated(base_angle)
 			world.append(transformed)
 			center += transformed
@@ -619,6 +623,18 @@ static func _render_penrose_grid(canvas: CanvasItem, state: Dictionary, arena: R
 		var alpha := _smoothstep((simulation_age - birth) / GG_TILE_REVEAL_TIME)
 		world.append(world[0])
 		canvas.draw_polyline(world, Color(gold.lightened(0.14), 0.82 * alpha), 1.75, true)
+
+
+static func _ensure_infinite_penrose_tiles(state: Dictionary, arena: Rect2, origin: Vector2) -> void:
+	var tile_edge := float(state["tile_edge"])
+	var base_angle := float(state["base_angle"])
+	var local_center := ((arena.get_center() - origin) / tile_edge).rotated(-base_angle)
+	var visible_radius := arena.size.length() * 0.5 / tile_edge + 6.0
+	var cached_center := Vector2(state.get("penrose_cache_center", Vector2(INF, INF)))
+	if state.has("penrose_tiles") and cached_center.distance_to(local_center) <= 4.0:
+		return
+	state["penrose_cache_center"] = local_center
+	state["penrose_tiles"] = INFINITE_PENROSE.tiles_around(local_center, visible_radius + 8.0)
 
 
 static func _penrose_tile_center(local_tile: PackedVector2Array, tile_edge: float, base_angle: float) -> Vector2:
