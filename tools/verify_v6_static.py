@@ -238,6 +238,20 @@ def verify_exact_restorations() -> None:
     require("Delaunay resonances retain every active unique intersection beyond the old display cap" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover more than forty active Delaunay intersections")
     require("cocircular stabilization preserves triangles touching the guard ring" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must protect guard-ring boundary connections")
 
+    for cyan_rosette_contract in (
+        "const CYAN_ROSETTE_LAUNCH_FRACTIONS := [0.00, 0.14, 0.30, 0.48]",
+        "const CYAN_ROSETTE_INSET := 0.92",
+        "_triangle_incircle(first, second, third)",
+        "_triangle_uses_only_real_points(triangle, cluster.size())",
+        "_cyan_rosette_layer_growth(age, layer)",
+        "var point_ages := _unique_point_effect_ages(points, groups)",
+        "0.78 + 0.17 * cos(6.0 * theta + phase * 0.35 + layer * 0.22) + 0.05 * cos(12.0 * theta)",
+    ):
+        require(cyan_rosette_contract in renderer, f"Missing cyan G/G incircle-rosette contract: {cyan_rosette_contract}")
+    require("cyan rosettes use the exact incircle of each real Delaunay triangle" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover cyan G/G incircle placement")
+    require("incircles keep cyan rosettes disjoint across a shared Delaunay edge" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover non-overlapping cyan G/G placement")
+    require("every cyan rosette layer completes within one cascade period" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover sequential cyan G/G growth")
+
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
         "const GY_TILE_REVEAL_TIME := 0.13",

@@ -17,6 +17,9 @@ const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
 const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08
+const CYAN_ROSETTE_LAUNCH_FRACTIONS := [0.00, 0.14, 0.30, 0.48]
+const CYAN_ROSETTE_INSET := 0.92
+const CYAN_ROSETTE_MIN_RADIUS := 4.0
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
 const GY_REVEAL_MANHATTAN_RADIUS := 2
@@ -547,23 +550,43 @@ static func _draw_inflation_stars(canvas: CanvasItem, groups: Array, phase: floa
 
 
 static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> void:
-	for group in groups:
-		var points: Array = group["points"]
-		if points.size() < 2:
-			continue
-		var first: Vector2 = points[0]
-		var second: Vector2 = points[1]
-		var center := (first + second) * 0.5
-		var base := first.distance_to(second) * 0.5
-		for layer in range(4):
-			var scale := float(layer + 1) / 4.0
-			var curve := PackedVector2Array()
-			for index in range(145):
-				var theta := TAU * float(index) / 144.0
-				var radius := base * scale * (0.78 + 0.17 * cos(6.0 * theta + phase * 0.35 + layer * 0.22) + 0.05 * cos(12.0 * theta))
-				curve.append(center + Vector2.from_angle(theta) * radius)
-			var color := ResonanceCatalog.color_spec(2)["color"] as Color
-			canvas.draw_polyline(curve, Color(color.lightened(0.08 * layer), 0.58 + 0.10 * layer), 2.0, true)
+	var points := _unique_points(groups)
+	var point_ages := _unique_point_effect_ages(points, groups)
+	var color := ResonanceCatalog.color_spec(2)["color"] as Color
+	for stage in _guarded_delaunay_stages(points, groups):
+		var cluster: Array[Vector2] = stage["points"]
+		var triangles: Array[Vector3i] = stage["triangles"]
+		for triangle in triangles:
+			if not _triangle_uses_only_real_points(triangle, cluster.size()):
+				continue
+			var first := cluster[triangle.x]
+			var second := cluster[triangle.y]
+			var third := cluster[triangle.z]
+			var incircle := _triangle_incircle(first, second, third)
+			if incircle.is_empty():
+				continue
+			var base := float(incircle["radius"]) * CYAN_ROSETTE_INSET
+			if base < CYAN_ROSETTE_MIN_RADIUS:
+				continue
+			var center: Vector2 = incircle["center"]
+			var age := minf(float(point_ages.get(first, 0.0)), minf(float(point_ages.get(second, 0.0)), float(point_ages.get(third, 0.0))))
+			for layer in range(4):
+				var growth := _cyan_rosette_layer_growth(age, layer)
+				if growth <= 0.0:
+					continue
+				var scale := float(layer + 1) / 4.0
+				var curve := PackedVector2Array()
+				for index in range(145):
+					var theta := TAU * float(index) / 144.0
+					var radius := base * scale * growth * (0.78 + 0.17 * cos(6.0 * theta + phase * 0.35 + layer * 0.22) + 0.05 * cos(12.0 * theta))
+					curve.append(center + Vector2.from_angle(theta) * radius)
+				canvas.draw_polyline(curve, Color(color.lightened(0.08 * layer), 0.58 + 0.10 * layer), 2.0, true)
+
+
+static func _cyan_rosette_layer_growth(age: float, layer: int) -> float:
+	var launch := float(CYAN_ROSETTE_LAUNCH_FRACTIONS[layer]) * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
+	var duration := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL - launch
+	return _smoothstep((age - launch) / duration)
 
 
 static func _draw_gielis_leaves(canvas: CanvasItem, groups: Array, phase: float) -> void:
@@ -867,6 +890,18 @@ static func _circumcircle(a: Vector2, b: Vector2, c: Vector2) -> Dictionary:
 	return {"center": center, "radius_sq": center.distance_squared_to(a)}
 
 
+static func _triangle_incircle(a: Vector2, b: Vector2, c: Vector2) -> Dictionary:
+	var opposite_a := b.distance_to(c)
+	var opposite_b := a.distance_to(c)
+	var opposite_c := a.distance_to(b)
+	var perimeter := opposite_a + opposite_b + opposite_c
+	var double_area := absf((b - a).cross(c - a))
+	if perimeter < 0.001 or double_area < 0.001:
+		return {}
+	var center := (a * opposite_a + b * opposite_b + c * opposite_c) / perimeter
+	return {"center": center, "radius": double_area / perimeter}
+
+
 static func _circumcircles_are_equivalent(first: Dictionary, second: Dictionary, local_step: float) -> bool:
 	if first.is_empty() or second.is_empty():
 		return false
@@ -893,6 +928,19 @@ static func _unique_points(groups: Array) -> Array[Vector2]:
 			if not duplicate:
 				result.append(point)
 	return result
+
+
+static func _unique_point_effect_ages(points: Array[Vector2], groups: Array) -> Dictionary:
+	var ages := {}
+	for point in points:
+		var age := 0.0
+		for group in groups:
+			var group_age := float(group.get("effect_age", 0.0))
+			for point_value in group["points"]:
+				if point.distance_squared_to(Vector2(point_value)) < 16.0:
+					age = maxf(age, group_age)
+		ages[point] = age
+	return ages
 
 
 static func _group_color(groups: Array) -> Color:
