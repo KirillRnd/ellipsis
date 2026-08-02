@@ -195,9 +195,9 @@ def verify_exact_restorations() -> None:
         "float(line_index) / float(YY_LINE_COUNT - 1)",
     ):
         require(yy_contract in renderer, f"Missing accepted Y/Y sector-fan contract: {yy_contract}")
-    require('resonance["id"] == "yy" and first["volley_index"] != second["volley_index"]' in room, "Y/Y must only pair corresponding A_k/B_k waves")
+    require('resonance["id"] == "yy" and first["volley_index"] != second["volley_index"]' not in room, "Y/Y must render every real A_i/B_j intersection")
     require('"volley_index": _current_volley_index' in room, "Every developer wave must retain its shared volley index")
-    require("corresponding straight waves share one volley index" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover corresponding Y/Y cascade pairs")
+    require("yellow resonance accepts real intersections across different cascade indices" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover all real Y/Y cascade intersections")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",

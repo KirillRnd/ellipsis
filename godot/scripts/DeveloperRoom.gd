@@ -178,8 +178,6 @@ func _draw_resonances() -> void:
 			var resonance := ResonanceCatalog.resonance_spec(first["color_index"], second["color_index"])
 			if resonance.is_empty():
 				continue
-			if resonance["id"] == "yy" and first["volley_index"] != second["volley_index"]:
-				continue
 			var visible_points: Array[Vector2] = []
 			for point in DeveloperWaveGeometry.intersections(first, second):
 				if not ARENA_RECT.grow(-3.0).has_point(point):
