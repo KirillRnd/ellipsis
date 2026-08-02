@@ -186,15 +186,12 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 	if not state.has("grid_velocity"):
 		var normal_gold := Vector2.from_angle(float(gold_wave["angle"]))
 		var normal_yellow := Vector2.from_angle(float(yellow_wave["angle"]))
-		var direction_gold := Vector2.from_angle(float(gold_wave["angle"]) + PI * 0.5)
-		var direction_yellow := Vector2.from_angle(float(yellow_wave["angle"]) + PI * 0.5)
 		var spacing := ResonanceCatalog.GAME_CASCADE_SPACING
 		var step_gold := _solve_normal_system(normal_gold, normal_yellow, Vector2(spacing, 0.0))
 		var step_yellow := _solve_normal_system(normal_gold, normal_yellow, Vector2(0.0, spacing))
-		var edge_length := sqrt(step_gold.length() * step_yellow.length()) / 3.0
 		state["grid_velocity"] = _solve_normal_system(normal_gold, normal_yellow, Vector2(ResonanceCatalog.GAME_WAVE_SPEED, ResonanceCatalog.GAME_WAVE_SPEED))
-		state["u"] = direction_gold * edge_length
-		state["v"] = direction_yellow * edge_length
+		state["u"] = step_yellow / 3.0
+		state["v"] = step_gold / 3.0
 	var simulation_age := float(groups[0]["simulation_age"])
 	var origin := _global_grid_origin(state, simulation_age)
 	var u: Vector2 = state["u"]

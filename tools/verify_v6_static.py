@@ -203,7 +203,8 @@ def verify_exact_restorations() -> None:
         "const GY_TILE_DELAY := 0.05",
         "const GY_TILE_REVEAL_TIME := 0.13",
         "const GY_REVEAL_MANHATTAN_RADIUS := 2",
-        "sqrt(step_gold.length() * step_yellow.length()) / 3.0",
+        'state["u"] = step_yellow / 3.0',
+        'state["v"] = step_gold / 3.0',
         "_solve_normal_system(normal_gold, normal_yellow, Vector2(ResonanceCatalog.GAME_WAVE_SPEED, ResonanceCatalog.GAME_WAVE_SPEED))",
         "_nearest_lattice_vertex(local, u, v)",
         'state["tile_births"][tile_key] = minf',
@@ -214,6 +215,7 @@ def verify_exact_restorations() -> None:
     require('group["global_state"] = global_state' in room, "All G/Y intersections must reveal one shared global grid")
     require("global straight-wave grids solve both normal velocity constraints" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover global grid velocity")
     require("rhomb grid anchors an intersection to its nearest lattice vertex" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover G/Y vertex anchoring")
+    require("repeated rhomb cascades land exactly three grid edges apart" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover stable G/Y alignment across repeated cascades")
 
     require(penrose_data.count("PackedVector2Array([") == 189, "Expected accepted 189-rhomb Penrose component")
     for coefficient in ("1.45 * local_step", "0.95 * local_step", "2.9 * local_step"):
