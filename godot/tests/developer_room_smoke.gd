@@ -128,6 +128,11 @@ func _run() -> void:
 	_expect(delaunay_clouds.size() == 2 and delaunay_clouds[0].size() == 3 and delaunay_clouds[1].size() == 3, "blue Delaunay stages split intersections into the same upper and lower clouds as red Voronoi")
 	var guarded_stages := DeveloperResonanceRenderer._guarded_delaunay_stages(delaunay_points, delaunay_groups)
 	_expect(guarded_stages.size() == 2, "blue edges and circumcircles share the guarded Delaunay stage")
+	var reference_circle := {"center": Vector2.ZERO, "radius_sq": 100.0}
+	var equivalent_circle := {"center": Vector2(0.4, -0.3), "radius_sq": 102.01}
+	var distinct_circle := {"center": Vector2(5.0, 0.0), "radius_sq": 100.0}
+	_expect(DeveloperResonanceRenderer._circumcircles_are_equivalent(reference_circle, equivalent_circle, 10.0), "near-cocircular Delaunay alternatives share one stable visual primitive")
+	_expect(not DeveloperResonanceRenderer._circumcircles_are_equivalent(reference_circle, distinct_circle, 10.0), "distinct Delaunay circumcircles remain separate visual primitives")
 	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
 	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var near_penrose_tiles: Dictionary = DeveloperResonanceRenderer.INFINITE_PENROSE.tiles_around(Vector2.ZERO, 3.0)

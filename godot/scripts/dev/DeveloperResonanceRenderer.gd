@@ -16,6 +16,7 @@ const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
 const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
+const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
 const GY_REVEAL_MANHATTAN_RADIUS := 2
@@ -99,14 +100,31 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: flo
 static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
+		var all_points: Array[Vector2] = stage["all_points"]
+		var triangles: Array[Vector3i] = stage["triangles"]
+		var local_step := float(stage["local_step"])
+		var circles: Array[Dictionary] = []
+		for triangle in triangles:
+			circles.append(_circumcircle(all_points[triangle.x], all_points[triangle.y], all_points[triangle.z]))
 		var edge_map := {}
-		for triangle in stage["triangles"]:
+		for triangle_index in range(triangles.size()):
+			var triangle := triangles[triangle_index]
 			for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.x, triangle.z)]:
 				if edge.x >= cluster.size() or edge.y >= cluster.size():
 					continue
 				var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
-				edge_map[key] = Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y))
-		for edge in edge_map.values():
+				if not edge_map.has(key):
+					edge_map[key] = {"edge": Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y)), "triangles": []}
+				var edge_data: Dictionary = edge_map[key]
+				var attached_triangles: Array = edge_data["triangles"]
+				attached_triangles.append(triangle_index)
+				edge_data["triangles"] = attached_triangles
+				edge_map[key] = edge_data
+		for edge_data in edge_map.values():
+			var attached: Array = edge_data["triangles"]
+			if attached.size() == 2 and _circumcircles_are_equivalent(circles[int(attached[0])], circles[int(attached[1])], local_step):
+				continue
+			var edge: Vector2i = edge_data["edge"]
 			canvas.draw_line(cluster[edge.x], cluster[edge.y], Color(color, 0.72), 2.0, true)
 	for point in points:
 		canvas.draw_circle(point, 3.2, INK)
@@ -133,6 +151,8 @@ static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vecto
 	var radius_limit := source_distance * 0.55 # accepted limit 2.2 for sources four units apart
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
+		var local_step := float(stage["local_step"])
+		var accepted_circles: Array[Dictionary] = []
 		for triangle in stage["triangles"]:
 			if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size():
 				continue
@@ -140,8 +160,17 @@ static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vecto
 			if circle.is_empty():
 				continue
 			var radius := sqrt(float(circle["radius_sq"]))
-			if radius <= radius_limit:
-				canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
+			if radius > radius_limit:
+				continue
+			var duplicate := false
+			for accepted in accepted_circles:
+				if _circumcircles_are_equivalent(circle, accepted, local_step):
+					duplicate = true
+					break
+			if duplicate:
+				continue
+			accepted_circles.append(circle)
+			canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
 	for point in points:
 		canvas.draw_circle(point, 3.0, INK)
 
@@ -432,7 +461,9 @@ static func _guarded_delaunay_stages(points: Array[Vector2], groups: Array) -> A
 		all_points.append_array(_build_guard_ring(cluster, local_step))
 		stages.append({
 			"points": cluster,
+			"all_points": all_points,
 			"triangles": _delaunay_triangles(all_points),
+			"local_step": local_step,
 		})
 	return stages
 
@@ -753,6 +784,7 @@ static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], o
 	var indices := Geometry2D.triangulate_delaunay(packed)
 	var triangles: Array[Vector3i] = []
 	var centers: Array[Vector2] = []
+	var circles: Array[Dictionary] = []
 	for offset in range(0, indices.size(), 3):
 		var triangle := Vector3i(indices[offset], indices[offset + 1], indices[offset + 2])
 		var circle := _circumcircle(all_points[triangle.x], all_points[triangle.y], all_points[triangle.z])
@@ -760,6 +792,7 @@ static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], o
 			continue
 		triangles.append(triangle)
 		centers.append(circle["center"])
+		circles.append(circle)
 	var edge_map := {}
 	for triangle_index in range(triangles.size()):
 		var triangle := triangles[triangle_index]
@@ -775,8 +808,12 @@ static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], o
 		var edge: Vector2i = attached[0]["edge"]
 		if edge.x >= cluster.size() and edge.y >= cluster.size():
 			continue
-		var a: Vector2 = centers[attached[0]["triangle"]]
-		var b: Vector2 = centers[attached[1]["triangle"]]
+		var first_triangle_index := int(attached[0]["triangle"])
+		var second_triangle_index := int(attached[1]["triangle"])
+		if _circumcircles_are_equivalent(circles[first_triangle_index], circles[second_triangle_index], local_step):
+			continue
+		var a: Vector2 = centers[first_triangle_index]
+		var b: Vector2 = centers[second_triangle_index]
 		if a.distance_to(b) > 2.9 * local_step:
 			continue
 		var direction := b - a
@@ -823,6 +860,15 @@ static func _circumcircle(a: Vector2, b: Vector2, c: Vector2) -> Dictionary:
 		(a_sq * (c.x - b.x) + b_sq * (a.x - c.x) + c_sq * (b.x - a.x)) / denominator,
 	)
 	return {"center": center, "radius_sq": center.distance_squared_to(a)}
+
+
+static func _circumcircles_are_equivalent(first: Dictionary, second: Dictionary, local_step: float) -> bool:
+	if first.is_empty() or second.is_empty():
+		return false
+	var tolerance := maxf(1.0, local_step * DELAUNAY_COCIRCULAR_TOLERANCE)
+	var center_distance := Vector2(first["center"]).distance_to(Vector2(second["center"]))
+	var radius_difference := absf(sqrt(float(first["radius_sq"])) - sqrt(float(second["radius_sq"])))
+	return center_distance <= tolerance and radius_difference <= tolerance
 
 
 static func _unique_points(groups: Array, limit: int = 40) -> Array[Vector2]:

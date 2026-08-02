@@ -220,14 +220,18 @@ def verify_exact_restorations() -> None:
     require("final gold-red stars nearly touch across one cascade step" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock K/G final-star spacing")
 
     for delaunay_contract in (
+        "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",
         "_draw_guarded_delaunay_edges(canvas, _unique_points(groups), groups",
         "_guarded_delaunay_stages(points, groups)",
         "_split_intersection_clouds(points, groups)",
+        "_circumcircles_are_equivalent",
         "if edge.x >= cluster.size() or edge.y >= cluster.size()",
         "if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size()",
     ):
         require(delaunay_contract in renderer, f"Missing shared S/S and S/G guarded-Delaunay contract: {delaunay_contract}")
     require("blue edges and circumcircles share the guarded Delaunay stage" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the shared blue Delaunay pipeline")
+    require("near-cocircular Delaunay alternatives share one stable visual primitive" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover cocircular Delaunay stabilization")
+    require(renderer.count("_circumcircles_are_equivalent") == 4, "S/S, S/G, and K/K must all share the cocircular stabilization predicate")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
