@@ -8,6 +8,7 @@ const YY_LINE_COUNT := 13
 const YY_LINE_DELAY := 0.035
 const YY_LINE_REVEAL_TIME := 0.10
 const YY_PLATEAU_TIME := 0.22
+const YY_FADE_TIME := 0.95
 const YY_CENTER_LENGTH_BOOST := 1.18
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
@@ -529,13 +530,13 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 			second_angle = swap_angle
 		var age := float(group.get("effect_age", 0.0))
 		var appear := _smoothstep(age / YY_PLATEAU_TIME)
-		var global_alpha := appear
+		var fade := 1.0 - _smoothstep((age - YY_PLATEAU_TIME) / YY_FADE_TIME) if age > YY_PLATEAU_TIME else 1.0
+		var global_alpha := appear * fade
 		if global_alpha <= 0.0:
 			continue
 		var parent_half_length := 0.88 * minf(_resonance_parent_half_length(first_wave), _resonance_parent_half_length(second_wave))
 		var yellow := ResonanceCatalog.color_spec(4)["color"] as Color
-		# Draw one complete fan for every current geometric intersection. A fan
-		# stays visible for as long as that intersection remains active.
+		# Draw and animate an independent fan at every current geometric intersection.
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
 			for line_index in range(YY_LINE_COUNT):
@@ -545,7 +546,7 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 				var ratio := float(line_index) / float(YY_LINE_COUNT - 1)
 				var angle := lerp_angle(first_angle, second_angle, ratio)
 				var direction := Vector2.from_angle(angle)
-				var local_alpha := _smoothstep(local_age / YY_LINE_REVEAL_TIME)
+				var local_alpha := _smoothstep(local_age / YY_LINE_REVEAL_TIME) * fade
 				var center_peak := 1.0 + (YY_CENTER_LENGTH_BOOST - 1.0) * (1.0 - absf(2.0 * ratio - 1.0))
 				var half_length := parent_half_length * center_peak * local_alpha
 				canvas.draw_line(point - direction * half_length, point + direction * half_length, Color(yellow.lightened(0.24), 0.92 * global_alpha), 2.4, true)

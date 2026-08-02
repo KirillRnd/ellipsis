@@ -193,12 +193,12 @@ def verify_exact_restorations() -> None:
         "const YY_LINE_DELAY := 0.035",
         "const YY_LINE_REVEAL_TIME := 0.10",
         "const YY_PLATEAU_TIME := 0.22",
+        "const YY_FADE_TIME := 0.95",
         "float(line_index) / float(YY_LINE_COUNT - 1)",
         'for point_value in group["points"]',
         "_yy_reverse_sweep(wave_a, wave_b)",
     ):
         require(yy_contract in renderer, f"Missing accepted Y/Y sector-fan contract: {yy_contract}")
-    require("YY_FADE_TIME" not in renderer, "Y/Y fans must remain visible at every active intersection")
     require('resonance["id"] == "yy" and first["volley_index"] != second["volley_index"]' not in room, "Y/Y must render every real A_i/B_j intersection")
     require('"volley_index": _current_volley_index' in room, "Every developer wave must retain its shared volley index")
     require("yellow resonance accepts real intersections across different cascade indices" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover all real Y/Y cascade intersections")
