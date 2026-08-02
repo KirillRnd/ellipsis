@@ -240,19 +240,29 @@ def verify_exact_restorations() -> None:
 
     for cyan_rosette_contract in (
         "const CYAN_ROSETTE_LAYERS := [1, 3]",
-        "const CYAN_ROSETTE_GROWTH_PERIODS := 2",
+        "const CYAN_ROSETTE_SOURCE_LAUNCH_TIMES := [0.00, 0.14, 0.30, 0.48]",
+        "const CYAN_ROSETTE_SOURCE_BASE_SPEED := 1.22",
+        "const CYAN_ROSETTE_SOURCE_HARMONIC := 6.0",
         "const CYAN_ROSETTE_INSET := 0.92",
         "_triangle_incircle(first, second, third)",
         "_triangle_uses_only_real_points(triangle, cluster.size())",
-        "_cyan_rosette_layer_growth(age, growth_step)",
+        "_cyan_rosette_period_progress(age, 0)",
+        "_cyan_rosette_period_progress(age, 1)",
         "var point_ages := _unique_point_effect_ages(points, groups)",
-        "0.78 + 0.17 * cos(6.0 * theta + phase * 0.35 + layer * 0.22) + 0.05 * cos(12.0 * theta)",
+        "var radius := 0.18 + CYAN_ROSETTE_SOURCE_BASE_SPEED * source_age",
+        "var a := (0.06 + 0.08 * float(layer)) * growth",
+        "var b := (0.02 + 0.03 * float(layer)) * growth",
+        "var phi := 0.7 * source_age + 0.35 * float(layer)",
+        "params.z * cos(2.0 * CYAN_ROSETTE_SOURCE_HARMONIC * theta + 0.5 * params.w)",
+        "var shared_rotation := _cyan_rosette_profile_rotation(expanded_profile)",
     ):
         require(cyan_rosette_contract in renderer, f"Missing cyan G/G incircle-rosette contract: {cyan_rosette_contract}")
     require("cyan rosettes use the exact incircle of each real Delaunay triangle" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover cyan G/G incircle placement")
     require("incircles keep cyan rosettes disjoint across a shared Delaunay edge" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover non-overlapping cyan G/G placement")
     require("cyan rosettes retain only their second and fourth geometric layers" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the selected cyan G/G layers")
-    require("cyan rosette fourth layer completes after two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover two-period cyan G/G growth")
+    require("cyan rosette fourth layer and new second layer complete after two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover two-period cyan G/G growth")
+    require("cyan rosette second-layer parameters exactly match the accepted Python source" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock cyan G/G source layer two")
+    require("cyan rosette fourth-layer parameters exactly match the accepted Python source" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock cyan G/G source layer four")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",

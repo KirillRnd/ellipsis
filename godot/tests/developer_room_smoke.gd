@@ -141,9 +141,13 @@ func _run() -> void:
 	_expect(Vector2(rosette_incircle["center"]).distance_to(Vector2(adjacent_rosette_incircle["center"])) + 0.001 >= float(rosette_incircle["radius"]) + float(adjacent_rosette_incircle["radius"]), "incircles keep cyan rosettes disjoint across a shared Delaunay edge")
 	var cascade_period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
 	_expect(DeveloperResonanceRenderer.CYAN_ROSETTE_LAYERS == [1, 3], "cyan rosettes retain only their second and fourth geometric layers")
-	_expect(is_equal_approx(DeveloperResonanceRenderer._cyan_rosette_layer_growth(cascade_period, 0), 1.0), "cyan rosette second layer completes during the first cascade period")
-	_expect(is_zero_approx(DeveloperResonanceRenderer._cyan_rosette_layer_growth(cascade_period, 1)), "cyan rosette fourth layer starts after the first cascade period")
-	_expect(is_equal_approx(DeveloperResonanceRenderer._cyan_rosette_layer_growth(cascade_period * 2.0, 1), 1.0), "cyan rosette fourth layer completes after two cascade periods")
+	_expect(is_equal_approx(DeveloperResonanceRenderer._cyan_rosette_period_progress(cascade_period, 0), 1.0), "cyan rosette second layer completes during the first cascade period")
+	_expect(is_zero_approx(DeveloperResonanceRenderer._cyan_rosette_period_progress(cascade_period, 1)), "cyan rosette expansion and new second layer start after the first cascade period")
+	_expect(is_equal_approx(DeveloperResonanceRenderer._cyan_rosette_period_progress(cascade_period * 2.0, 1), 1.0), "cyan rosette fourth layer and new second layer complete after two cascade periods")
+	var source_layer_two := DeveloperResonanceRenderer._cyan_rosette_front_params(0.86, 1)
+	_expect(source_layer_two.is_equal_approx(Vector4(1.2292, 0.14, 0.05, 0.952)), "cyan rosette second-layer parameters exactly match the accepted Python source")
+	var source_layer_four := DeveloperResonanceRenderer._cyan_rosette_front_params(0.52, 3)
+	_expect(source_layer_four.is_equal_approx(Vector4(0.8144, 0.30, 0.11, 1.414)), "cyan rosette fourth-layer parameters exactly match the accepted Python source")
 	var reference_circle := {"center": Vector2.ZERO, "radius_sq": 100.0}
 	var equivalent_circle := {"center": Vector2(0.4, -0.3), "radius_sq": 102.01}
 	var distinct_circle := {"center": Vector2(5.0, 0.0), "radius_sq": 100.0}

@@ -18,7 +18,10 @@ const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
 const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08
 const CYAN_ROSETTE_LAYERS := [1, 3]
-const CYAN_ROSETTE_GROWTH_PERIODS := 2
+const CYAN_ROSETTE_SOURCE_LAUNCH_TIMES := [0.00, 0.14, 0.30, 0.48]
+const CYAN_ROSETTE_SOURCE_BASE_SPEED := 1.22
+const CYAN_ROSETTE_SOURCE_HARMONIC := 6.0
+const CYAN_ROSETTE_CURVE_SEGMENTS := 360
 const CYAN_ROSETTE_INSET := 0.92
 const CYAN_ROSETTE_MIN_RADIUS := 4.0
 const GY_TILE_DELAY := 0.05
@@ -550,10 +553,15 @@ static func _draw_inflation_stars(canvas: CanvasItem, groups: Array, phase: floa
 				canvas.draw_polyline(star, Color(color.lightened(stage * 0.08), 0.62 + stage * 0.13), 1.5, true)
 
 
-static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> void:
+static func _draw_rosettes(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	var points := _unique_points(groups)
 	var point_ages := _unique_point_effect_ages(points, groups)
 	var color := ResonanceCatalog.color_spec(2)["color"] as Color
+	var inner_layer := int(CYAN_ROSETTE_LAYERS[0])
+	var outer_layer := int(CYAN_ROSETTE_LAYERS[1])
+	var inner_final_age := 1.0 - float(CYAN_ROSETTE_SOURCE_LAUNCH_TIMES[inner_layer])
+	var inner_final_params := _cyan_rosette_front_params(inner_final_age, inner_layer)
+	var inner_color := Color(color.lightened(0.08 * inner_layer), 0.58 + 0.10 * inner_layer)
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
 		var triangles: Array[Vector3i] = stage["triangles"]
@@ -571,23 +579,86 @@ static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> v
 				continue
 			var center: Vector2 = incircle["center"]
 			var age := minf(float(point_ages.get(first, 0.0)), minf(float(point_ages.get(second, 0.0)), float(point_ages.get(third, 0.0))))
-			for growth_step in range(CYAN_ROSETTE_GROWTH_PERIODS):
-				var layer := int(CYAN_ROSETTE_LAYERS[growth_step])
-				var growth := _cyan_rosette_layer_growth(age, growth_step)
-				if growth <= 0.0:
-					continue
-				var scale := float(layer + 1) / 4.0
-				var curve := PackedVector2Array()
-				for index in range(145):
-					var theta := TAU * float(index) / 144.0
-					var radius := base * scale * growth * (0.78 + 0.17 * cos(6.0 * theta + phase * 0.35 + layer * 0.22) + 0.05 * cos(12.0 * theta))
-					curve.append(center + Vector2.from_angle(theta) * radius)
-				canvas.draw_polyline(curve, Color(color.lightened(0.08 * layer), 0.58 + 0.10 * layer), 2.0, true)
+			var first_period := _cyan_rosette_period_progress(age, 0)
+			var second_period := _cyan_rosette_period_progress(age, 1)
+			if first_period > 0.0:
+				if second_period <= 0.0:
+					var first_profile := _cyan_rosette_profile(inner_layer, first_period)
+					_draw_cyan_rosette_profile(canvas, center, base * 0.5 * first_period, first_profile, inner_color)
+				else:
+					var transition := second_period
+					var outer_age := transition * (1.0 - float(CYAN_ROSETTE_SOURCE_LAUNCH_TIMES[outer_layer]))
+					var outer_params := _cyan_rosette_front_params(outer_age, outer_layer)
+					var expanded_params := inner_final_params.lerp(outer_params, transition)
+					var expanded_profile := _cyan_rosette_profile_from_params(expanded_params)
+					var expanded_lightening := lerpf(0.08 * inner_layer, 0.08 * outer_layer, transition)
+					var expanded_alpha := lerpf(0.58 + 0.10 * inner_layer, 0.58 + 0.10 * outer_layer, transition)
+					var expanded_color := Color(color.lightened(expanded_lightening), expanded_alpha)
+					var shared_rotation := _cyan_rosette_profile_rotation(expanded_profile)
+					_draw_cyan_rosette_profile(canvas, center, base * lerpf(0.5, 1.0, transition), expanded_profile, expanded_color, shared_rotation)
+					var new_inner_profile := _cyan_rosette_profile(inner_layer, second_period)
+					_draw_cyan_rosette_profile(canvas, center, base * 0.5 * second_period, new_inner_profile, inner_color, shared_rotation)
 
 
-static func _cyan_rosette_layer_growth(age: float, growth_step: int) -> float:
+static func _cyan_rosette_period_progress(age: float, growth_step: int) -> float:
 	var period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
 	return _smoothstep((age - float(growth_step) * period) / period)
+
+
+static func _cyan_rosette_front_params(source_age: float, layer: int) -> Vector4:
+	var launch := float(CYAN_ROSETTE_SOURCE_LAUNCH_TIMES[layer])
+	var age01 := clampf(source_age / (1.0 - launch), 0.0, 1.0)
+	var growth := _smoothstep(age01)
+	var radius := 0.18 + CYAN_ROSETTE_SOURCE_BASE_SPEED * source_age
+	var a := (0.06 + 0.08 * float(layer)) * growth
+	var b := (0.02 + 0.03 * float(layer)) * growth
+	var phi := 0.7 * source_age + 0.35 * float(layer)
+	return Vector4(radius, a, b, phi)
+
+
+static func _cyan_rosette_radius(theta: float, params: Vector4) -> float:
+	return params.x + params.y * cos(CYAN_ROSETTE_SOURCE_HARMONIC * theta + params.w) + params.z * cos(2.0 * CYAN_ROSETTE_SOURCE_HARMONIC * theta + 0.5 * params.w)
+
+
+static func _cyan_rosette_profile(layer: int, progress: float) -> PackedFloat32Array:
+	var source_age := clampf(progress, 0.0, 1.0) * (1.0 - float(CYAN_ROSETTE_SOURCE_LAUNCH_TIMES[layer]))
+	var params := _cyan_rosette_front_params(source_age, layer)
+	return _cyan_rosette_profile_from_params(params)
+
+
+static func _cyan_rosette_profile_from_params(params: Vector4) -> PackedFloat32Array:
+	var profile := PackedFloat32Array()
+	for index in range(CYAN_ROSETTE_CURVE_SEGMENTS + 1):
+		var theta := TAU * float(index) / float(CYAN_ROSETTE_CURVE_SEGMENTS)
+		profile.append(_cyan_rosette_radius(theta, params))
+	return profile
+
+
+static func _cyan_rosette_profile_rotation(profile: PackedFloat32Array) -> float:
+	var peak_index := 0
+	var peak_radius := -INF
+	for index in range(profile.size() - 1):
+		if profile[index] > peak_radius:
+			peak_radius = profile[index]
+			peak_index = index
+	return PI * 0.5 - TAU * float(peak_index) / float(CYAN_ROSETTE_CURVE_SEGMENTS)
+
+
+static func _draw_cyan_rosette_profile(canvas: CanvasItem, center: Vector2, envelope_radius: float, profile: PackedFloat32Array, color: Color, rotation_override: float = INF) -> void:
+	if envelope_radius <= 0.0 or profile.is_empty():
+		return
+	var peak_radius := -INF
+	for index in range(profile.size() - 1):
+		if profile[index] > peak_radius:
+			peak_radius = profile[index]
+	if peak_radius <= 0.001:
+		return
+	var rotation := _cyan_rosette_profile_rotation(profile) if is_inf(rotation_override) else rotation_override
+	var curve := PackedVector2Array()
+	for index in range(profile.size()):
+		var theta := TAU * float(index) / float(CYAN_ROSETTE_CURVE_SEGMENTS)
+		curve.append(center + Vector2.from_angle(theta + rotation) * envelope_radius * profile[index] / peak_radius)
+	canvas.draw_polyline(curve, color, 2.0, true)
 
 
 static func _draw_gielis_leaves(canvas: CanvasItem, groups: Array, phase: float) -> void:
