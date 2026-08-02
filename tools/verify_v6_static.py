@@ -60,6 +60,43 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def require_balanced_delimiters(source: str, label: str) -> None:
+    pairs = {")": "(", "]": "[", "}": "{"}
+    stack: list[tuple[str, int]] = []
+    quote: str | None = None
+    escaped = False
+    line = 1
+    index = 0
+    while index < len(source):
+        character = source[index]
+        if character == "\n":
+            line += 1
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == quote:
+                quote = None
+            index += 1
+            continue
+        if character in ('"', "'"):
+            quote = character
+        elif character == "#":
+            newline = source.find("\n", index)
+            index = len(source) if newline < 0 else newline
+            continue
+        elif character in "([{":
+            stack.append((character, line))
+        elif character in ")]}":
+            require(bool(stack) and stack[-1][0] == pairs[character], f"{label} has unmatched {character} on line {line}")
+            stack.pop()
+        index += 1
+    require(quote is None, f"{label} has an unterminated string")
+    if stack:
+        raise AssertionError(f"{label} has an unclosed {stack[-1][0]} from line {stack[-1][1]}")
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as source:
@@ -122,6 +159,9 @@ def verify_exact_restorations() -> None:
     room = (GODOT / "scripts" / "DeveloperRoom.gd").read_text(encoding="utf-8")
     curve_data = (GODOT / "scripts" / "dev" / "ResonanceCurveData.gd").read_text(encoding="utf-8")
     penrose_data = (GODOT / "scripts" / "dev" / "PenrosePatchData.gd").read_text(encoding="utf-8")
+
+    require_balanced_delimiters(renderer, "DeveloperResonanceRenderer.gd")
+    require_balanced_delimiters(room, "DeveloperRoom.gd")
 
     require("ContinuousCascadeButton" in room, "Developer room needs a toggleable continuous cascade")
     fire_volley = room.split("func _fire_volley()", 1)[1].split("\n\nfunc ", 1)[0]

@@ -218,6 +218,7 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 				candidates.append({"coordinate": seed + Vector2i(di, dj), "shell": shell, "angle": atan2(float(dj), float(di)) if di != 0 or dj != 0 else -PI})
 		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return int(a["shell"]) < int(b["shell"]) or (int(a["shell"]) == int(b["shell"]) and float(a["angle"]) < float(b["angle"]))
+		)
 		var pair_birth := simulation_age - float(group.get("effect_age", 0.0))
 		for order in range(candidates.size()):
 			var coordinate: Vector2i = candidates[order]["coordinate"]
