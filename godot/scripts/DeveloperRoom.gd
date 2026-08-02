@@ -219,6 +219,8 @@ func _draw_resonances() -> void:
 					"birth_time": _simulation_age,
 					"anchor": Vector2(groups[0]["points"][0]),
 					"tile_births": {},
+					"tile_coordinates": {},
+					"tile_offsets": {},
 					"pair_local_positions": {},
 					"pair_sample_counts": {},
 					"scheduled_pairs": {},

@@ -199,6 +199,10 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 	var determinant := u.cross(v)
 	if absf(determinant) <= 0.001:
 		return
+	if not state.has("tile_coordinates"):
+		state["tile_coordinates"] = {}
+	if not state.has("tile_offsets"):
+		state["tile_offsets"] = {}
 	for group in groups:
 		var pair_key: String = group["resonance_key"]
 		var local := _update_pair_local_position(state, pair_key, group["points"], origin)
@@ -206,6 +210,12 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 			continue
 		state["scheduled_pairs"][pair_key] = true
 		var seed := _nearest_lattice_vertex(local, u, v)
+		# The accepted source uses a fixed cascade period, so every intersection
+		# belongs to one lattice. Manual volleys have arbitrary intervals. Keep
+		# the common lattice when possible, but translate an off-phase fragment
+		# so its real intersection is still exactly a rhomb vertex.
+		var fragment_offset := _lattice_vertex_offset(local, seed, u, v)
+		var fragment_key := "global" if fragment_offset.length_squared() <= 0.0625 else pair_key
 		var candidates: Array[Dictionary] = []
 		for di in range(-GY_REVEAL_MANHATTAN_RADIUS, GY_REVEAL_MANHATTAN_RADIUS + 1):
 			for dj in range(-GY_REVEAL_MANHATTAN_RADIUS, GY_REVEAL_MANHATTAN_RADIUS + 1):
@@ -219,11 +229,13 @@ static func _draw_rhombic_grids(canvas: CanvasItem, groups: Array, _arena: Rect2
 		var pair_birth := simulation_age - float(group.get("effect_age", 0.0))
 		for order in range(candidates.size()):
 			var coordinate: Vector2i = candidates[order]["coordinate"]
-			var tile_key := "%d:%d" % [coordinate.x, coordinate.y]
+			var tile_key := "%s|%d:%d" % [fragment_key, coordinate.x, coordinate.y]
 			var scheduled := pair_birth + float(order) * GY_TILE_DELAY
 			if coordinate == seed:
 				scheduled = pair_birth - GLOBAL_SEED_LEAD_TIME
 			state["tile_births"][tile_key] = minf(float(state["tile_births"].get(tile_key, INF)), scheduled)
+			state["tile_coordinates"][tile_key] = coordinate
+			state["tile_offsets"][tile_key] = Vector2.ZERO if fragment_key == "global" else fragment_offset
 	_render_rhombic_grid(canvas, state, _arena, simulation_age)
 
 
@@ -238,9 +250,9 @@ static func _render_rhombic_grid(canvas: CanvasItem, state: Dictionary, arena: R
 		var birth := float(state["tile_births"][tile_key])
 		if simulation_age < birth:
 			continue
-		var parts := String(tile_key).split(":")
-		var coordinate := Vector2i(int(parts[0]), int(parts[1]))
-		var p0 := origin + float(coordinate.x) * u + float(coordinate.y) * v
+		var coordinate: Vector2i = state["tile_coordinates"].get(tile_key, Vector2i.ZERO)
+		var offset: Vector2 = state["tile_offsets"].get(tile_key, Vector2.ZERO)
+		var p0 := origin + offset + float(coordinate.x) * u + float(coordinate.y) * v
 		var center := p0 + 0.5 * (u + v)
 		if not arena.grow(48.0).has_point(center):
 			continue
@@ -280,6 +292,10 @@ static func _nearest_lattice_vertex(local: Vector2, u: Vector2, v: Vector2) -> V
 				best_distance = distance
 				best = candidate
 	return best
+
+
+static func _lattice_vertex_offset(local: Vector2, coordinate: Vector2i, u: Vector2, v: Vector2) -> Vector2:
+	return local - float(coordinate.x) * u - float(coordinate.y) * v
 
 
 static func _build_local_bush() -> Array[Dictionary]:
