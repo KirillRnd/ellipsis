@@ -117,6 +117,8 @@ func _run() -> void:
 	_expect(not DeveloperResonanceRenderer._yy_reverse_sweep(yy_a0, yy_b0), "yellow checkerboard starts with an A-to-B sweep")
 	_expect(DeveloperResonanceRenderer._yy_reverse_sweep(yy_a0, yy_b1) and DeveloperResonanceRenderer._yy_reverse_sweep(yy_a1, yy_b0), "yellow checkerboard reverses adjacent intersections to B-to-A")
 	_expect(not DeveloperResonanceRenderer._yy_reverse_sweep(yy_a1, yy_b1), "yellow checkerboard returns diagonal intersections to A-to-B")
+	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_CYCLE_TIME, 2.0 * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL), "yellow fan pulse cycle lasts exactly two cascade periods")
+	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_PLATEAU_TIME + DeveloperResonanceRenderer.YY_FADE_TIME, DeveloperResonanceRenderer.YY_CYCLE_TIME), "yellow fan appearance and fade exactly fill its pulse cycle")
 	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
 	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var near_penrose_tiles: Dictionary = DeveloperResonanceRenderer.INFINITE_PENROSE.tiles_around(Vector2.ZERO, 3.0)

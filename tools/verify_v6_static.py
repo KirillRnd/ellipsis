@@ -193,7 +193,10 @@ def verify_exact_restorations() -> None:
         "const YY_LINE_DELAY := 0.035",
         "const YY_LINE_REVEAL_TIME := 0.10",
         "const YY_PLATEAU_TIME := 0.22",
-        "const YY_FADE_TIME := 0.95",
+        "const YY_CYCLE_PERIODS := 2.0",
+        "const YY_CYCLE_TIME := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * YY_CYCLE_PERIODS",
+        "const YY_FADE_TIME := YY_CYCLE_TIME - YY_PLATEAU_TIME",
+        "fposmod(effect_age, YY_CYCLE_TIME)",
         "float(line_index) / float(YY_LINE_COUNT - 1)",
         'for point_value in group["points"]',
         "_yy_reverse_sweep(wave_a, wave_b)",
@@ -203,6 +206,7 @@ def verify_exact_restorations() -> None:
     require('"volley_index": _current_volley_index' in room, "Every developer wave must retain its shared volley index")
     require("yellow resonance accepts real intersections across different cascade indices" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover all real Y/Y cascade intersections")
     require("yellow checkerboard reverses adjacent intersections to B-to-A" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover alternating Y/Y sweep directions")
+    require("yellow fan pulse cycle lasts exactly two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock Y/Y pulse timing to the cascade period")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
