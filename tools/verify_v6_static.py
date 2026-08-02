@@ -196,6 +196,7 @@ def verify_exact_restorations() -> None:
         "const YY_CYCLE_PERIODS := 2.0",
         "const YY_CYCLE_TIME := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * YY_CYCLE_PERIODS",
         "const YY_FADE_TIME := YY_CYCLE_TIME - YY_PLATEAU_TIME",
+        "const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)",
         "fposmod(effect_age, YY_CYCLE_TIME)",
         "float(line_index) / float(YY_LINE_COUNT - 1)",
         'for point_value in group["points"]',
@@ -207,6 +208,8 @@ def verify_exact_restorations() -> None:
     require("yellow resonance accepts real intersections across different cascade indices" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover all real Y/Y cascade intersections")
     require("yellow checkerboard reverses adjacent intersections to B-to-A" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover alternating Y/Y sweep directions")
     require("yellow fan pulse cycle lasts exactly two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock Y/Y pulse timing to the cascade period")
+    require("all yellow fan rows use the accepted bottom-row size" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock one common Y/Y fan size")
+    require("_resonance_parent_half_length" not in renderer, "Y/Y fan size must not grow with parent-wave age")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",

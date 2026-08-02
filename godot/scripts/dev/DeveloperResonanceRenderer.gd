@@ -12,6 +12,7 @@ const YY_CYCLE_PERIODS := 2.0
 const YY_CYCLE_TIME := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * YY_CYCLE_PERIODS
 const YY_FADE_TIME := YY_CYCLE_TIME - YY_PLATEAU_TIME
 const YY_CENTER_LENGTH_BOOST := 1.18
+const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
 const GY_REVEAL_MANHATTAN_RADIUS := 2
@@ -537,7 +538,6 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 		var global_alpha := appear * fade
 		if global_alpha <= 0.0:
 			continue
-		var parent_half_length := 0.88 * minf(_resonance_parent_half_length(first_wave), _resonance_parent_half_length(second_wave))
 		var yellow := ResonanceCatalog.color_spec(4)["color"] as Color
 		# Draw and animate an independent fan at every current geometric intersection.
 		for point_value in group["points"]:
@@ -551,16 +551,12 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 				var direction := Vector2.from_angle(angle)
 				var local_alpha := _smoothstep(local_age / YY_LINE_REVEAL_TIME) * fade
 				var center_peak := 1.0 + (YY_CENTER_LENGTH_BOOST - 1.0) * (1.0 - absf(2.0 * ratio - 1.0))
-				var half_length := parent_half_length * center_peak * local_alpha
+				var half_length := YY_PARENT_HALF_LENGTH * center_peak * local_alpha
 				canvas.draw_line(point - direction * half_length, point + direction * half_length, Color(yellow.lightened(0.24), 0.92 * global_alpha), 2.4, true)
 
 
 static func _yy_reverse_sweep(wave_a: Dictionary, wave_b: Dictionary) -> bool:
 	return (int(wave_a.get("volley_index", 0)) + int(wave_b.get("volley_index", 0))) % 2 != 0
-
-
-static func _resonance_parent_half_length(wave: Dictionary) -> float:
-	return minf(260.0, 24.0 + 92.0 * float(wave["age"]))
 
 
 static func _draw_penrose_tiles(canvas: CanvasItem, groups: Array, arena: Rect2) -> void:
