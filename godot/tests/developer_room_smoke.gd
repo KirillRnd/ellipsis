@@ -156,7 +156,7 @@ func _run() -> void:
 	}]
 	_expect(DeveloperResonanceRenderer._point_resonance_identity(Vector2(0.0, -1.0), fs_identity_groups) != DeveloperResonanceRenderer._point_resonance_identity(Vector2(0.0, 1.0), fs_identity_groups), "F/S history distinguishes the two intersection branches of one wave pair")
 	var fs_retention := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * DeveloperResonanceRenderer.FS_EDGE_RETENTION_PERIODS
-	_expect(is_equal_approx(DeveloperResonanceRenderer._fs_history_alpha(0.0), 1.0) and is_zero_approx(DeveloperResonanceRenderer._fs_history_alpha(fs_retention)), "departed F/S MST runners fade for exactly two cascade periods")
+	_expect(is_equal_approx(DeveloperResonanceRenderer._fs_history_alpha(0.0), 1.0) and is_zero_approx(DeveloperResonanceRenderer._fs_history_alpha(fs_retention)), "departed F/S MST runners fade for exactly one cascade period")
 	var delaunay_groups := [{"first": {"origin": Vector2(-10.0, 0.0)}, "second": {"origin": Vector2(10.0, 0.0)}}]
 	var delaunay_points: Array[Vector2] = [Vector2(-4.0, -4.0), Vector2(0.0, -6.0), Vector2(4.0, -4.0), Vector2(-4.0, 4.0), Vector2(0.0, 6.0), Vector2(4.0, 4.0)]
 	var delaunay_clouds := DeveloperResonanceRenderer._split_intersection_clouds(delaunay_points, delaunay_groups)
