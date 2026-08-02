@@ -220,7 +220,7 @@ def verify_exact_restorations() -> None:
     require("final gold-red stars nearly touch across one cascade step" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock K/G final-star spacing")
 
     for lissajous_contract in (
-        "const LISSAJOUS_RATIOS := [Vector2i(2, 1), Vector2i(2, 1), Vector2i(3, 2), Vector2i(4, 3)]",
+        "const LISSAJOUS_RATIOS := [Vector2i(2, 1)]",
         "const LISSAJOUS_PRECESSION_PERIODS := 8.0",
         "const LISSAJOUS_TRAIL_FRACTION := 0.18",
         "static func _lissajous_ratio(group: Dictionary)",

@@ -122,7 +122,7 @@ func _run() -> void:
 	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_PARENT_HALF_LENGTH, 0.88 * (24.0 + 92.0 * DeveloperResonanceRenderer.YY_PLATEAU_TIME)), "all yellow fan rows use the accepted bottom-row size")
 	var kg_final_diameter := 2.0 * DeveloperResonanceRenderer.KG_BASE_OUTER_RADIUS * pow(DeveloperResonanceRenderer.GOLDEN_RATIO, 2.0)
 	_expect(is_equal_approx(kg_final_diameter, ResonanceCatalog.GAME_CASCADE_SPACING * DeveloperResonanceRenderer.KG_FINAL_DIAMETER_TO_CASCADE_SPACING), "final gold-red stars nearly touch across one cascade step")
-	_expect(DeveloperResonanceRenderer.LISSAJOUS_RATIOS == [Vector2i(2, 1), Vector2i(2, 1), Vector2i(3, 2), Vector2i(4, 3)], "Lissajous resonances use the accepted frequency family with a dominant 2-to-1 mode")
+	_expect(DeveloperResonanceRenderer.LISSAJOUS_RATIOS == [Vector2i(2, 1)], "Lissajous resonances use only the accepted 2-to-1 frequency ratio")
 	var lissajous_group := {"first": {"volley_index": 2, "source_id": 1}, "second": {"volley_index": 5, "source_id": 2}}
 	var reversed_lissajous_group := {"first": lissajous_group["second"], "second": lissajous_group["first"]}
 	_expect(DeveloperResonanceRenderer._lissajous_ratio(lissajous_group) == DeveloperResonanceRenderer._lissajous_ratio(reversed_lissajous_group) and is_equal_approx(DeveloperResonanceRenderer._lissajous_phase_offset(lissajous_group), DeveloperResonanceRenderer._lissajous_phase_offset(reversed_lissajous_group)), "Lissajous mode and phase are stable under source ordering")
