@@ -110,6 +110,13 @@ func _run() -> void:
 	var corrected_vertex := float(irregular_seed.x) * lattice_u + float(irregular_seed.y) * lattice_v + irregular_offset
 	_expect(corrected_vertex.is_equal_approx(irregular_intersection), "off-phase manual volleys remain exactly vertex-anchored")
 	_expect(DeveloperResonanceRenderer._lattice_vertex_offset(2.0 * lattice_u - lattice_v, Vector2i(2, -1), lattice_u, lattice_v).is_zero_approx(), "fixed-period cascades continue sharing the common rhomb lattice")
+	var yy_a0 := {"volley_index": 0}
+	var yy_a1 := {"volley_index": 1}
+	var yy_b0 := {"volley_index": 0}
+	var yy_b1 := {"volley_index": 1}
+	_expect(not DeveloperResonanceRenderer._yy_reverse_sweep(yy_a0, yy_b0), "yellow checkerboard starts with an A-to-B sweep")
+	_expect(DeveloperResonanceRenderer._yy_reverse_sweep(yy_a0, yy_b1) and DeveloperResonanceRenderer._yy_reverse_sweep(yy_a1, yy_b0), "yellow checkerboard reverses adjacent intersections to B-to-A")
+	_expect(not DeveloperResonanceRenderer._yy_reverse_sweep(yy_a1, yy_b1), "yellow checkerboard returns diagonal intersections to A-to-B")
 	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
 	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var near_penrose_tiles: Dictionary = DeveloperResonanceRenderer.INFINITE_PENROSE.tiles_around(Vector2.ZERO, 3.0)

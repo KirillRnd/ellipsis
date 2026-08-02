@@ -8,7 +8,6 @@ const YY_LINE_COUNT := 13
 const YY_LINE_DELAY := 0.035
 const YY_LINE_REVEAL_TIME := 0.10
 const YY_PLATEAU_TIME := 0.22
-const YY_FADE_TIME := 0.95
 const YY_CENTER_LENGTH_BOOST := 1.18
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
@@ -519,16 +518,24 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 	for group in groups:
 		var first_wave: Dictionary = group["first"]
 		var second_wave: Dictionary = group["second"]
-		var first_angle := float(first_wave["angle"]) + PI * 0.5
-		var second_angle := float(second_wave["angle"]) + PI * 0.5
+		var first_is_a := int(first_wave["source_id"]) < int(second_wave["source_id"])
+		var wave_a: Dictionary = first_wave if first_is_a else second_wave
+		var wave_b: Dictionary = second_wave if first_is_a else first_wave
+		var first_angle := float(wave_a["angle"]) + PI * 0.5
+		var second_angle := float(wave_b["angle"]) + PI * 0.5
+		if _yy_reverse_sweep(wave_a, wave_b):
+			var swap_angle := first_angle
+			first_angle = second_angle
+			second_angle = swap_angle
 		var age := float(group.get("effect_age", 0.0))
 		var appear := _smoothstep(age / YY_PLATEAU_TIME)
-		var fade := 1.0 - _smoothstep((age - YY_PLATEAU_TIME) / YY_FADE_TIME) if age > YY_PLATEAU_TIME else 1.0
-		var global_alpha := appear * fade
+		var global_alpha := appear
 		if global_alpha <= 0.0:
 			continue
 		var parent_half_length := 0.88 * minf(_resonance_parent_half_length(first_wave), _resonance_parent_half_length(second_wave))
 		var yellow := ResonanceCatalog.color_spec(4)["color"] as Color
+		# Draw one complete fan for every current geometric intersection. A fan
+		# stays visible for as long as that intersection remains active.
 		for point_value in group["points"]:
 			var point: Vector2 = point_value
 			for line_index in range(YY_LINE_COUNT):
@@ -538,10 +545,14 @@ static func _draw_sector_fans(canvas: CanvasItem, groups: Array) -> void:
 				var ratio := float(line_index) / float(YY_LINE_COUNT - 1)
 				var angle := lerp_angle(first_angle, second_angle, ratio)
 				var direction := Vector2.from_angle(angle)
-				var local_alpha := _smoothstep(local_age / YY_LINE_REVEAL_TIME) * fade
+				var local_alpha := _smoothstep(local_age / YY_LINE_REVEAL_TIME)
 				var center_peak := 1.0 + (YY_CENTER_LENGTH_BOOST - 1.0) * (1.0 - absf(2.0 * ratio - 1.0))
 				var half_length := parent_half_length * center_peak * local_alpha
 				canvas.draw_line(point - direction * half_length, point + direction * half_length, Color(yellow.lightened(0.24), 0.92 * global_alpha), 2.4, true)
+
+
+static func _yy_reverse_sweep(wave_a: Dictionary, wave_b: Dictionary) -> bool:
+	return (int(wave_a.get("volley_index", 0)) + int(wave_b.get("volley_index", 0))) % 2 != 0
 
 
 static func _resonance_parent_half_length(wave: Dictionary) -> float:
