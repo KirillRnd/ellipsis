@@ -223,13 +223,11 @@ def verify_exact_restorations() -> None:
         "const LISSAJOUS_RATIOS := [Vector2i(2, 1)]",
         "const LISSAJOUS_CYCLE_PERIODS := 2.0",
         "const LISSAJOUS_PRECESSION_PERIODS := 8.0",
-        "const LISSAJOUS_TRAIL_FRACTION := 0.18",
         "const FS_EDGE_RETENTION_PERIODS := 1.0",
         "static func _lissajous_ratio(group: Dictionary)",
         "static func _lissajous_clock(age: float, group: Dictionary)",
         "static func _lissajous_precession(age: float, group: Dictionary)",
         "_lissajous_fast_coordinate(ratio, clock, precession)",
-        "_draw_lissajous_projection_trail",
         "_minimum_spanning_graph_edges(points, groups)",
         "_minimum_spanning_forest",
         "_update_fs_edge_history",
@@ -247,6 +245,7 @@ def verify_exact_restorations() -> None:
     require('resonance_id in ["fs", "gy", "gold_gold"]' in room, "F/S must retain departed MST runners in persistent resonance state")
     fs_projection = renderer.split("static func _draw_lissajous_projection_edge", 1)[1].split("\n\nstatic func ", 1)[0]
     require("draw_line" not in fs_projection, "F/S must render moving points without visible MST segments")
+    require("projection_trail" not in renderer, "F/S runners must not leave a visible trail")
 
     for delaunay_contract in (
         "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",

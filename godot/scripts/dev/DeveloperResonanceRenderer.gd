@@ -16,9 +16,7 @@ const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
 const LISSAJOUS_RATIOS := [Vector2i(2, 1)]
 const LISSAJOUS_CYCLE_PERIODS := 2.0
 const LISSAJOUS_PRECESSION_PERIODS := 8.0
-const LISSAJOUS_TRAIL_FRACTION := 0.18
 const LISSAJOUS_CURVE_SEGMENTS := 192
-const LISSAJOUS_PROJECTION_TRAIL_SAMPLES := 12
 const FS_EDGE_RETENTION_PERIODS := 1.0
 const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
@@ -183,7 +181,6 @@ static func _draw_lissajous_projection_edge(canvas: CanvasItem, edge: Dictionary
 	var coordinate := _lissajous_fast_coordinate(ratio, clock, precession)
 	var half_length := distance * 0.5 * reveal
 	var color := ResonanceCatalog.resonance_color(0, 1)
-	_draw_lissajous_projection_trail(canvas, center, axis, half_length, ratio, clock, precession, reveal, Color(color, color.a * alpha))
 	var runner := center + axis * half_length * coordinate
 	canvas.draw_circle(runner, 7.5, Color(color.lightened(0.25), 0.24 * alpha))
 	canvas.draw_circle(runner, 4.5, Color(INK, INK.a * alpha))
@@ -412,16 +409,6 @@ static func _lissajous_curve(center: Vector2, axis: Vector2, perpendicular: Vect
 		var t := TAU * float(index) / float(LISSAJOUS_CURVE_SEGMENTS)
 		curve.append(_lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, t, precession))
 	return curve
-
-
-static func _draw_lissajous_projection_trail(canvas: CanvasItem, center: Vector2, axis: Vector2, half_length: float, ratio: Vector2i, clock: float, precession: float, reveal: float, color: Color) -> void:
-	var span := TAU * minf(reveal, LISSAJOUS_TRAIL_FRACTION)
-	for sample in range(1, LISSAJOUS_PROJECTION_TRAIL_SAMPLES + 1):
-		var progress := float(sample) / float(LISSAJOUS_PROJECTION_TRAIL_SAMPLES)
-		var history_clock := clock - span + span * progress
-		var coordinate := _lissajous_fast_coordinate(ratio, history_clock, precession)
-		var alpha := color.a * (0.06 + 0.34 * progress * progress)
-		canvas.draw_circle(center + axis * half_length * coordinate, 1.4 + 1.5 * progress, Color(color.lightened(0.18), alpha))
 
 
 static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
