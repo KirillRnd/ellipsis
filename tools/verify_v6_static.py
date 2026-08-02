@@ -224,6 +224,7 @@ def verify_exact_restorations() -> None:
         "const LISSAJOUS_CYCLE_PERIODS := 2.0",
         "const LISSAJOUS_PRECESSION_PERIODS := 8.0",
         "const LISSAJOUS_TRAIL_FRACTION := 0.18",
+        "const FS_EDGE_RETENTION_PERIODS := 2.0",
         "static func _lissajous_ratio(group: Dictionary)",
         "static func _lissajous_clock(age: float, group: Dictionary)",
         "static func _lissajous_precession(age: float, group: Dictionary)",
@@ -231,6 +232,8 @@ def verify_exact_restorations() -> None:
         "_draw_lissajous_projection_trail",
         "_minimum_spanning_graph_edges(points, groups)",
         "_minimum_spanning_forest",
+        "_update_fs_edge_history",
+        "_draw_persistent_lissajous_projections",
     ):
         require(lissajous_contract in renderer, f"Missing enhanced F/F and F/S Lissajous contract: {lissajous_contract}")
     require("phase * 1.9" not in renderer and "phase * 2.6" not in renderer, "F/F and F/S must not use unrelated animation clocks")
@@ -240,6 +243,10 @@ def verify_exact_restorations() -> None:
     require("Lissajous mode and phase are stable under source ordering" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock stable Lissajous pair identity")
     require("F/F and F/S minimum spanning tree connects each cloud without cyclic resonance edges" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the acyclic F/F and F/S minimum spanning trees")
     require("F/F and F/S Kruskal selection prefers shorter Delaunay edges" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock minimum-weight F/F and F/S edge selection")
+    require("departed F/S MST runners fade for exactly two cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock F/S runner persistence")
+    require('resonance_id in ["fs", "gy", "gold_gold"]' in room, "F/S must retain departed MST runners in persistent resonance state")
+    fs_projection = renderer.split("static func _draw_lissajous_projection_edge", 1)[1].split("\n\nstatic func ", 1)[0]
+    require("draw_line" not in fs_projection, "F/S must render moving points without visible MST segments")
 
     for delaunay_contract in (
         "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",

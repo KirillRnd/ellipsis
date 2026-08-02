@@ -19,6 +19,7 @@ const LISSAJOUS_PRECESSION_PERIODS := 8.0
 const LISSAJOUS_TRAIL_FRACTION := 0.18
 const LISSAJOUS_CURVE_SEGMENTS := 192
 const LISSAJOUS_PROJECTION_TRAIL_SAMPLES := 12
+const FS_EDGE_RETENTION_PERIODS := 2.0
 const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
@@ -78,6 +79,8 @@ static func draw_mixed(canvas: CanvasItem, resonance_id: String, groups: Array, 
 
 static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, state: Dictionary, arena: Rect2, simulation_age: float) -> void:
 	match resonance_id:
+		"fs":
+			_draw_persistent_lissajous_projections(canvas, state, simulation_age)
 		"gy":
 			_render_rhombic_grid(canvas, state, arena, simulation_age)
 		"gold_gold":
@@ -150,33 +153,74 @@ static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vecto
 
 static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	var points := _unique_points(groups)
-	for edge in _minimum_spanning_graph_edges(points, groups):
-		var first: Vector2 = edge["first"]
-		var second: Vector2 = edge["second"]
-		var axis := second - first
-		var distance := axis.length()
-		if distance < 2.0:
+	var current_edges := _minimum_spanning_graph_edges(points, groups)
+	var state: Dictionary = {}
+	if not groups.is_empty():
+		state = groups[0].get("global_state", {}) as Dictionary
+	if state.is_empty():
+		for edge in current_edges:
+			_draw_lissajous_projection_edge(canvas, edge, float(edge["age"]), 1.0)
+		return
+	var simulation_age := float(groups[0].get("simulation_age", 0.0))
+	_update_fs_edge_history(state, current_edges, simulation_age)
+	_draw_persistent_lissajous_projections(canvas, state, simulation_age)
+
+
+static func _draw_lissajous_projection_edge(canvas: CanvasItem, edge: Dictionary, age: float, alpha: float) -> void:
+	var first: Vector2 = edge["first"]
+	var second: Vector2 = edge["second"]
+	var axis := second - first
+	var distance := axis.length()
+	if distance < 2.0 or alpha <= 0.0:
+		return
+	axis /= distance
+	var center := (first + second) * 0.5
+	var seed := int(edge["seed"])
+	var ratio := _lissajous_ratio_from_seed(seed)
+	var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
+	var clock := _lissajous_clock_from_seed(age, seed)
+	var precession := _lissajous_precession_from_seed(age, seed)
+	var coordinate := _lissajous_fast_coordinate(ratio, clock, precession)
+	var half_length := distance * 0.5 * reveal
+	var color := ResonanceCatalog.resonance_color(0, 1)
+	_draw_lissajous_projection_trail(canvas, center, axis, half_length, ratio, clock, precession, reveal, Color(color, color.a * alpha))
+	var runner := center + axis * half_length * coordinate
+	canvas.draw_circle(runner, 7.5, Color(color.lightened(0.25), 0.24 * alpha))
+	canvas.draw_circle(runner, 4.5, Color(INK, INK.a * alpha))
+
+
+static func _update_fs_edge_history(state: Dictionary, current_edges: Array[Dictionary], simulation_age: float) -> void:
+	var history := state.get("fs_edges", {}) as Dictionary
+	for edge in current_edges:
+		var key := String(edge["key"])
+		var stored := history.get(key, {}) as Dictionary
+		if stored.is_empty():
+			stored["birth_time"] = simulation_age - float(edge["age"])
+		stored["first"] = edge["first"]
+		stored["second"] = edge["second"]
+		stored["seed"] = edge["seed"]
+		stored["last_seen"] = simulation_age
+		history[key] = stored
+	state["fs_edges"] = history
+
+
+static func _draw_persistent_lissajous_projections(canvas: CanvasItem, state: Dictionary, simulation_age: float) -> void:
+	var history := state.get("fs_edges", {}) as Dictionary
+	for key in history.keys():
+		var edge := history[key] as Dictionary
+		var time_since_seen := maxf(0.0, simulation_age - float(edge["last_seen"]))
+		var alpha := _fs_history_alpha(time_since_seen)
+		if alpha <= 0.0:
+			history.erase(key)
 			continue
-		axis /= distance
-		var center := (first + second) * 0.5
-		var seed := int(edge["seed"])
-		var ratio := _lissajous_ratio_from_seed(seed)
-		var age := float(edge["age"])
-		var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
-		var clock := _lissajous_clock_from_seed(age, seed)
-		var precession := _lissajous_precession_from_seed(age, seed)
-		var coordinate := _lissajous_fast_coordinate(ratio, clock, precession)
-		var half_length := distance * 0.5 * reveal
-		var color := ResonanceCatalog.resonance_color(0, 1)
-		var center_pulse := pow(1.0 - absf(coordinate), 4.0)
-		canvas.draw_line(center - axis * half_length, center + axis * half_length, Color(color, 0.20 + 0.16 * center_pulse), 9.0, true)
-		canvas.draw_line(center - axis * half_length, center + axis * half_length, Color(color, 0.78 + 0.14 * center_pulse), 2.3 + 0.8 * center_pulse, true)
-		_draw_lissajous_projection_trail(canvas, center, axis, half_length, ratio, clock, precession, reveal, color)
-		var runner := center + axis * half_length * coordinate
-		canvas.draw_circle(runner, 7.5, Color(color.lightened(0.25), 0.24))
-		canvas.draw_circle(runner, 4.5, INK)
-		canvas.draw_circle(first, 3.0, Color(INK, 0.76))
-		canvas.draw_circle(second, 3.0, Color(INK, 0.76))
+		var age := maxf(0.0, simulation_age - float(edge["birth_time"]))
+		_draw_lissajous_projection_edge(canvas, edge, age, alpha)
+	state["fs_edges"] = history
+
+
+static func _fs_history_alpha(time_since_seen: float) -> float:
+	var retention := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * FS_EDGE_RETENTION_PERIODS
+	return 1.0 - _smoothstep(time_since_seen / retention)
 
 
 static func _minimum_spanning_graph_edges(points: Array[Vector2], groups: Array) -> Array[Dictionary]:
@@ -265,12 +309,33 @@ static func _disjoint_set_root(parents: Array[int], index: int) -> int:
 static func _make_proximity_edge(first: Vector2, second: Vector2, point_ages: Dictionary, groups: Array) -> Dictionary:
 	var first_seed := _point_lissajous_seed(first, groups)
 	var second_seed := _point_lissajous_seed(second, groups)
+	var identities := [_point_resonance_identity(first, groups), _point_resonance_identity(second, groups)]
+	identities.sort()
 	return {
 		"first": first,
 		"second": second,
 		"age": minf(float(point_ages.get(first, 0.0)), float(point_ages.get(second, 0.0))),
 		"seed": mini(first_seed, second_seed) * 97 + maxi(first_seed, second_seed) * 53,
+		"key": "%s|%s" % [identities[0], identities[1]],
 	}
+
+
+static func _point_resonance_identity(point: Vector2, groups: Array) -> String:
+	var identity := ""
+	for group in groups:
+		for point_value in group["points"]:
+			if point.distance_squared_to(Vector2(point_value)) >= 16.0:
+				continue
+			var first: Dictionary = group["first"]
+			var second: Dictionary = group["second"]
+			var origin_first := Vector2(first["origin"])
+			var origin_second := Vector2(second["origin"])
+			var side := 1 if (origin_second - origin_first).cross(point - (origin_first + origin_second) * 0.5) >= 0.0 else 0
+			var resonance_key := String(group.get("resonance_key", "%d:%d" % [int(first.get("id", 0)), int(second.get("id", 0))]))
+			var candidate := "%s:%d" % [resonance_key, side]
+			if identity.is_empty() or candidate.naturalnocasecmp_to(identity) < 0:
+				identity = candidate
+	return identity
 
 
 static func _point_lissajous_seed(point: Vector2, groups: Array) -> int:
@@ -355,7 +420,7 @@ static func _draw_lissajous_projection_trail(canvas: CanvasItem, center: Vector2
 		var progress := float(sample) / float(LISSAJOUS_PROJECTION_TRAIL_SAMPLES)
 		var history_clock := clock - span + span * progress
 		var coordinate := _lissajous_fast_coordinate(ratio, history_clock, precession)
-		var alpha := 0.06 + 0.34 * progress * progress
+		var alpha := color.a * (0.06 + 0.34 * progress * progress)
 		canvas.draw_circle(center + axis * half_length * coordinate, 1.4 + 1.5 * progress, Color(color.lightened(0.18), alpha))
 
 

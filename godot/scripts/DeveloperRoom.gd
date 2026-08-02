@@ -211,7 +211,7 @@ func _draw_resonances() -> void:
 	var drawn_global_resonances := {}
 	for resonance_id in groups_by_type:
 		var groups: Array = groups_by_type[resonance_id]
-		if resonance_id in ["gy", "gold_gold"]:
+		if resonance_id in ["fs", "gy", "gold_gold"]:
 			var global_state := _global_resonance_states.get(resonance_id, {}) as Dictionary
 			if global_state.is_empty():
 				global_state = {
@@ -224,6 +224,7 @@ func _draw_resonances() -> void:
 					"pair_local_positions": {},
 					"pair_sample_counts": {},
 					"scheduled_pairs": {},
+					"fs_edges": {},
 				}
 				_global_resonance_states[resonance_id] = global_state
 			for group in groups:
