@@ -87,7 +87,7 @@ static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, sta
 
 static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	var points := _unique_points(groups)
-	for edge in _proximity_graph_edges(points, groups, "rng"):
+	for edge in _proximity_graph_edges(points, groups, "mst"):
 		var first: Vector2 = edge["first"]
 		var second: Vector2 = edge["second"]
 		var center := (first + second) * 0.5
@@ -231,11 +231,53 @@ static func _proximity_graph_edges(points: Array[Vector2], groups: Array, graph_
 			var first := cluster[edge.x]
 			var second := cluster[edge.y]
 			var tolerance := maxf(1.0, local_step * DELAUNAY_COCIRCULAR_TOLERANCE)
-			var accepted := _is_relative_neighborhood_edge(first, second, cluster, tolerance) if graph_kind == "rng" else _is_gabriel_edge(first, second, cluster, tolerance)
+			var accepted := true
+			if graph_kind == "rng":
+				accepted = _is_relative_neighborhood_edge(first, second, cluster, tolerance)
+			elif graph_kind == "gabriel":
+				accepted = _is_gabriel_edge(first, second, cluster, tolerance)
 			if not accepted:
 				continue
 			result.append(_make_proximity_edge(first, second, point_ages, groups))
+	if graph_kind == "mst":
+		return _minimum_spanning_forest(result, points)
 	return result
+
+
+static func _minimum_spanning_forest(edges: Array[Dictionary], points: Array[Vector2]) -> Array[Dictionary]:
+	var sorted_edges := edges.duplicate()
+	sorted_edges.sort_custom(func(first: Dictionary, second: Dictionary) -> bool:
+		return Vector2(first["first"]).distance_squared_to(Vector2(first["second"])) < Vector2(second["first"]).distance_squared_to(Vector2(second["second"]))
+	)
+	var point_indices := {}
+	var parents: Array[int] = []
+	for index in range(points.size()):
+		point_indices[points[index]] = index
+		parents.append(index)
+	var result: Array[Dictionary] = []
+	for edge in sorted_edges:
+		var first_index := int(point_indices.get(Vector2(edge["first"]), -1))
+		var second_index := int(point_indices.get(Vector2(edge["second"]), -1))
+		if first_index < 0 or second_index < 0:
+			continue
+		var first_root := _disjoint_set_root(parents, first_index)
+		var second_root := _disjoint_set_root(parents, second_index)
+		if first_root == second_root:
+			continue
+		parents[second_root] = first_root
+		result.append(edge)
+	return result
+
+
+static func _disjoint_set_root(parents: Array[int], index: int) -> int:
+	var root := index
+	while parents[root] != root:
+		root = parents[root]
+	while parents[index] != index:
+		var parent := parents[index]
+		parents[index] = root
+		index = parent
+	return root
 
 
 static func _make_proximity_edge(first: Vector2, second: Vector2, point_ages: Dictionary, groups: Array) -> Dictionary:

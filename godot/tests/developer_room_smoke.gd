@@ -140,6 +140,23 @@ func _run() -> void:
 	_expect(DeveloperResonanceRenderer._is_gabriel_edge(proximity_first, proximity_second, lune_points), "F/S Gabriel graph keeps an edge whose open diametral disk is empty")
 	_expect(not DeveloperResonanceRenderer._is_relative_neighborhood_edge(proximity_first, proximity_second, lune_points), "F/F relative-neighborhood graph is the stricter pairwise stage before F/S")
 	_expect(not DeveloperResonanceRenderer._is_gabriel_edge(proximity_first, proximity_second, diameter_points), "F/S Gabriel graph rejects an edge containing another active node in its diametral disk")
+	var mst_points: Array[Vector2] = [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]
+	var mst_candidates: Array[Dictionary] = [
+		{"first": Vector2.ZERO, "second": Vector2.RIGHT},
+		{"first": Vector2.RIGHT, "second": Vector2.ONE},
+		{"first": Vector2.ONE, "second": Vector2.DOWN},
+		{"first": Vector2.DOWN, "second": Vector2.ZERO},
+		{"first": Vector2.ZERO, "second": Vector2.ONE},
+	]
+	var mst_edges := DeveloperResonanceRenderer._minimum_spanning_forest(mst_candidates, mst_points)
+	_expect(mst_edges.size() == mst_points.size() - 1, "F/F minimum spanning tree connects each cloud without cyclic Lissajous edges")
+	var mst_uses_diagonal := false
+	for edge in mst_edges:
+		var first: Vector2 = edge["first"]
+		var second: Vector2 = edge["second"]
+		if (first == Vector2.ZERO and second == Vector2.ONE) or (first == Vector2.ONE and second == Vector2.ZERO):
+			mst_uses_diagonal = true
+	_expect(not mst_uses_diagonal, "F/F Kruskal selection prefers shorter Delaunay edges")
 	var delaunay_groups := [{"first": {"origin": Vector2(-10.0, 0.0)}, "second": {"origin": Vector2(10.0, 0.0)}}]
 	var delaunay_points: Array[Vector2] = [Vector2(-4.0, -4.0), Vector2(0.0, -6.0), Vector2(4.0, -4.0), Vector2(-4.0, 4.0), Vector2(0.0, 6.0), Vector2(4.0, 4.0)]
 	var delaunay_clouds := DeveloperResonanceRenderer._split_intersection_clouds(delaunay_points, delaunay_groups)
