@@ -13,6 +13,13 @@ const YY_CYCLE_TIME := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * YY_CYCL
 const YY_FADE_TIME := YY_CYCLE_TIME - YY_PLATEAU_TIME
 const YY_CENTER_LENGTH_BOOST := 1.18
 const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
+const LISSAJOUS_RATIOS := [Vector2i(2, 1), Vector2i(2, 1), Vector2i(3, 2), Vector2i(4, 3)]
+const LISSAJOUS_PRECESSION_PERIODS := 8.0
+const LISSAJOUS_TRAIL_FRACTION := 0.18
+const LISSAJOUS_CURVE_SEGMENTS := 192
+const LISSAJOUS_TRAIL_SEGMENTS := 48
+const LISSAJOUS_TRAIL_CHUNKS := 8
+const LISSAJOUS_PROJECTION_TRAIL_SAMPLES := 12
 const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
@@ -78,7 +85,7 @@ static func draw_persistent_global(canvas: CanvasItem, resonance_id: String, sta
 			_render_penrose_grid(canvas, state, arena, simulation_age)
 
 
-static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: float) -> void:
+static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	for group in groups:
 		var points: Array = group["points"]
 		if points.size() < 2:
@@ -92,16 +99,25 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: flo
 			continue
 		axis /= distance
 		var perpendicular := Vector2(-axis.y, axis.x)
-		var curve := PackedVector2Array()
-		for index in range(97):
-			var t := TAU * float(index) / 96.0
-			curve.append(center + axis * sin(t) * distance * 0.5 + perpendicular * sin(2.0 * t) * minf(42.0, distance * 0.28))
+		var longitudinal := minf(42.0, distance * 0.28)
+		var transverse := distance * 0.5
+		var ratio := _lissajous_ratio(group)
+		var age := float(group.get("effect_age", 0.0))
+		var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
+		var clock := _lissajous_clock(age, group)
+		var precession := _lissajous_precession(age, group)
 		var color := ResonanceCatalog.resonance_color(0, 0)
-		canvas.draw_polyline(curve, Color(color, 0.24), 8.0, true)
-		canvas.draw_polyline(curve, Color(color, 0.92), 2.4, true)
-		var runner_t := fmod(phase * 1.9, TAU)
-		var runner := center + axis * sin(runner_t) * distance * 0.5 + perpendicular * sin(2.0 * runner_t) * minf(42.0, distance * 0.28)
+		if reveal >= 1.0:
+			var curve := _lissajous_curve(center, axis, perpendicular, longitudinal, transverse, ratio, precession)
+			canvas.draw_polyline(curve, Color(color, 0.20), 8.0, true)
+			canvas.draw_polyline(curve, Color(color, 0.62), 1.8, true)
+		var trail_span := TAU * reveal if reveal < 1.0 else TAU * LISSAJOUS_TRAIL_FRACTION
+		_draw_lissajous_trail(canvas, center, axis, perpendicular, longitudinal, transverse, ratio, precession, clock, trail_span, color)
+		var runner := _lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, clock, precession)
+		canvas.draw_circle(runner, 7.0, Color(color.lightened(0.25), 0.24))
 		canvas.draw_circle(runner, 4.0, INK)
+		canvas.draw_circle(first, 3.2, Color(INK, 0.82))
+		canvas.draw_circle(second, 3.2, Color(INK, 0.82))
 
 
 static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
@@ -141,18 +157,107 @@ static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vecto
 		canvas.draw_circle(point, 3.2, INK)
 
 
-static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, phase: float) -> void:
+static func _draw_lissajous_projections(canvas: CanvasItem, groups: Array, _phase: float) -> void:
 	for group in groups:
 		var points: Array = group["points"]
 		if points.size() < 2:
 			continue
 		var first: Vector2 = points[0]
 		var second: Vector2 = points[1]
+		var axis := second - first
+		var distance := axis.length()
+		if distance < 2.0:
+			continue
+		axis /= distance
+		var center := (first + second) * 0.5
+		var ratio := _lissajous_ratio(group)
+		var age := float(group.get("effect_age", 0.0))
+		var reveal := _smoothstep(age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL)
+		var clock := _lissajous_clock(age, group)
+		var precession := _lissajous_precession(age, group)
+		var coordinate := _lissajous_fast_coordinate(ratio, clock, precession)
+		var half_length := distance * 0.5 * reveal
 		var color := ResonanceCatalog.resonance_color(0, 1)
-		canvas.draw_line(first, second, Color(color, 0.24), 9.0, true)
-		canvas.draw_line(first, second, Color(color, 0.92), 2.3, true)
-		var ratio := 0.5 + 0.5 * sin(phase * 2.6)
-		canvas.draw_circle(first.lerp(second, ratio), 4.5, INK)
+		var center_pulse := pow(1.0 - absf(coordinate), 4.0)
+		canvas.draw_line(center - axis * half_length, center + axis * half_length, Color(color, 0.20 + 0.16 * center_pulse), 9.0, true)
+		canvas.draw_line(center - axis * half_length, center + axis * half_length, Color(color, 0.78 + 0.14 * center_pulse), 2.3 + 0.8 * center_pulse, true)
+		_draw_lissajous_projection_trail(canvas, center, axis, half_length, ratio, clock, precession, reveal, color)
+		var runner := center + axis * half_length * coordinate
+		canvas.draw_circle(runner, 7.5, Color(color.lightened(0.25), 0.24))
+		canvas.draw_circle(runner, 4.5, INK)
+		canvas.draw_circle(first, 3.0, Color(INK, 0.76))
+		canvas.draw_circle(second, 3.0, Color(INK, 0.76))
+
+
+static func _lissajous_seed(group: Dictionary) -> int:
+	var first: Dictionary = group["first"]
+	var second: Dictionary = group["second"]
+	var first_volley := mini(int(first.get("volley_index", 0)), int(second.get("volley_index", 0)))
+	var second_volley := maxi(int(first.get("volley_index", 0)), int(second.get("volley_index", 0)))
+	var first_source := mini(int(first.get("source_id", 0)), int(second.get("source_id", 0)))
+	var second_source := maxi(int(first.get("source_id", 0)), int(second.get("source_id", 0)))
+	return first_volley * 97 + second_volley * 53 + first_source * 29 + second_source * 17
+
+
+static func _lissajous_ratio(group: Dictionary) -> Vector2i:
+	return Vector2i(LISSAJOUS_RATIOS[_lissajous_seed(group) % LISSAJOUS_RATIOS.size()])
+
+
+static func _lissajous_phase_offset(group: Dictionary) -> float:
+	return TAU * float((_lissajous_seed(group) * 73) % 360) / 360.0
+
+
+static func _lissajous_clock(age: float, group: Dictionary) -> float:
+	return TAU * age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL + _lissajous_phase_offset(group)
+
+
+static func _lissajous_precession(age: float, group: Dictionary) -> float:
+	var period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * LISSAJOUS_PRECESSION_PERIODS
+	return TAU * age / period + _lissajous_phase_offset(group) * 0.5
+
+
+static func _lissajous_fast_coordinate(ratio: Vector2i, t: float, precession: float) -> float:
+	return sin(float(ratio.x) * t + precession)
+
+
+static func _lissajous_position(center: Vector2, axis: Vector2, perpendicular: Vector2, longitudinal: float, transverse: float, ratio: Vector2i, t: float, precession: float) -> Vector2:
+	var fast_coordinate := _lissajous_fast_coordinate(ratio, t, precession)
+	var slow_coordinate := sin(float(ratio.y) * t)
+	return center + perpendicular * longitudinal * fast_coordinate + axis * transverse * slow_coordinate
+
+
+static func _lissajous_curve(center: Vector2, axis: Vector2, perpendicular: Vector2, longitudinal: float, transverse: float, ratio: Vector2i, precession: float) -> PackedVector2Array:
+	var curve := PackedVector2Array()
+	for index in range(LISSAJOUS_CURVE_SEGMENTS + 1):
+		var t := TAU * float(index) / float(LISSAJOUS_CURVE_SEGMENTS)
+		curve.append(_lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, t, precession))
+	return curve
+
+
+static func _draw_lissajous_trail(canvas: CanvasItem, center: Vector2, axis: Vector2, perpendicular: Vector2, longitudinal: float, transverse: float, ratio: Vector2i, precession: float, clock: float, span: float, color: Color) -> void:
+	if span <= 0.0:
+		return
+	for chunk in range(LISSAJOUS_TRAIL_CHUNKS):
+		var curve := PackedVector2Array()
+		var first_sample := int(floor(float(chunk) * float(LISSAJOUS_TRAIL_SEGMENTS) / float(LISSAJOUS_TRAIL_CHUNKS)))
+		var last_sample := int(ceil(float(chunk + 1) * float(LISSAJOUS_TRAIL_SEGMENTS) / float(LISSAJOUS_TRAIL_CHUNKS)))
+		for sample in range(first_sample, last_sample + 1):
+			var progress := float(sample) / float(LISSAJOUS_TRAIL_SEGMENTS)
+			var t := clock - span + span * progress
+			curve.append(_lissajous_position(center, axis, perpendicular, longitudinal, transverse, ratio, t, precession))
+		var brightness := float(chunk + 1) / float(LISSAJOUS_TRAIL_CHUNKS)
+		canvas.draw_polyline(curve, Color(color, 0.08 + 0.24 * brightness), 6.0, true)
+		canvas.draw_polyline(curve, Color(color.lightened(0.18), 0.22 + 0.68 * brightness), 1.8 + brightness, true)
+
+
+static func _draw_lissajous_projection_trail(canvas: CanvasItem, center: Vector2, axis: Vector2, half_length: float, ratio: Vector2i, clock: float, precession: float, reveal: float, color: Color) -> void:
+	var span := TAU * minf(reveal, LISSAJOUS_TRAIL_FRACTION)
+	for sample in range(1, LISSAJOUS_PROJECTION_TRAIL_SAMPLES + 1):
+		var progress := float(sample) / float(LISSAJOUS_PROJECTION_TRAIL_SAMPLES)
+		var history_clock := clock - span + span * progress
+		var coordinate := _lissajous_fast_coordinate(ratio, history_clock, precession)
+		var alpha := 0.06 + 0.34 * progress * progress
+		canvas.draw_circle(center + axis * half_length * coordinate, 1.4 + 1.5 * progress, Color(color.lightened(0.18), alpha))
 
 
 static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:

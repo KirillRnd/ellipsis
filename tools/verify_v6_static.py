@@ -219,6 +219,24 @@ def verify_exact_restorations() -> None:
         require(kg_contract in renderer, f"Missing accepted K/G star-spacing contract: {kg_contract}")
     require("final gold-red stars nearly touch across one cascade step" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock K/G final-star spacing")
 
+    for lissajous_contract in (
+        "const LISSAJOUS_RATIOS := [Vector2i(2, 1), Vector2i(2, 1), Vector2i(3, 2), Vector2i(4, 3)]",
+        "const LISSAJOUS_PRECESSION_PERIODS := 8.0",
+        "const LISSAJOUS_TRAIL_FRACTION := 0.18",
+        "_lissajous_ratio(group)",
+        "_lissajous_clock(age, group)",
+        "_lissajous_precession(age, group)",
+        "_lissajous_fast_coordinate(ratio, clock, precession)",
+        "_draw_lissajous_trail",
+        "_draw_lissajous_projection_trail",
+    ):
+        require(lissajous_contract in renderer, f"Missing enhanced F/F and F/S Lissajous contract: {lissajous_contract}")
+    require("phase * 1.9" not in renderer and "phase * 2.6" not in renderer, "F/F and F/S must not use unrelated animation clocks")
+    require("Lissajous runner completes one parameter cycle per cascade period" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock Lissajous cadence")
+    require("Lissajous phase precession completes one turn per eight cascade periods" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock slow Lissajous precession")
+    require("F/S projection uses the fast coordinate of the shared Lissajous oscillator" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock the F/F to F/S projection relationship")
+    require("Lissajous mode and phase are stable under source ordering" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must lock stable Lissajous pair identity")
+
     for delaunay_contract in (
         "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",
         "_draw_guarded_delaunay_edges(canvas, _unique_points(groups), groups",

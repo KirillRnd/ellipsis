@@ -122,6 +122,15 @@ func _run() -> void:
 	_expect(is_equal_approx(DeveloperResonanceRenderer.YY_PARENT_HALF_LENGTH, 0.88 * (24.0 + 92.0 * DeveloperResonanceRenderer.YY_PLATEAU_TIME)), "all yellow fan rows use the accepted bottom-row size")
 	var kg_final_diameter := 2.0 * DeveloperResonanceRenderer.KG_BASE_OUTER_RADIUS * pow(DeveloperResonanceRenderer.GOLDEN_RATIO, 2.0)
 	_expect(is_equal_approx(kg_final_diameter, ResonanceCatalog.GAME_CASCADE_SPACING * DeveloperResonanceRenderer.KG_FINAL_DIAMETER_TO_CASCADE_SPACING), "final gold-red stars nearly touch across one cascade step")
+	_expect(DeveloperResonanceRenderer.LISSAJOUS_RATIOS == [Vector2i(2, 1), Vector2i(2, 1), Vector2i(3, 2), Vector2i(4, 3)], "Lissajous resonances use the accepted frequency family with a dominant 2-to-1 mode")
+	var lissajous_group := {"first": {"volley_index": 2, "source_id": 1}, "second": {"volley_index": 5, "source_id": 2}}
+	var reversed_lissajous_group := {"first": lissajous_group["second"], "second": lissajous_group["first"]}
+	_expect(DeveloperResonanceRenderer._lissajous_ratio(lissajous_group) == DeveloperResonanceRenderer._lissajous_ratio(reversed_lissajous_group) and is_equal_approx(DeveloperResonanceRenderer._lissajous_phase_offset(lissajous_group), DeveloperResonanceRenderer._lissajous_phase_offset(reversed_lissajous_group)), "Lissajous mode and phase are stable under source ordering")
+	var lissajous_period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
+	_expect(is_equal_approx(DeveloperResonanceRenderer._lissajous_clock(lissajous_period, lissajous_group) - DeveloperResonanceRenderer._lissajous_clock(0.0, lissajous_group), TAU), "Lissajous runner completes one parameter cycle per cascade period")
+	_expect(is_equal_approx(DeveloperResonanceRenderer._lissajous_precession(lissajous_period * 8.0, lissajous_group) - DeveloperResonanceRenderer._lissajous_precession(0.0, lissajous_group), TAU), "Lissajous phase precession completes one turn per eight cascade periods")
+	_expect(is_equal_approx(DeveloperResonanceRenderer._lissajous_fast_coordinate(Vector2i(2, 1), PI * 0.25, 0.0), 1.0), "F/S projection uses the fast coordinate of the shared Lissajous oscillator")
+	_expect(DeveloperResonanceRenderer._lissajous_position(Vector2.ZERO, Vector2.RIGHT, Vector2.DOWN, 4.0, 10.0, Vector2i(2, 1), PI * 0.5, 0.0).is_equal_approx(Vector2(10.0, 0.0)), "base 2-to-1 Lissajous geometry retains its node-aligned slow extremum")
 	var delaunay_groups := [{"first": {"origin": Vector2(-10.0, 0.0)}, "second": {"origin": Vector2(10.0, 0.0)}}]
 	var delaunay_points: Array[Vector2] = [Vector2(-4.0, -4.0), Vector2(0.0, -6.0), Vector2(4.0, -4.0), Vector2(-4.0, 4.0), Vector2(0.0, 6.0), Vector2(4.0, 4.0)]
 	var delaunay_clouds := DeveloperResonanceRenderer._split_intersection_clouds(delaunay_points, delaunay_groups)
