@@ -16,7 +16,6 @@ const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
 const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
-const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08
 const GY_TILE_DELAY := 0.05
 const GY_TILE_REVEAL_TIME := 0.13
 const GY_REVEAL_MANHATTAN_RADIUS := 2
@@ -100,8 +99,14 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: flo
 static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
-		var complex_data: Dictionary = stage["complex"]
-		for edge in _stable_real_delaunay_edges(complex_data, cluster.size()):
+		var edge_map := {}
+		for triangle in stage["triangles"]:
+			for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.x, triangle.z)]:
+				if edge.x >= cluster.size() or edge.y >= cluster.size():
+					continue
+				var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
+				edge_map[key] = Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y))
+		for edge in edge_map.values():
 			canvas.draw_line(cluster[edge.x], cluster[edge.y], Color(color, 0.72), 2.0, true)
 	for point in points:
 		canvas.draw_circle(point, 3.2, INK)
@@ -128,9 +133,13 @@ static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vecto
 	var radius_limit := source_distance * 0.55 # accepted limit 2.2 for sources four units apart
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
-		var complex_data: Dictionary = stage["complex"]
-		for circle in _stable_real_delaunay_circles(complex_data, cluster.size()):
-			var radius := float(circle["radius"])
+		for triangle in stage["triangles"]:
+			if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size():
+				continue
+			var circle := _circumcircle(cluster[triangle.x], cluster[triangle.y], cluster[triangle.z])
+			if circle.is_empty():
+				continue
+			var radius := sqrt(float(circle["radius_sq"]))
 			if radius <= radius_limit:
 				canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
 	for point in points:
@@ -423,7 +432,7 @@ static func _guarded_delaunay_stages(points: Array[Vector2], groups: Array) -> A
 		all_points.append_array(_build_guard_ring(cluster, local_step))
 		stages.append({
 			"points": cluster,
-			"complex": _build_delaunay_complex(all_points, local_step),
+			"triangles": _delaunay_triangles(all_points),
 		})
 	return stages
 
@@ -443,112 +452,6 @@ static func _split_intersection_clouds(points: Array[Vector2], groups: Array) ->
 		else:
 			lower.append(point)
 	return [upper, lower]
-
-
-static func _build_delaunay_complex(points: Array[Vector2], local_step: float) -> Dictionary:
-	var triangles: Array[Vector3i] = []
-	var centers: Array[Vector2] = []
-	var radii: Array[float] = []
-	for triangle in _delaunay_triangles(points):
-		var circle := _circumcircle(points[triangle.x], points[triangle.y], points[triangle.z])
-		if circle.is_empty():
-			continue
-		triangles.append(triangle)
-		centers.append(circle["center"])
-		radii.append(sqrt(float(circle["radius_sq"])))
-	var edge_map := {}
-	for triangle_index in range(triangles.size()):
-		var triangle := triangles[triangle_index]
-		for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.z, triangle.x)]:
-			var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
-			if not edge_map.has(key):
-				edge_map[key] = {"edge": Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y)), "triangles": []}
-			var edge_data: Dictionary = edge_map[key]
-			var attached_triangles: Array = edge_data["triangles"]
-			attached_triangles.append(triangle_index)
-			edge_data["triangles"] = attached_triangles
-			edge_map[key] = edge_data
-	var adjacency: Array = []
-	for _index in range(triangles.size()):
-		adjacency.append([])
-	var tolerance := maxf(1.0, local_step * DELAUNAY_COCIRCULAR_TOLERANCE)
-	for edge_data in edge_map.values():
-		var attached: Array = edge_data["triangles"]
-		if attached.size() != 2:
-			continue
-		var first := int(attached[0])
-		var second := int(attached[1])
-		if centers[first].distance_to(centers[second]) <= tolerance and absf(radii[first] - radii[second]) <= tolerance:
-			adjacency[first].append(second)
-			adjacency[second].append(first)
-	var cell_by_triangle: Array[int] = []
-	cell_by_triangle.resize(triangles.size())
-	cell_by_triangle.fill(-1)
-	var cells: Array[Dictionary] = []
-	for seed in range(triangles.size()):
-		if cell_by_triangle[seed] >= 0:
-			continue
-		var cell_index := cells.size()
-		var stack: Array[int] = [seed]
-		var center_sum := Vector2.ZERO
-		var radius_sum := 0.0
-		var count := 0
-		var vertices := {}
-		while not stack.is_empty():
-			var current := stack.pop_back()
-			if cell_by_triangle[current] >= 0:
-				continue
-			cell_by_triangle[current] = cell_index
-			center_sum += centers[current]
-			radius_sum += radii[current]
-			count += 1
-			var triangle := triangles[current]
-			vertices[triangle.x] = true
-			vertices[triangle.y] = true
-			vertices[triangle.z] = true
-			for neighbor in adjacency[current]:
-				if cell_by_triangle[int(neighbor)] < 0:
-					stack.append(int(neighbor))
-		cells.append({
-			"center": center_sum / float(count),
-			"radius": radius_sum / float(count),
-			"vertices": vertices.keys(),
-		})
-	return {
-		"triangles": triangles,
-		"edge_map": edge_map,
-		"cell_by_triangle": cell_by_triangle,
-		"cells": cells,
-	}
-
-
-static func _stable_real_delaunay_edges(complex_data: Dictionary, real_point_count: int) -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
-	var cell_by_triangle: Array = complex_data["cell_by_triangle"]
-	var edge_map: Dictionary = complex_data["edge_map"]
-	for edge_data in edge_map.values():
-		var edge: Vector2i = edge_data["edge"]
-		if edge.x >= real_point_count or edge.y >= real_point_count:
-			continue
-		var attached: Array = edge_data["triangles"]
-		if attached.size() == 2 and cell_by_triangle[int(attached[0])] == cell_by_triangle[int(attached[1])]:
-			continue
-		result.append(edge)
-	return result
-
-
-static func _stable_real_delaunay_circles(complex_data: Dictionary, real_point_count: int) -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	var cells: Array = complex_data["cells"]
-	for cell in cells:
-		var all_real := true
-		for vertex in cell["vertices"]:
-			if int(vertex) >= real_point_count:
-				all_real = false
-				break
-		if all_real:
-			result.append({"center": cell["center"], "radius": cell["radius"]})
-	return result
 
 
 static func _convex_hull(points: Array[Vector2]) -> Array[Vector2]:
@@ -846,30 +749,34 @@ static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], o
 	var guards := _build_guard_ring(cluster, local_step)
 	var all_points: Array[Vector2] = cluster.duplicate()
 	all_points.append_array(guards)
-	var complex_data := _build_delaunay_complex(all_points, local_step)
-	var cells: Array = complex_data["cells"]
-	var cell_by_triangle: Array = complex_data["cell_by_triangle"]
-	var complex_edge_map: Dictionary = complex_data["edge_map"]
-	var connection_map := {}
-	for edge_data in complex_edge_map.values():
-		var attached: Array = edge_data["triangles"]
+	var packed := PackedVector2Array(all_points)
+	var indices := Geometry2D.triangulate_delaunay(packed)
+	var triangles: Array[Vector3i] = []
+	var centers: Array[Vector2] = []
+	for offset in range(0, indices.size(), 3):
+		var triangle := Vector3i(indices[offset], indices[offset + 1], indices[offset + 2])
+		var circle := _circumcircle(all_points[triangle.x], all_points[triangle.y], all_points[triangle.z])
+		if circle.is_empty():
+			continue
+		triangles.append(triangle)
+		centers.append(circle["center"])
+	var edge_map := {}
+	for triangle_index in range(triangles.size()):
+		var triangle := triangles[triangle_index]
+		for edge in [Vector2i(triangle.x, triangle.y), Vector2i(triangle.y, triangle.z), Vector2i(triangle.z, triangle.x)]:
+			var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
+			if not edge_map.has(key):
+				edge_map[key] = []
+			edge_map[key].append({"triangle": triangle_index, "edge": edge})
+	var source_distance := origin_a.distance_to(origin_b)
+	for attached in edge_map.values():
 		if attached.size() != 2:
 			continue
-		var edge: Vector2i = edge_data["edge"]
+		var edge: Vector2i = attached[0]["edge"]
 		if edge.x >= cluster.size() and edge.y >= cluster.size():
 			continue
-		var first_cell := int(cell_by_triangle[int(attached[0])])
-		var second_cell := int(cell_by_triangle[int(attached[1])])
-		if first_cell == second_cell:
-			continue
-		var key := "%d:%d" % [mini(first_cell, second_cell), maxi(first_cell, second_cell)]
-		connection_map[key] = Vector2i(mini(first_cell, second_cell), maxi(first_cell, second_cell))
-	var source_distance := origin_a.distance_to(origin_b)
-	for connection in connection_map.values():
-		var a: Vector2 = cells[connection.x]["center"]
-		var b: Vector2 = cells[connection.y]["center"]
-		if a.distance_squared_to(b) <= 1.0:
-			continue
+		var a: Vector2 = centers[attached[0]["triangle"]]
+		var b: Vector2 = centers[attached[1]["triangle"]]
 		if a.distance_to(b) > 2.9 * local_step:
 			continue
 		var direction := b - a
