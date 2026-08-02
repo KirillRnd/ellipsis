@@ -227,8 +227,8 @@ def verify_exact_restorations() -> None:
         "if int(vertex) >= real_point_count",
         "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",
         "_build_delaunay_complex(all_points, local_step)",
-        "_stable_real_delaunay_edges(stage[\"complex\"], cluster.size())",
-        "_stable_real_delaunay_circles(stage[\"complex\"], cluster.size())",
+        "_stable_real_delaunay_edges(complex_data, cluster.size())",
+        "_stable_real_delaunay_circles(complex_data, cluster.size())",
         "if first_cell == second_cell",
     ):
         require(delaunay_contract in renderer, f"Missing shared S/S and S/G guarded-Delaunay contract: {delaunay_contract}")

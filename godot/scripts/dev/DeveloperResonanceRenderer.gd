@@ -100,7 +100,8 @@ static func _draw_lissajous_groups(canvas: CanvasItem, groups: Array, phase: flo
 static func _draw_guarded_delaunay_edges(canvas: CanvasItem, points: Array[Vector2], groups: Array, color: Color) -> void:
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
-		for edge in _stable_real_delaunay_edges(stage["complex"], cluster.size()):
+		var complex_data: Dictionary = stage["complex"]
+		for edge in _stable_real_delaunay_edges(complex_data, cluster.size()):
 			canvas.draw_line(cluster[edge.x], cluster[edge.y], Color(color, 0.72), 2.0, true)
 	for point in points:
 		canvas.draw_circle(point, 3.2, INK)
@@ -127,7 +128,8 @@ static func _draw_delaunay_circumcircles(canvas: CanvasItem, points: Array[Vecto
 	var radius_limit := source_distance * 0.55 # accepted limit 2.2 for sources four units apart
 	for stage in _guarded_delaunay_stages(points, groups):
 		var cluster: Array[Vector2] = stage["points"]
-		for circle in _stable_real_delaunay_circles(stage["complex"], cluster.size()):
+		var complex_data: Dictionary = stage["complex"]
+		for circle in _stable_real_delaunay_circles(complex_data, cluster.size()):
 			var radius := float(circle["radius"])
 			if radius <= radius_limit:
 				canvas.draw_arc(circle["center"], radius, 0.0, TAU, 72, Color(color, 0.55), 1.6, true)
@@ -461,7 +463,11 @@ static func _build_delaunay_complex(points: Array[Vector2], local_step: float) -
 			var key := "%d:%d" % [mini(edge.x, edge.y), maxi(edge.x, edge.y)]
 			if not edge_map.has(key):
 				edge_map[key] = {"edge": Vector2i(mini(edge.x, edge.y), maxi(edge.x, edge.y)), "triangles": []}
-			edge_map[key]["triangles"].append(triangle_index)
+			var edge_data: Dictionary = edge_map[key]
+			var attached_triangles: Array = edge_data["triangles"]
+			attached_triangles.append(triangle_index)
+			edge_data["triangles"] = attached_triangles
+			edge_map[key] = edge_data
 	var adjacency: Array = []
 	for _index in range(triangles.size()):
 		adjacency.append([])
@@ -516,10 +522,11 @@ static func _build_delaunay_complex(points: Array[Vector2], local_step: float) -
 	}
 
 
-static func _stable_real_delaunay_edges(complex: Dictionary, real_point_count: int) -> Array[Vector2i]:
+static func _stable_real_delaunay_edges(complex_data: Dictionary, real_point_count: int) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
-	var cell_by_triangle: Array = complex["cell_by_triangle"]
-	for edge_data in complex["edge_map"].values():
+	var cell_by_triangle: Array = complex_data["cell_by_triangle"]
+	var edge_map: Dictionary = complex_data["edge_map"]
+	for edge_data in edge_map.values():
 		var edge: Vector2i = edge_data["edge"]
 		if edge.x >= real_point_count or edge.y >= real_point_count:
 			continue
@@ -530,9 +537,10 @@ static func _stable_real_delaunay_edges(complex: Dictionary, real_point_count: i
 	return result
 
 
-static func _stable_real_delaunay_circles(complex: Dictionary, real_point_count: int) -> Array[Dictionary]:
+static func _stable_real_delaunay_circles(complex_data: Dictionary, real_point_count: int) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for cell in complex["cells"]:
+	var cells: Array = complex_data["cells"]
+	for cell in cells:
 		var all_real := true
 		for vertex in cell["vertices"]:
 			if int(vertex) >= real_point_count:
@@ -838,11 +846,12 @@ static func _draw_guarded_cluster(canvas: CanvasItem, cluster: Array[Vector2], o
 	var guards := _build_guard_ring(cluster, local_step)
 	var all_points: Array[Vector2] = cluster.duplicate()
 	all_points.append_array(guards)
-	var complex := _build_delaunay_complex(all_points, local_step)
-	var cells: Array = complex["cells"]
-	var cell_by_triangle: Array = complex["cell_by_triangle"]
+	var complex_data := _build_delaunay_complex(all_points, local_step)
+	var cells: Array = complex_data["cells"]
+	var cell_by_triangle: Array = complex_data["cell_by_triangle"]
+	var complex_edge_map: Dictionary = complex_data["edge_map"]
 	var connection_map := {}
-	for edge_data in complex["edge_map"].values():
+	for edge_data in complex_edge_map.values():
 		var attached: Array = edge_data["triangles"]
 		if attached.size() != 2:
 			continue
