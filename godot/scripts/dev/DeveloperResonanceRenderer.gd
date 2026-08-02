@@ -14,6 +14,7 @@ const YY_FADE_TIME := YY_CYCLE_TIME - YY_PLATEAU_TIME
 const YY_CENTER_LENGTH_BOOST := 1.18
 const YY_PARENT_HALF_LENGTH := 0.88 * (24.0 + 92.0 * YY_PLATEAU_TIME)
 const LISSAJOUS_RATIOS := [Vector2i(2, 1)]
+const LISSAJOUS_CYCLE_PERIODS := 2.0
 const LISSAJOUS_PRECESSION_PERIODS := 8.0
 const LISSAJOUS_TRAIL_FRACTION := 0.18
 const LISSAJOUS_CURVE_SEGMENTS := 192
@@ -326,7 +327,8 @@ static func _lissajous_clock(age: float, group: Dictionary) -> float:
 
 
 static func _lissajous_clock_from_seed(age: float, seed: int) -> float:
-	return TAU * age / ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL + _lissajous_phase_offset_from_seed(seed)
+	var period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL * LISSAJOUS_CYCLE_PERIODS
+	return TAU * age / period + _lissajous_phase_offset_from_seed(seed)
 
 
 static func _lissajous_precession(age: float, group: Dictionary) -> float:
