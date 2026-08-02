@@ -128,6 +128,11 @@ func _run() -> void:
 	_expect(delaunay_clouds.size() == 2 and delaunay_clouds[0].size() == 3 and delaunay_clouds[1].size() == 3, "blue Delaunay stages split intersections into the same upper and lower clouds as red Voronoi")
 	var guarded_stages := DeveloperResonanceRenderer._guarded_delaunay_stages(delaunay_points, delaunay_groups)
 	_expect(guarded_stages.size() == 2, "blue edges and circumcircles share the guarded Delaunay stage")
+	var cyclic_quad: Array[Vector2] = [Vector2(-5.0, -5.0), Vector2(5.0, -5.0), Vector2(5.0, 5.0), Vector2(-5.0, 5.0)]
+	var cyclic_complex := DeveloperResonanceRenderer._build_delaunay_complex(cyclic_quad, 10.0)
+	_expect(cyclic_complex["cells"].size() == 1, "a symmetric cyclic quadrilateral becomes one stable Delaunay cell")
+	_expect(DeveloperResonanceRenderer._stable_real_delaunay_edges(cyclic_complex, 4).size() == 4, "an ambiguous cyclic diagonal is hidden from blue Delaunay edges")
+	_expect(DeveloperResonanceRenderer._stable_real_delaunay_circles(cyclic_complex, 4).size() == 1, "a cyclic Delaunay cell produces only one blue-cyan circumcircle")
 	var unit_tile := PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
 	_expect(DeveloperResonanceRenderer._penrose_tile_center(unit_tile, 2.0, 0.0).is_equal_approx(Vector2.ONE), "Penrose reveal uses transformed global tile centers")
 	var near_penrose_tiles: Dictionary = DeveloperResonanceRenderer.INFINITE_PENROSE.tiles_around(Vector2.ZERO, 3.0)

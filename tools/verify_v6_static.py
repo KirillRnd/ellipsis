@@ -223,11 +223,17 @@ def verify_exact_restorations() -> None:
         "_draw_guarded_delaunay_edges(canvas, _unique_points(groups), groups",
         "_guarded_delaunay_stages(points, groups)",
         "_split_intersection_clouds(points, groups)",
-        "if edge.x >= cluster.size() or edge.y >= cluster.size()",
-        "if triangle.x >= cluster.size() or triangle.y >= cluster.size() or triangle.z >= cluster.size()",
+        "if edge.x >= real_point_count or edge.y >= real_point_count",
+        "if int(vertex) >= real_point_count",
+        "const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08",
+        "_build_delaunay_complex(all_points, local_step)",
+        "_stable_real_delaunay_edges(stage[\"complex\"], cluster.size())",
+        "_stable_real_delaunay_circles(stage[\"complex\"], cluster.size())",
+        "if first_cell == second_cell",
     ):
         require(delaunay_contract in renderer, f"Missing shared S/S and S/G guarded-Delaunay contract: {delaunay_contract}")
     require("blue edges and circumcircles share the guarded Delaunay stage" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover the shared blue Delaunay pipeline")
+    require("a symmetric cyclic quadrilateral becomes one stable Delaunay cell" in (GODOT / "tests" / "developer_room_smoke.gd").read_text(encoding="utf-8"), "Developer smoke test must cover stable cocircular Delaunay cells")
 
     for gy_contract in (
         "const GY_TILE_DELAY := 0.05",
