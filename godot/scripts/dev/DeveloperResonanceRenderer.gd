@@ -17,7 +17,8 @@ const GOLDEN_RATIO := 1.61803398875
 const KG_FINAL_DIAMETER_TO_CASCADE_SPACING := 0.92
 const KG_BASE_OUTER_RADIUS := ResonanceCatalog.GAME_CASCADE_SPACING * KG_FINAL_DIAMETER_TO_CASCADE_SPACING * 0.5 / (GOLDEN_RATIO * GOLDEN_RATIO)
 const DELAUNAY_COCIRCULAR_TOLERANCE := 0.08
-const CYAN_ROSETTE_LAUNCH_FRACTIONS := [0.00, 0.14, 0.30, 0.48]
+const CYAN_ROSETTE_LAYERS := [1, 3]
+const CYAN_ROSETTE_GROWTH_PERIODS := 2
 const CYAN_ROSETTE_INSET := 0.92
 const CYAN_ROSETTE_MIN_RADIUS := 4.0
 const GY_TILE_DELAY := 0.05
@@ -570,8 +571,9 @@ static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> v
 				continue
 			var center: Vector2 = incircle["center"]
 			var age := minf(float(point_ages.get(first, 0.0)), minf(float(point_ages.get(second, 0.0)), float(point_ages.get(third, 0.0))))
-			for layer in range(4):
-				var growth := _cyan_rosette_layer_growth(age, layer)
+			for growth_step in range(CYAN_ROSETTE_GROWTH_PERIODS):
+				var layer := int(CYAN_ROSETTE_LAYERS[growth_step])
+				var growth := _cyan_rosette_layer_growth(age, growth_step)
 				if growth <= 0.0:
 					continue
 				var scale := float(layer + 1) / 4.0
@@ -583,10 +585,9 @@ static func _draw_rosettes(canvas: CanvasItem, groups: Array, phase: float) -> v
 				canvas.draw_polyline(curve, Color(color.lightened(0.08 * layer), 0.58 + 0.10 * layer), 2.0, true)
 
 
-static func _cyan_rosette_layer_growth(age: float, layer: int) -> float:
-	var launch := float(CYAN_ROSETTE_LAUNCH_FRACTIONS[layer]) * ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
-	var duration := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL - launch
-	return _smoothstep((age - launch) / duration)
+static func _cyan_rosette_layer_growth(age: float, growth_step: int) -> float:
+	var period := ResonanceCatalog.GAME_RESONATOR_VOLLEY_INTERVAL
+	return _smoothstep((age - float(growth_step) * period) / period)
 
 
 static func _draw_gielis_leaves(canvas: CanvasItem, groups: Array, phase: float) -> void:
